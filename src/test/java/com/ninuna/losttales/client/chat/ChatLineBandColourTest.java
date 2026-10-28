@@ -51,7 +51,7 @@ public final class ChatLineBandColourTest {
     /**
      * A flash burning out crosses back into the line's own colour rather
      * than fading its band away, so nothing pops when it ends: the open
-     * window's panel and the closed feed's band both wear this.
+     * window's panel and the feed's band both wear this.
      */
     @Test
     public void aFlashBurningOutCrossesBackIntoTheLinesOwnColour() {

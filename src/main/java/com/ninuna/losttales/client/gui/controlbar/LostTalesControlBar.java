@@ -249,13 +249,6 @@ public final class LostTalesControlBar {
                     keyCode, label);
         }
 
-        public static Hint mouseButton(
-                Minecraft minecraft, FontRenderer font,
-                int buttonIndex, String label) {
-            return input(minecraft, font, Type.MOUSE_BUTTON,
-                    -100 + Math.max(0, buttonIndex), label);
-        }
-
         public static Hint wheel(Minecraft minecraft, FontRenderer font,
                                  String label) {
             return input(minecraft, font, Type.MOUSE_WHEEL, 0, label);
@@ -269,31 +262,13 @@ public final class LostTalesControlBar {
             return create(font, parts, label);
         }
 
-        public static Hint keyCluster(
-                Minecraft minecraft, FontRenderer font, int[] keyCodes,
-                String prefix, String label) {
-            ArrayList<Part> parts = new ArrayList<Part>();
-            if (prefix != null && prefix.length() > 0) {
-                parts.add(Part.text(font, prefix, 0, true));
-            }
-            if (keyCodes != null) {
-                for (int index = 0; index < keyCodes.length; index++) {
-                    parts.add(Part.input(minecraft, Type.KEYBOARD,
-                            keyCodes[index], index == 0
-                                    ? INPUT_TEXT_GAP : 1, false));
-                }
-            }
-            return create(font, parts, label);
-        }
-
         public static Hint alternative(
                 Minecraft minecraft, FontRenderer font,
                 KeyBinding binding, int keyCode, String label) {
             ArrayList<Part> parts = new ArrayList<Part>();
             parts.add(Part.binding(minecraft, binding, 0));
-            parts.add(Part.text(font, "/", 2, false));
-            parts.add(Part.input(minecraft, Type.KEYBOARD,
-                    keyCode, 2, false));
+            parts.add(Part.text(font, "/", 2));
+            parts.add(Part.input(minecraft, Type.KEYBOARD, keyCode, 2));
             return create(font, parts, label);
         }
 
@@ -301,7 +276,7 @@ public final class LostTalesControlBar {
                 Minecraft minecraft, FontRenderer font, Type type,
                 int keyCode, String label) {
             ArrayList<Part> parts = new ArrayList<Part>();
-            parts.add(Part.input(minecraft, type, keyCode, 0, false));
+            parts.add(Part.input(minecraft, type, keyCode, 0));
             return create(font, parts, label);
         }
 
@@ -313,9 +288,9 @@ public final class LostTalesControlBar {
         }
 
         int width(boolean withLabel) {
-            int partsWidth = visiblePartsWidth(this.parts, withLabel);
-            return partsWidth + (withLabel && this.labelWidth > 0
-                    ? (partsWidth > 0 ? INPUT_TEXT_GAP : 0)
+            int keys = partsWidth(this.parts);
+            return keys + (withLabel && this.labelWidth > 0
+                    ? (keys > 0 ? INPUT_TEXT_GAP : 0)
                             + this.labelWidth : 0);
         }
 
@@ -324,9 +299,6 @@ public final class LostTalesControlBar {
             int end = x;
             boolean drewPart = false;
             for (Part part : this.parts) {
-                if (part.labelOnly && !withLabel) {
-                    continue;
-                }
                 if (drewPart) {
                     end += part.gapBefore;
                 }
@@ -349,15 +321,11 @@ public final class LostTalesControlBar {
                     LostTalesUiInk.CAP_HEIGHT);
         }
 
-        private static int visiblePartsWidth(
-                List<Part> parts, boolean withLabels) {
+        private static int partsWidth(List<Part> parts) {
             int width = 0;
             boolean visible = false;
             if (parts != null) {
                 for (Part part : parts) {
-                    if (part.labelOnly && !withLabels) {
-                        continue;
-                    }
                     if (visible) {
                         width += part.gapBefore;
                     }
@@ -375,27 +343,23 @@ public final class LostTalesControlBar {
             private final String text;
             private final int width;
             private final int gapBefore;
-            private final boolean labelOnly;
 
             private Part(Type type, int keyCode, KeyBinding binding,
-                         String text, int width, int gapBefore,
-                         boolean labelOnly) {
+                         String text, int width, int gapBefore) {
                 this.type = type;
                 this.keyCode = keyCode;
                 this.binding = binding;
                 this.text = text;
                 this.width = Math.max(0, width);
                 this.gapBefore = Math.max(0, gapBefore);
-                this.labelOnly = labelOnly;
             }
 
             private static Part input(
-                    Minecraft minecraft, Type type, int keyCode,
-                    int gap, boolean labelOnly) {
+                    Minecraft minecraft, Type type, int keyCode, int gap) {
                 return new Part(type, keyCode, null, null,
                         LostTalesInputIconRenderer.measureInput(
                                 minecraft, type, keyCode, INPUT_SCALE),
-                        gap, labelOnly);
+                        gap);
             }
 
             private static Part binding(
@@ -403,16 +367,15 @@ public final class LostTalesControlBar {
                 return new Part(null, 0, binding, null,
                         LostTalesInputIconRenderer.measureKeyBinding(
                                 minecraft, binding, INPUT_SCALE),
-                        gap, false);
+                        gap);
             }
 
             private static Part text(
-                    FontRenderer font, String text, int gap,
-                    boolean labelOnly) {
+                    FontRenderer font, String text, int gap) {
                 String safe = text == null ? "" : text;
                 return new Part(null, 0, null, safe,
                         font == null ? 0 : font.getStringWidth(safe),
-                        gap, labelOnly);
+                        gap);
             }
 
             private int draw(

@@ -38,36 +38,36 @@ import java.util.Set;
  * front, and the conversations waiting for a window; and the Fellowships
  * view's conversations ({@link ViewDefaults}).</li>
  * <li>Each conversation's two choices ({@link ChatLineChoice}):
- * which of its lines chime, and which reach the closed feed.</li>
+ * which of its lines chime, and which reach the feed.</li>
  * <li>The NPC conversations of the session: only the last few stay open
  * by themselves, and the {@code +} opens the others again.</li>
  * <li>Closed channels: a plain channel in no window is gone from every
  * window, its history untouched, restorable into any window, and back
  * with its next message, but for Operator Chat and the consoles, which
- * open only by hand ({@link #opensByItself}). Closing is about tabs
+ * open only by hand ({@link #opensByItself}). Closing is about pages
  * only: a closed channel keeps receiving, keeps its history, its unread
  * counts and its preferences.</li>
- * <li>Whisper tabs, remembered per server.</li>
- * <li>Where the closed feed stands, whether the picker strip is folded,
+ * <li>Whisper pages, remembered per server.</li>
+ * <li>Where the feed stands, whether the picker strip is folded,
  * and each conversation's timestamp area and member list.</li>
  * </ul>
  *
  * <p>All of it is written into the layout file as the chat's part of it.
- * Message history stays in vanilla's chat, per-line tabs and unread
+ * Message history stays in vanilla's chat, per-line pages and unread
  * counts in {@link ClientChatChannelViews}, channel availability in
  * {@link ClientChatChannelState}.</p>
  */
 public final class ChatLayout {
-    /** The tabs the Chat view's window opens with, the first in front. */
-    private static final List<ConversationPage> FIRST_TABS =
+    /** The pages the Chat view's window opens with, the first in front. */
+    private static final List<ConversationPage> FIRST_PAGES =
             Collections.unmodifiableList(Arrays.asList(
                     ConversationPage.of(ChatChannel.GLOBAL),
                     ConversationPage.of(ChatChannel.OOC)));
     /** The two consoles, in the order the Consoles view's window holds them. */
     private static final List<ConversationPage> CONSOLES =
             Collections.unmodifiableList(Arrays.asList(
-                    ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
-                    ConversationPage.of(ChatChannel.SERVER_CONSOLE)));
+                    ConversationPage.of(ChatChannel.CONSOLE),
+                    ConversationPage.of(ChatChannel.SERVER_LOG)));
     /**
      * The channels that never open by themselves, only by hand: staff talk
      * and the consoles, which speak often and are not conversations. They
@@ -76,17 +76,17 @@ public final class ChatLayout {
     private static final List<ConversationPage> OPENED_BY_HAND =
             Collections.unmodifiableList(Arrays.asList(
                     ConversationPage.of(ChatChannel.OPERATOR),
-                    ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
-                    ConversationPage.of(ChatChannel.SERVER_CONSOLE)));
+                    ConversationPage.of(ChatChannel.CONSOLE),
+                    ConversationPage.of(ChatChannel.SERVER_LOG)));
     /**
      * Each conversation's notification choice, where it is not the
      * conversation's default ({@link #defaultNotification}).
      *
      * <p>This and the feed choices below hold row entries. A scoped channel's conversations share the one entry the
-     * row holds, so a choice for the Faction tab is the channel's rather
+     * row holds, so a choice for the Faction page is the channel's rather
      * than whichever faction happened to be on screen. Every accessor
      * normalises through {@link ConversationPage#row}, so a caller holding a
-     * line's own tab asks the same question.</p>
+     * line's own page asks the same question.</p>
      */
     private static final Map<ConversationPage, ChatLineChoice> NOTIFICATIONS =
             new HashMap<ConversationPage, ChatLineChoice>();
@@ -112,7 +112,7 @@ public final class ChatLayout {
      */
     private static final Set<ConversationPage> CLOSED_BY_HAND = new HashSet<ConversationPage>();
     /**
-     * Whisper and fellowship tabs remembered per place, by the session's
+     * Whisper and fellowship pages remembered per place, by the session's
      * server key: where each was open, in order, and which were closed by
      * hand. A conversation belongs to the server it was held on, so
      * arriving elsewhere leaves it in the file for the next visit.
@@ -121,13 +121,13 @@ public final class ChatLayout {
             new LinkedHashMap<String, List<String[]>>();
     private static final Map<String, Set<String>> CLOSED_CONVERSATIONS =
             new LinkedHashMap<String, Set<String>>();
-    /** The place whose whisper and fellowship tabs are on screen; empty before a join. */
+    /** The place whose whisper and fellowship pages are on screen; empty before a join. */
     private static String conversationsPlace = "";
     /**
      * Each conversation's timestamp area and member list, by its id, only
      * where they differ from how they first are.
      */
-    private static final Map<String, Panels> VIEWS = new HashMap<String, Panels>();
+    private static final Map<String, Panels> PANELS_BY_PAGE = new HashMap<String, Panels>();
     /**
      * Conversations that tried to open by themselves while the Chat view
      * had no window: the view's window brings them as it opens. For the
@@ -169,7 +169,7 @@ public final class ChatLayout {
 
     /**
      * Puts the chat into the window layout: the windows a new player
-     * starts with, reading its tabs back from the layout file, and its
+     * starts with, reading its pages back from the layout file, and its
      * part of that file. Called before the file is read.
      */
     public static synchronized void install() {
@@ -268,14 +268,14 @@ public final class ChatLayout {
      * conversation that tried to open while the view had no window.
      */
     private static synchronized List<ConversationPage> chatViewPages() {
-        List<ConversationPage> pages = new ArrayList<ConversationPage>(FIRST_TABS);
+        List<ConversationPage> pages = new ArrayList<ConversationPage>(FIRST_PAGES);
         Iterator<ConversationPage> waiting = WAITING.iterator();
         while (waiting.hasNext()) {
-            ConversationPage tab = waiting.next();
-            if (WindowLayout.isOpen(tab)) {
+            ConversationPage page = waiting.next();
+            if (WindowLayout.isOpen(page)) {
                 waiting.remove();
-            } else if (!pages.contains(tab)) {
-                pages.add(tab);
+            } else if (!pages.contains(page)) {
+                pages.add(page);
             }
         }
         return pages;
@@ -285,10 +285,10 @@ public final class ChatLayout {
     private static List<ConversationPage> fellowshipConversations() {
         List<ConversationPage> conversations = new ArrayList<ConversationPage>();
         for (ChatFellowship fellowship : ClientChatIdentitySelection.fellowships()) {
-            ConversationPage tab = ConversationPage.of(ChatChannel.FELLOWSHIP,
+            ConversationPage page = ConversationPage.of(ChatChannel.FELLOWSHIP,
                     ConversationPage.ownerKeyOf(fellowship.getId()));
-            if (tab != null && tab.isFellowship()) {
-                conversations.add(tab);
+            if (page != null && page.isFellowship()) {
+                conversations.add(page);
             }
         }
         return conversations;
@@ -313,9 +313,9 @@ public final class ChatLayout {
 
     /* ---- Where channels stand ---- */
 
-    /** Whether the tab's row entry is in a window. */
-    public static synchronized boolean isOpen(ConversationPage tab) {
-        return WindowLayout.windowOf(ConversationPage.row(tab)) != null;
+    /** Whether the page's row entry is in a window. */
+    public static synchronized boolean isOpen(ConversationPage page) {
+        return WindowLayout.windowOf(ConversationPage.row(page)) != null;
     }
 
     public static synchronized boolean isOpen(ChatChannel channel) {
@@ -340,8 +340,8 @@ public final class ChatLayout {
      * a whisper, with a player or an NPC, and Only Mentions for every
      * channel, the consoles and Operator included.
      */
-    static ChatLineChoice defaultNotification(ConversationPage tab) {
-        return tab != null && tab.isWhisper()
+    static ChatLineChoice defaultNotification(ConversationPage page) {
+        return page != null && page.isWhisper()
                 ? ChatLineChoice.EVERYTHING : ChatLineChoice.ONLY_MENTIONS;
     }
 
@@ -349,8 +349,8 @@ public final class ChatLayout {
      * The row entry what is opened and closed by hand is kept by: the
      * same for every copy of the conversation.
      */
-    private static ConversationPage sharedRow(ConversationPage tab) {
-        ConversationPage row = ConversationPage.row(tab);
+    private static ConversationPage sharedRow(ConversationPage page) {
+        ConversationPage row = ConversationPage.row(page);
         return row == null ? null : row.conversation();
     }
 
@@ -358,8 +358,8 @@ public final class ChatLayout {
      * The conversation's notification choice, one for all its copies
      * (CHAT-02): its default unless the player chose another in a copy.
      */
-    public static synchronized ChatLineChoice notification(ConversationPage tab) {
-        ConversationPage row = sharedRow(tab);
+    public static synchronized ChatLineChoice notification(ConversationPage page) {
+        ConversationPage row = sharedRow(page);
         ChatLineChoice choice = row == null ? null : NOTIFICATIONS.get(row);
         return choice == null ? defaultNotification(row) : choice;
     }
@@ -369,9 +369,9 @@ public final class ChatLayout {
      * changes: every line still counts unread, the feed still shows what
      * its feed choice lets through, and the history is untouched.
      */
-    public static synchronized void setNotification(ConversationPage tab,
+    public static synchronized void setNotification(ConversationPage page,
                                                     ChatLineChoice choice) {
-        ConversationPage row = sharedRow(tab);
+        ConversationPage row = sharedRow(page);
         if (row == null || choice == null || notification(row) == choice) {
             return;
         }
@@ -384,20 +384,20 @@ public final class ChatLayout {
     }
 
     /** The conversation's feed choice, one for all its copies: Everything unless the player chose another. */
-    public static synchronized ChatLineChoice feedChoice(ConversationPage tab) {
-        ConversationPage row = sharedRow(tab);
+    public static synchronized ChatLineChoice feedChoice(ConversationPage page) {
+        ConversationPage row = sharedRow(page);
         ChatLineChoice choice = row == null ? null : FEED_CHOICES.get(row);
         return choice == null ? ChatLineChoice.EVERYTHING : choice;
     }
 
     /**
-     * Chooses which of the conversation's lines reach the closed feed.
+     * Chooses which of the conversation's lines reach the feed.
      * Nothing else changes: every line still counts unread and chimes as
      * its notification choice says.
      */
-    public static synchronized void setFeedChoice(ConversationPage tab,
+    public static synchronized void setFeedChoice(ConversationPage page,
                                                   ChatLineChoice choice) {
-        ConversationPage row = sharedRow(tab);
+        ConversationPage row = sharedRow(page);
         if (row == null || choice == null || feedChoice(row) == choice) {
             return;
         }
@@ -411,10 +411,10 @@ public final class ChatLayout {
 
     /**
      * Whether the conversation is muted: none of its lines chime. Its
-     * tab writes its name in italics.
+     * page writes its name in italics.
      */
-    public static synchronized boolean isMuted(ConversationPage tab) {
-        return notification(tab) == ChatLineChoice.NOTHING;
+    public static synchronized boolean isMuted(ConversationPage page) {
+        return notification(page) == ChatLineChoice.NOTHING;
     }
 
     /**
@@ -424,8 +424,8 @@ public final class ChatLayout {
      * Only Mentions. The caller leaves out the player's own lines and
      * replayed ones; Do Not Disturb holds the chime still.
      */
-    public static synchronized boolean chimes(ConversationPage tab, boolean addressed) {
-        return tab != null && notification(tab).lets(addressed);
+    public static synchronized boolean chimes(ConversationPage page, boolean addressed) {
+        return page != null && notification(page).lets(addressed);
     }
 
     /**
@@ -515,7 +515,7 @@ public final class ChatLayout {
     static synchronized void forgetCopy(ConversationPage copy) {
         ConversationPage row = ConversationPage.row(copy);
         if (row != null) {
-            VIEWS.remove(row.id());
+            PANELS_BY_PAGE.remove(row.id());
         }
     }
 
@@ -524,20 +524,20 @@ public final class ChatLayout {
      * file's order: by id, NPC conversations left out, since they end
      * with the session.
      */
-    static synchronized List<ConversationPage> notificationTabs() {
-        return writtenTabs(NOTIFICATIONS.keySet());
+    static synchronized List<ConversationPage> notificationPages() {
+        return writtenPages(NOTIFICATIONS.keySet());
     }
 
     /** The conversations whose feed choice is not Everything, in the same order. */
-    static synchronized List<ConversationPage> feedChoiceTabs() {
-        return writtenTabs(FEED_CHOICES.keySet());
+    static synchronized List<ConversationPage> feedChoicePages() {
+        return writtenPages(FEED_CHOICES.keySet());
     }
 
-    private static List<ConversationPage> writtenTabs(Set<ConversationPage> tabs) {
+    private static List<ConversationPage> writtenPages(Set<ConversationPage> pages) {
         List<ConversationPage> result = new ArrayList<ConversationPage>();
-        for (ConversationPage tab : tabs) {
-            if (!tab.isNpc()) {
-                result.add(tab);
+        for (ConversationPage page : pages) {
+            if (!page.isNpc()) {
+                result.add(page);
             }
         }
         Collections.sort(result, new Comparator<ConversationPage>() {
@@ -550,59 +550,59 @@ public final class ChatLayout {
     }
 
     /**
-     * Whether a line arriving may open the tab while it is closed. Operator
+     * Whether a line arriving may open the page while it is closed. Operator
      * Chat and the consoles never do: they open by hand. Nor does a whisper
      * closed by hand, which a live line opens again
      * ({@link #reopenConversation}) and a replay does not.
      */
-    public static synchronized boolean opensByItself(ConversationPage tab) {
-        ConversationPage row = tab == null ? null : sharedRow(tab);
+    public static synchronized boolean opensByItself(ConversationPage page) {
+        ConversationPage row = page == null ? null : sharedRow(page);
         return row != null && !OPENED_BY_HAND.contains(row)
                 && !CLOSED_BY_HAND.contains(row);
     }
 
     /**
-     * The conversations whose every line the closed feed carries, in its
+     * The conversations whose every line the feed carries, in its
      * order, each as the character played reads it, whoever the copies
      * speak as: every channel the player can see whose feed choice lets it through
      * with {@link ChatLineChoice#EVERYTHING}, in presentation order, whether or
-     * not it has a tab — closing a tab hides the tab, not the channel's
+     * not it has a page — closing a page hides the page, not the channel's
      * messages — then every open whisper and fellowship conversation the
-     * same way. Conversations are read from their open tabs only: a closed
+     * same way. Conversations are read from their open pages only: a closed
      * one is hidden until its next message reopens it. Their typing shows
      * in the feed too.
      */
-    public static List<ConversationPage> feedTabs() {
-        return feedTabs(ChatLineChoice.EVERYTHING);
+    public static List<ConversationPage> feedPages() {
+        return feedPages(ChatLineChoice.EVERYTHING);
     }
 
     /**
      * The conversations only whose lines addressed to the player the
-     * closed feed carries, in the same order: those whose feed choice
+     * feed carries, in the same order: those whose feed choice
      * is {@link ChatLineChoice#ONLY_MENTIONS}.
      */
-    public static List<ConversationPage> mentionFeedTabs() {
-        return feedTabs(ChatLineChoice.ONLY_MENTIONS);
+    public static List<ConversationPage> mentionFeedPages() {
+        return feedPages(ChatLineChoice.ONLY_MENTIONS);
     }
 
-    /** What the closed feed shows: see {@link #feedTabs} and {@link #mentionFeedTabs}. */
+    /** What the feed shows: see {@link #feedPages} and {@link #mentionFeedPages}. */
     static ChatLineFilter feedFilter() {
-        return ChatLineFilter.of(feedTabs(), mentionFeedTabs());
+        return ChatLineFilter.of(feedPages(), mentionFeedPages());
     }
 
-    private static List<ConversationPage> feedTabs(ChatLineChoice choice) {
+    private static List<ConversationPage> feedPages(ChatLineChoice choice) {
         Set<ConversationPage> shown = new LinkedHashSet<ConversationPage>();
         for (ChatChannel channel : ChatChannel.presentationOrder()) {
-            ConversationPage tab = ConversationPage.of(channel);
-            if (ClientChatChannelState.isAvailable(tab)) {
-                addToFeed(shown, ConversationPage.playedConversation(tab), choice);
+            ConversationPage page = ConversationPage.of(channel);
+            if (ClientChatChannelState.isAvailable(page)) {
+                addToFeed(shown, ConversationPage.playedConversation(page), choice);
             }
         }
         for (WindowPage each : WindowLayout.order()) {
-            ConversationPage tab = ConversationPage.from(each);
-            if (tab != null && (tab.isWhisper() || tab.isFellowship())
-                    && ClientChatChannelState.isAvailable(tab)) {
-                addToFeed(shown, ConversationPage.playedConversation(tab), choice);
+            ConversationPage page = ConversationPage.from(each);
+            if (page != null && (page.isWhisper() || page.isFellowship())
+                    && ClientChatChannelState.isAvailable(page)) {
+                addToFeed(shown, ConversationPage.playedConversation(page), choice);
             }
         }
         return new ArrayList<ConversationPage>(shown);
@@ -631,29 +631,29 @@ public final class ChatLayout {
     /* ---- Closing and opening ---- */
 
     /**
-     * Removes the tab from its window, as {@link WindowLayout#close}
+     * Removes the page from its window, as {@link WindowLayout#close}
      * does; a whisper closed by hand, its last copy, stays closed through
-     * a replay, and comes back with the next live line. The tab's choices
-     * are untouched: a closed tab keeps them for when it is restored.
+     * a replay, and comes back with the next live line. The page's choices
+     * are untouched: a closed page keeps them for when it is restored.
      */
-    public static synchronized boolean close(ConversationPage tab) {
-        if (!WindowLayout.close(tab)) {
+    public static synchronized boolean close(ConversationPage page) {
+        if (!WindowLayout.close(page)) {
             return false;
         }
-        if (isRemembered(tab) && !isOpen(tab)) {
-            CLOSED_BY_HAND.add(sharedRow(tab));
+        if (isRemembered(page) && !isOpen(page)) {
+            CLOSED_BY_HAND.add(sharedRow(page));
         }
-        if (tab.instance() > 1) {
-            // A copy past the first ends with its tab, its draft with it.
-            ClientChatChannelState.setDraft(tab, "");
+        if (page.instance() > 1) {
+            // A copy past the first ends with its page, its draft with it.
+            ClientChatChannelState.setDraft(page, "");
         }
         return true;
     }
 
     /**
-     * The whisper tab with the named account as one identity of theirs,
+     * The whisper page with the named account as one identity of theirs,
      * empty for the account's own, opened if it is not, as the player asked
-     * for it ({@link #openHere}). The front tab is left alone. The tab is
+     * for it ({@link #openHere}). The front page is left alone. The page is
      * the person's row entry: which conversation it shows follows the
      * identity the chat is read as, which is who speaks in it.
      */
@@ -663,18 +663,18 @@ public final class ChatLayout {
     }
 
     /**
-     * Opens a conversation's tab where it belongs
+     * Opens a conversation's page where it belongs
      * ({@link WindowLayout#openTab}): the window asked for, else another
      * of the Chat view, never a locked one, else a window of its own; and
      * answers it as the layout holds it. The row holds one entry per
      * channel and per person, so a conversation held as one character
-     * opens as its row entry: a line's own tab never stands in a window
+     * opens as its row entry: a line's own page never stands in a window
      * beside the one that shows it. Null while the Chat view has no
-     * window: the tab waits for the view to open.
+     * window: the page waits for the view to open.
      */
-    public static synchronized ConversationPage openTab(ConversationPage tab,
+    public static synchronized ConversationPage openTab(ConversationPage page,
                                                String preferredWindowId) {
-        ConversationPage row = ConversationPage.row(tab);
+        ConversationPage row = ConversationPage.row(page);
         int windows = WindowLayout.windows().size();
         ConversationPage opened = ConversationPage.from(WindowLayout.openTab(row,
                 preferredWindowId));
@@ -705,17 +705,17 @@ public final class ChatLayout {
             return front;
         }
         for (WindowPage each : window.getTabs()) {
-            ConversationPage tab = ConversationPage.from(each);
-            if (waits(tab)) {
-                return tab;
+            ConversationPage page = ConversationPage.from(each);
+            if (waits(page)) {
+                return page;
             }
         }
         return null;
     }
 
-    private static boolean waits(ConversationPage tab) {
-        return ClientChatChannelState.isSelectable(tab)
-                && ClientChatChannelViews.hasUnread(tab);
+    private static boolean waits(ConversationPage page) {
+        return ClientChatChannelState.isSelectable(page)
+                && ClientChatChannelViews.hasUnread(page);
     }
 
     /**
@@ -736,21 +736,21 @@ public final class ChatLayout {
      * jump to a line — where a page opened by hand opens: in the view the
      * screen shows ({@link WindowLayout#openByHand}).
      */
-    public static synchronized ConversationPage openHere(ConversationPage tab,
+    public static synchronized ConversationPage openHere(ConversationPage page,
                                                 String preferredWindowId) {
         return ConversationPage.from(WindowLayout.openByHand(
-                ConversationPage.row(tab), preferredWindowId));
+                ConversationPage.row(page), preferredWindowId));
     }
 
-    /* ---- Whisper and fellowship tabs per place ---- */
+    /* ---- Whisper and fellowship pages per place ---- */
 
-    /** Whether a tab is a conversation the layout remembers per place: a player's whisper or a fellowship's. */
-    private static boolean isRemembered(ConversationPage tab) {
-        return tab != null && tab.isPlaceConversation();
+    /** Whether a page is a conversation the layout remembers per place: a player's whisper or a fellowship's. */
+    private static boolean isRemembered(ConversationPage page) {
+        return page != null && page.isPlaceConversation();
     }
 
     /**
-     * Writes a place's whisper and fellowship tabs into the remembered set: the open
+     * Writes a place's whisper and fellowship pages into the remembered set: the open
      * ones with their windows, in order, and the ones closed by hand.
      */
     static synchronized void rememberConversations(String serverKey) {
@@ -760,15 +760,15 @@ public final class ChatLayout {
         List<String[]> open = new ArrayList<String[]>();
         for (Window window : WindowLayout.windows()) {
             for (WindowPage each : window.getTabs()) {
-                ConversationPage tab = ConversationPage.from(each);
-                if (isRemembered(tab)) {
-                    open.add(new String[] {window.getId(), tab.id()});
+                ConversationPage page = ConversationPage.from(each);
+                if (isRemembered(page)) {
+                    open.add(new String[] {window.getId(), page.id()});
                 }
             }
         }
         Set<String> closed = new LinkedHashSet<String>();
-        for (ConversationPage tab : CLOSED_BY_HAND) {
-            closed.add(tab.id());
+        for (ConversationPage page : CLOSED_BY_HAND) {
+            closed.add(page.id());
         }
         CONVERSATIONS.put(serverKey, open);
         CLOSED_CONVERSATIONS.put(serverKey, closed);
@@ -776,10 +776,10 @@ public final class ChatLayout {
     }
 
     /**
-     * Opens the place's remembered whisper and fellowship tabs where they were, and
+     * Opens the place's remembered whisper and fellowship pages where they were, and
      * marks the ones closed by hand so a replay does not bring them
      * back. Called as the client connects, before anything is replayed;
-     * a tab already open is left as it is.
+     * a page already open is left as it is.
      */
     public static synchronized void restoreConversations(String serverKey) {
         conversationsPlace = serverKey == null ? "" : serverKey;
@@ -789,19 +789,19 @@ public final class ChatLayout {
         Set<String> closed = CLOSED_CONVERSATIONS.get(conversationsPlace);
         if (closed != null) {
             for (String id : closed) {
-                ConversationPage tab = ConversationPage.fromId(id);
-                if (isRemembered(tab)) {
-                    CLOSED_BY_HAND.add(tab);
+                ConversationPage page = ConversationPage.fromId(id);
+                if (isRemembered(page)) {
+                    CLOSED_BY_HAND.add(page);
                 }
             }
         }
         List<String[]> open = CONVERSATIONS.get(conversationsPlace);
         if (open != null) {
             for (String[] entry : open) {
-                ConversationPage tab = ConversationPage.fromId(entry[1]);
-                if (isRemembered(tab) && !WindowLayout.holds(tab)) {
-                    CLOSED_BY_HAND.remove(tab.conversation());
-                    putBack(tab, entry[0]);
+                ConversationPage page = ConversationPage.fromId(entry[1]);
+                if (isRemembered(page) && !WindowLayout.holds(page)) {
+                    CLOSED_BY_HAND.remove(page.conversation());
+                    putBack(page, entry[0]);
                 }
             }
         }
@@ -810,15 +810,15 @@ public final class ChatLayout {
 
     /**
      * Puts a remembered conversation back in the window it stood in, locked or
-     * not: that is the layout as the player left it, not a tab arriving.
+     * not: that is the layout as the player left it, not a page arriving.
      * With that window gone it opens as any conversation does.
      */
-    private static void putBack(ConversationPage tab, String windowId) {
+    private static void putBack(ConversationPage page, String windowId) {
         Window window = WindowLayout.window(windowId);
         if (window == null) {
-            openTab(tab, null);
+            openTab(page, null);
         } else {
-            WindowLayout.appendTabs(window, Collections.singletonList(tab));
+            WindowLayout.appendTabs(window, Collections.singletonList(page));
         }
     }
 
@@ -828,19 +828,19 @@ public final class ChatLayout {
      * somebody spoke in it again, and opens speaking as the identity the
      * line's conversation is held as. Null for anything else.
      */
-    public static synchronized ConversationPage reopenConversation(ConversationPage tab,
+    public static synchronized ConversationPage reopenConversation(ConversationPage page,
                                                           String preferredWindowId) {
-        if (tab == null || !(tab.isWhisper() || tab.isFellowship())) {
+        if (page == null || !(page.isWhisper() || page.isFellowship())) {
             return null;
         }
-        CLOSED_BY_HAND.remove(sharedRow(tab));
-        return openReader(tab, preferredWindowId, false);
+        CLOSED_BY_HAND.remove(sharedRow(page));
+        return openReader(page, preferredWindowId, false);
     }
 
     /**
-     * Closes every whisper, NPC and fellowship tab: a conversation ends
-     * with the session it was held in, and so does its tab — the place's
-     * whisper and fellowship tabs are remembered first, open and closed by
+     * Closes every whisper, NPC and fellowship page: a conversation ends
+     * with the session it was held in, and so does its page — the place's
+     * whisper and fellowship pages are remembered first, open and closed by
      * hand alike, and come back on the next visit, each with its choices. The NPC
      * conversations of the session go, with their choices. A window left
      * empty goes, the last one included. The place is left behind with
@@ -856,8 +856,8 @@ public final class ChatLayout {
         List<WindowPage> removed = WindowLayout.removeTabs(
                 new WindowLayout.TabFilter() {
                     @Override
-                    public boolean matches(WindowPage tab) {
-                        ConversationPage conversation = ConversationPage.from(tab);
+                    public boolean matches(WindowPage page) {
+                        ConversationPage conversation = ConversationPage.from(page);
                         return conversation != null
                                 && (conversation.isWhisper()
                                         || conversation.isFellowship());
@@ -880,17 +880,17 @@ public final class ChatLayout {
         List<WindowPage> removed = WindowLayout.removeTabs(
                 new WindowLayout.TabFilter() {
                     @Override
-                    public boolean matches(WindowPage tab) {
-                        return isLeftFellowship(ConversationPage.from(tab));
+                    public boolean matches(WindowPage page) {
+                        return isLeftFellowship(ConversationPage.from(page));
                     }
                 });
         boolean changed = !removed.isEmpty();
-        for (WindowPage tab : removed) {
-            ConversationPage copy = ConversationPage.from(tab);
+        for (WindowPage page : removed) {
+            ConversationPage copy = ConversationPage.from(page);
             copy.forgetCopy();
             ConversationPage row = ConversationPage.row(copy);
             if (row != null) {
-                VIEWS.remove(row.id());
+                PANELS_BY_PAGE.remove(row.id());
             }
         }
         Iterator<ConversationPage> closed = CLOSED_BY_HAND.iterator();
@@ -913,10 +913,10 @@ public final class ChatLayout {
         }
     }
 
-    /** Whether a tab is the conversation of a fellowship no character of the account is in. */
-    private static boolean isLeftFellowship(ConversationPage tab) {
-        return tab != null && tab.isFellowship()
-                && !ClientChatIdentitySelection.keepsFellowship(tab.getOwnerKey());
+    /** Whether a page is the conversation of a fellowship no character of the account is in. */
+    private static boolean isLeftFellowship(ConversationPage page) {
+        return page != null && page.isFellowship()
+                && !ClientChatIdentitySelection.keepsFellowship(page.getOwnerKey());
     }
 
     /** Takes every left fellowship's conversation out of a setting's rows; answers whether any went. */
@@ -938,12 +938,12 @@ public final class ChatLayout {
      * {@link #MAX_NPC_CONVERSATIONS} that spoke last, so the {@code +}
      * can open one again once it is closed.
      */
-    public static synchronized void noteNpcSpoke(ConversationPage tab) {
-        if (tab == null || !tab.isNpc()) {
+    public static synchronized void noteNpcSpoke(ConversationPage page) {
+        if (page == null || !page.isNpc()) {
             return;
         }
-        NPC_SPOKEN.remove(tab);
-        NPC_SPOKEN.put(tab, Long.valueOf(++npcTurn));
+        NPC_SPOKEN.remove(page);
+        NPC_SPOKEN.put(page, Long.valueOf(++npcTurn));
         Iterator<ConversationPage> quietest = NPC_SPOKEN.keySet().iterator();
         while (NPC_SPOKEN.size() > MAX_NPC_CONVERSATIONS && quietest.hasNext()) {
             quietest.next();
@@ -958,9 +958,9 @@ public final class ChatLayout {
      */
     static synchronized List<ConversationPage> npcConversations(boolean closedOnly) {
         List<ConversationPage> result = new ArrayList<ConversationPage>();
-        for (ConversationPage tab : NPC_SPOKEN.keySet()) {
-            if (!(closedOnly && isOpen(tab))) {
-                result.add(tab);
+        for (ConversationPage page : NPC_SPOKEN.keySet()) {
+            if (!(closedOnly && isOpen(page))) {
+                result.add(page);
             }
         }
         Collections.reverse(result);
@@ -984,15 +984,15 @@ public final class ChatLayout {
         }
         for (Window window : WindowLayout.windows()) {
             for (WindowPage each : window.getTabs()) {
-                ConversationPage tab = ConversationPage.from(each);
-                if (tab == null || !tab.isNpc()) {
+                ConversationPage page = ConversationPage.from(each);
+                if (page == null || !page.isNpc()) {
                     continue;
                 }
-                Long turn = NPC_SPOKEN.get(tab.conversation());
-                open.put(tab, turn == null ? Long.valueOf(0L) : turn);
+                Long turn = NPC_SPOKEN.get(page.conversation());
+                open.put(page, turn == null ? Long.valueOf(0L) : turn);
                 if (each.equals(window.getActiveTab())
-                        || ClientChatChannelState.getDraft(tab).length() > 0) {
-                    exempt.add(tab);
+                        || ClientChatChannelState.getDraft(page).length() > 0) {
+                    exempt.add(page);
                 }
             }
         }
@@ -1002,8 +1002,8 @@ public final class ChatLayout {
         }
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
-            public boolean matches(WindowPage tab) {
-                return closing.contains(tab);
+            public boolean matches(WindowPage page) {
+                return closing.contains(page);
             }
         });
         WindowLayout.persist();
@@ -1119,17 +1119,17 @@ public final class ChatLayout {
         return Math.max(0.0D, Math.min(100.0D, value));
     }
 
-    /** A view as its line writes it: what is put away, then the list's width. */
-    private static String describeView(Panels view) {
+    /** The panels as their line writes them: what is put away, then the list's width. */
+    private static String describePanels(Panels panels) {
         StringBuilder line = new StringBuilder();
-        if (view.areaHidden) {
+        if (panels.areaHidden) {
             line.append(" area=").append(PUT_AWAY);
         }
-        if (view.membersHidden) {
+        if (panels.membersHidden) {
             line.append(" members=").append(PUT_AWAY);
         }
-        if (view.membersWidth > 0.0D) {
-            line.append(" members_width=").append(format(view.membersWidth));
+        if (panels.membersWidth > 0.0D) {
+            line.append(" members_width=").append(format(panels.membersWidth));
         }
         return line.toString().trim();
     }
@@ -1149,61 +1149,61 @@ public final class ChatLayout {
     /* ---- A conversation's timestamp area and member list ---- */
 
     /** The most conversations whose area and list are kept apart from how they first are. */
-    static final int MAX_VIEWS = 256;
+    static final int MAX_PANELS = 256;
 
-    /** The conversation's view to change, made where it has none; null for no conversation. */
-    private static Panels view(ConversationPage tab) {
-        if (tab == null) {
+    /** The conversation's panels to change, made where it has none; null for no conversation. */
+    private static Panels panelsToChange(ConversationPage page) {
+        if (page == null) {
             return null;
         }
-        Panels view = VIEWS.get(viewKey(tab));
-        if (view == null) {
-            if (VIEWS.size() >= MAX_VIEWS) {
+        Panels panels = PANELS_BY_PAGE.get(panelsKey(page));
+        if (panels == null) {
+            if (PANELS_BY_PAGE.size() >= MAX_PANELS) {
                 return null;
             }
-            view = new Panels();
-            VIEWS.put(viewKey(tab), view);
+            panels = new Panels();
+            PANELS_BY_PAGE.put(panelsKey(page), panels);
         }
-        return view;
+        return panels;
     }
 
     /**
-     * What a conversation's view is kept by: the id of the tab its window
-     * holds, so a faction's conversation keeps one view whichever
+     * What a conversation's panels are kept by: the id of the page its window
+     * holds, so a faction's conversation keeps one set of panels whichever
      * identity reads it.
      */
-    private static String viewKey(ConversationPage tab) {
-        return ConversationPage.row(tab).id();
+    private static String panelsKey(ConversationPage page) {
+        return ConversationPage.row(page).id();
     }
 
-    /** A conversation's view as it stands; null while it stands as it first was. */
-    private static Panels viewOf(ConversationPage tab) {
-        return tab == null ? null : VIEWS.get(viewKey(tab));
+    /** A conversation's panels as they stand; null while they stand as they first were. */
+    private static Panels panelsOf(ConversationPage page) {
+        return page == null ? null : PANELS_BY_PAGE.get(panelsKey(page));
     }
 
-    /** Drops a view that stands as it first was, so only changed ones are kept. */
-    private static void settle(ConversationPage tab, Panels view) {
-        if (view.isAsFirst()) {
-            VIEWS.remove(viewKey(tab));
+    /** Drops panels that stand as they first were, so only changed ones are kept. */
+    private static void settle(ConversationPage page, Panels panels) {
+        if (panels.isAsFirst()) {
+            PANELS_BY_PAGE.remove(panelsKey(page));
         }
     }
 
     /** Whether the conversation's timestamp area is driven out. */
-    public static synchronized boolean isAreaHidden(ConversationPage tab) {
-        Panels view = viewOf(tab);
-        return view != null && view.areaHidden;
+    public static synchronized boolean isAreaHidden(ConversationPage page) {
+        Panels panels = panelsOf(page);
+        return panels != null && panels.areaHidden;
     }
 
     /** Whether the conversation's member list is put away. */
-    public static synchronized boolean isMembersHidden(ConversationPage tab) {
-        Panels view = viewOf(tab);
-        return view != null && view.membersHidden;
+    public static synchronized boolean isMembersHidden(ConversationPage page) {
+        Panels panels = panelsOf(page);
+        return panels != null && panels.membersHidden;
     }
 
     /** The width the player gave the conversation's member list, in the chat's pixels; 0 for its own. */
-    public static synchronized double getMembersWidth(ConversationPage tab) {
-        Panels view = viewOf(tab);
-        return view == null ? 0.0D : view.membersWidth;
+    public static synchronized double getMembersWidth(ConversationPage page) {
+        Panels panels = panelsOf(page);
+        return panels == null ? 0.0D : panels.membersWidth;
     }
 
     /**
@@ -1212,14 +1212,14 @@ public final class ChatLayout {
      * conversation's: the one beside it in a split keeps its own. Written
      * to the file.
      */
-    public static synchronized boolean setAreaHidden(ConversationPage tab,
+    public static synchronized boolean setAreaHidden(ConversationPage page,
                                                      boolean hidden) {
-        Panels view = isAreaHidden(tab) == hidden ? null : view(tab);
-        if (view == null) {
+        Panels panels = isAreaHidden(page) == hidden ? null : panelsToChange(page);
+        if (panels == null) {
             return false;
         }
-        view.areaHidden = hidden;
-        settle(tab, view);
+        panels.areaHidden = hidden;
+        settle(page, panels);
         WindowLayout.persist();
         return true;
     }
@@ -1229,14 +1229,14 @@ public final class ChatLayout {
      * keeps its size and the words take the list's room. Only this
      * conversation's. Written to the file.
      */
-    public static synchronized boolean setMembersHidden(ConversationPage tab,
+    public static synchronized boolean setMembersHidden(ConversationPage page,
                                                         boolean hidden) {
-        Panels view = isMembersHidden(tab) == hidden ? null : view(tab);
-        if (view == null) {
+        Panels panels = isMembersHidden(page) == hidden ? null : panelsToChange(page);
+        if (panels == null) {
             return false;
         }
-        view.membersHidden = hidden;
-        settle(tab, view);
+        panels.membersHidden = hidden;
+        settle(page, panels);
         WindowLayout.persist();
         return true;
     }
@@ -1245,8 +1245,8 @@ public final class ChatLayout {
      * A conversation's timestamp area and member list as they first are:
      * both out, the list at its own width. Written to the file.
      */
-    public static synchronized void resetView(ConversationPage tab) {
-        if (tab != null && VIEWS.remove(viewKey(tab)) != null) {
+    public static synchronized void resetPanels(ConversationPage page) {
+        if (page != null && PANELS_BY_PAGE.remove(panelsKey(page)) != null) {
             WindowLayout.persist();
         }
     }
@@ -1256,15 +1256,15 @@ public final class ChatLayout {
      * to, in the chat's pixels, written to the file when {@code persist}
      * says so — once, as the drag ends.
      */
-    public static synchronized boolean setMembersWidth(ConversationPage tab,
+    public static synchronized boolean setMembersWidth(ConversationPage page,
                                                        double width,
                                                        boolean persist) {
-        Panels view = view(tab);
-        if (view == null) {
+        Panels panels = panelsToChange(page);
+        if (panels == null) {
             return false;
         }
-        view.membersWidth = clampMembersWidth(width);
-        settle(tab, view);
+        panels.membersWidth = clampMembersWidth(width);
+        settle(page, panels);
         if (persist) {
             WindowLayout.persist();
         }
@@ -1315,14 +1315,14 @@ public final class ChatLayout {
      * toolbar collapsed=false
      * notify	everything	ooc
      * notify	mentions	whisper:Steve|Aldric
-     * feedchoice	nothing	server_console
+     * feedchoice	nothing	server_log
      * </pre>
      *
      * <p>A channel in no window is closed: no line names it, and it opens
      * with its next line like any other closed channel.</p>
      *
      * <p>A conversation's timestamp area and member list, where either
-     * differs from how it first is, stand on a {@code panels} line: the tab
+     * differs from how it first is, stand on a {@code panels} line: the page
      * id, then the area or the list put away and the list's width. Never
      * an NPC conversation's, whose view ends with the session.</p>
      *
@@ -1332,18 +1332,18 @@ public final class ChatLayout {
      * <p>A conversation's notification choice, one for all its copies, where
      * it is not the conversation's default, stands on a {@code notify} line: the choice
      * ({@code everything}, {@code mentions} or {@code nothing}) and the
-     * tab id. Its feed choice, where it is not {@code everything}, stands on a
+     * page id. Its feed choice, where it is not {@code everything}, stands on a
      * {@code feedchoice} line the same way ({@code mentions} or
      * {@code nothing}). Both name whispers and fellowships too, never an
      * NPC conversation, whose choices end with the session. A whisper or
-     * fellowship tab is remembered per place on a line of its own: {@code conversation}, the place, the
-     * window and the tab id for one that was open;
-     * {@code closedconversation}, the place and the tab id for one closed
+     * fellowship page is remembered per place on a line of its own: {@code conversation}, the place, the
+     * window and the page id for one that was open;
+     * {@code closedconversation}, the place and the page id for one closed
      * by hand. Who a copy speaks as stands on a {@code voice} line per
-     * place: the place, the copy's tab id, the character's id or {@code -},
+     * place: the place, the copy's page id, the character's id or {@code -},
      * and {@code narrator} or {@code -} ({@link ClientChatIdentities#describeVoices}).
      * These lines and the {@code panels}, {@code notify} and
-     * {@code feedchoice} lines are tab-separated, since a name or a place
+     * {@code feedchoice} lines are page-separated, since a name or a place
      * may hold spaces; {@code feed} and {@code toolbar} lines are
      * space-separated.</p>
      */
@@ -1357,7 +1357,7 @@ public final class ChatLayout {
             CLOSED_CONVERSATIONS.clear();
             ClientChatIdentities.clearKept();
             conversationsPlace = "";
-            VIEWS.clear();
+            PANELS_BY_PAGE.clear();
             feedOffsetX = 50.0D;
             feedOffsetY = 100.0D;
             feedPlaced = false;
@@ -1414,7 +1414,7 @@ public final class ChatLayout {
             return false;
         }
 
-        /** A {@code notify} line: the choice, then the tab it is for. */
+        /** A {@code notify} line: the choice, then the page it is for. */
         private void readNotification(String[] fields) {
             if (fields.length != 3) {
                 return;
@@ -1427,12 +1427,12 @@ public final class ChatLayout {
             }
         }
 
-        /** A {@code panels} line: the tab it is for, then its area, its list and the list's width. */
+        /** A {@code panels} line: the page it is for, then its area, its list and the list's width. */
         private void readView(String[] fields) {
-            ConversationPage tab = fields.length == 3
+            ConversationPage page = fields.length == 3
                     ? ConversationPage.row(ConversationPage.fromId(fields[1])) : null;
-            Panels view = tab == null || tab.isNpc() ? null : view(tab);
-            if (view == null) {
+            Panels panels = page == null || page.isNpc() ? null : panelsToChange(page);
+            if (panels == null) {
                 return;
             }
             for (String part : fields[2].split("\\s+")) {
@@ -1440,18 +1440,18 @@ public final class ChatLayout {
                 String key = equals < 0 ? part : part.substring(0, equals);
                 String value = equals < 0 ? "" : part.substring(equals + 1);
                 if ("area".equals(key)) {
-                    view.areaHidden = PUT_AWAY.equalsIgnoreCase(value);
+                    panels.areaHidden = PUT_AWAY.equalsIgnoreCase(value);
                 } else if ("members".equals(key)) {
-                    view.membersHidden = PUT_AWAY.equalsIgnoreCase(value);
+                    panels.membersHidden = PUT_AWAY.equalsIgnoreCase(value);
                 } else if ("members_width".equals(key)) {
-                    view.membersWidth = clampMembersWidth(
+                    panels.membersWidth = clampMembersWidth(
                             WindowLayoutStore.parseDouble(value));
                 }
             }
-            settle(tab, view);
+            settle(page, panels);
         }
 
-        /** A {@code feedchoice} line: the choice, then the tab it is for. */
+        /** A {@code feedchoice} line: the choice, then the page it is for. */
         private void readFeedChoice(String[] fields) {
             if (fields.length != 3) {
                 return;
@@ -1489,19 +1489,19 @@ public final class ChatLayout {
                 lines.add(feedLine());
             }
             lines.add(TOOLBAR + " collapsed=" + toolbarCollapsed);
-            for (ConversationPage tab : notificationTabs()) {
-                lines.add(NOTIFY + "\t" + notification(tab).id() + "\t"
-                        + tab.id());
+            for (ConversationPage page : notificationPages()) {
+                lines.add(NOTIFY + "\t" + notification(page).id() + "\t"
+                        + page.id());
             }
-            for (ConversationPage tab : feedChoiceTabs()) {
-                lines.add(FEED_CHOICE + "\t" + feedChoice(tab).id() + "\t"
-                        + tab.id());
+            for (ConversationPage page : feedChoicePages()) {
+                lines.add(FEED_CHOICE + "\t" + feedChoice(page).id() + "\t"
+                        + page.id());
             }
-            for (Map.Entry<String, Panels> each : VIEWS.entrySet()) {
-                ConversationPage tab = ConversationPage.fromId(each.getKey());
-                if (tab != null && !tab.isNpc()) {
+            for (Map.Entry<String, Panels> each : PANELS_BY_PAGE.entrySet()) {
+                ConversationPage page = ConversationPage.fromId(each.getKey());
+                if (page != null && !page.isNpc()) {
                     lines.add(PANELS + "\t" + each.getKey() + "\t"
-                            + describeView(each.getValue()));
+                            + describePanels(each.getValue()));
                 }
             }
             rememberConversations(conversationsPlace);

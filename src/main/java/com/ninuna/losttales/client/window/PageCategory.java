@@ -11,7 +11,7 @@ import net.minecraft.util.StatCollector;
  * <p>Whispers and the consoles are the channels' subcategories. Whispers
  * stand with the channels, in their view; the consoles have a view of
  * their own, the command key's. The skills are the profile's, with a view
- * of their own (PROG-17).</p>
+ * of their own (PROG-13).</p>
  */
 public enum PageCategory {
     /**

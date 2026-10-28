@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Complete private view of lore definitions and current world ownership. */
+/** Every lore character as one player sees it, and whether the stores take claims and releases. */
 public final class LoreCharacterSnapshot {
 
     private final List<LoreCharacterSummary> characters;

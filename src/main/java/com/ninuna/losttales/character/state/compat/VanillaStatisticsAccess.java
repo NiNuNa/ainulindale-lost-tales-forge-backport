@@ -11,11 +11,9 @@ import java.lang.reflect.Modifier;
 import java.util.Map;
 
 /**
- * Narrow compatibility bridge for replacing the complete 1.7.10 statistics map.
- *
- * <p>The vanilla API supports individual statistic updates but does not expose a
- * public bulk replacement operation. Runtime-obfuscated field names are handled
- * by verifying the field shape rather than relying exclusively on an SRG name.</p>
+ * The player's whole statistics map, which vanilla changes only one
+ * statistic at a time. The field is found by its name, else by its shape:
+ * the one map field of {@link StatFileWriter}, and none while two match.
  */
 public final class VanillaStatisticsAccess {
 

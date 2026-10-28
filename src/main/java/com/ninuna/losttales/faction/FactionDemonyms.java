@@ -1,8 +1,8 @@
 package com.ninuna.losttales.faction;
 
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.util.Locale;
-import net.minecraft.util.StatCollector;
 
 /**
  * What the people of a faction are called, as opposed to what the
@@ -36,13 +36,22 @@ public final class FactionDemonyms {
      *                           stripped of formatting codes
      */
     public static String of(String factionId, String factionDisplayName) {
+        return of(LostTalesWords.LANG, factionId, factionDisplayName);
+    }
+
+    /**
+     * {@link #of} with the demonym read in {@code words}: a linked Discord
+     * channel's, for the name a post goes under.
+     */
+    public static String of(LostTalesWords words, String factionId,
+                            String factionDisplayName) {
         String fallback = factionDisplayName == null
                 ? "" : factionDisplayName.trim();
         String key = keyFor(factionId);
         if (key.length() == 0) {
             return fallback;
         }
-        String demonym = StatCollector.translateToLocal(key);
+        String demonym = words.format(key);
         // An absent key translates to itself; a blank entry is no entry.
         if (demonym == null || demonym.length() == 0
                 || demonym.equals(key)) {

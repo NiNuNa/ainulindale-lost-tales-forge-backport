@@ -20,6 +20,7 @@ public final class MissiveSeals {
     /** Where a letter keeps its seal, beside its missive. */
     public static final String TAG_SEAL = "LostTalesMissiveSeal";
 
+    /** Whether the unusable key was logged; cleared with the server's stores. */
     private static boolean warnedUnusable;
 
     private MissiveSeals() {}
@@ -77,11 +78,17 @@ public final class MissiveSeals {
         return data.key();
     }
 
+    /** Logs an unusable key again in the next world. */
+    public static synchronized void clear() {
+        warnedUnusable = false;
+    }
+
     private static synchronized void warnUnusable() {
         if (!warnedUnusable) {
             warnedUnusable = true;
             LostTalesLog.warning("The missive seal key in this world cannot be used; "
-                    + "no missive letter can be accepted or pinned until it can");
+                    + "boards post no letters, and no letter or quest starter can be"
+                    + " accepted, pinned or made, until it can");
         }
     }
 }

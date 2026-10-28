@@ -1,6 +1,6 @@
 package com.ninuna.losttales.character.lore.ownership;
 
-/** Result of one atomic low-level lore-character ownership mutation. */
+/** What one claim or release of the ownership index came to. */
 public final class LoreCharacterOwnershipResult {
 
     public enum Status {

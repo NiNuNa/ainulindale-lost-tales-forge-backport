@@ -44,6 +44,7 @@ public class LostTalesQuickLootDropItemPacket implements IMessage {
             }
         } catch (RuntimeException exception) {
             this.malformed = true;
+            LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
 

@@ -28,6 +28,10 @@ import net.minecraft.client.resources.I18n;
  * closes. The views a character is needed for stay closed meanwhile: the
  * Map, the Quest Journal, Fellowships, Skills and the custom views. While
  * the server cannot read characters, it is asked again every half minute.
+ *
+ * <p>A player whose last switch waits for an administrator is held the
+ * same way (CHAR-45), with the Characters page in front, saying why, in
+ * place of the editor.</p>
  */
 @SideOnly(Side.CLIENT)
 public final class FirstVisit {
@@ -50,8 +54,12 @@ public final class FirstVisit {
         Views.addGate(new Views.Gate() {
             @Override
             public String closedWhy(View view) {
-                return isWaiting() && closes(view) ? I18n.format(
-                        "gui.losttales.character.first.view_closed") : "";
+                if (!isWaiting() || !closes(view)) {
+                    return "";
+                }
+                return I18n.format(isJournalHeld()
+                        ? "gui.losttales.character.error.switch_journal_held"
+                        : "gui.losttales.character.first.view_closed");
             }
         });
         FMLCommonHandler.instance().bus().register(new FirstVisit());
@@ -63,10 +71,17 @@ public final class FirstVisit {
                 || CLOSED.contains(view.category()));
     }
 
-    /** Whether the player waits for their first character. */
+    /** Whether the player waits for their first character, or for an administrator to settle their last switch. */
     static boolean isWaiting() {
         CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
-        return roster != null && roster.isWaitingForFirstCharacter();
+        return roster != null && (roster.isWaitingForFirstCharacter()
+                || roster.isJournalHeld());
+    }
+
+    /** Whether the player waits for an administrator to settle their last switch (CHAR-45). */
+    static boolean isJournalHeld() {
+        CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
+        return roster != null && roster.isJournalHeld();
     }
 
     @SubscribeEvent
@@ -80,7 +95,8 @@ public final class FirstVisit {
             return;
         }
         CharacterRosterSnapshot roster = ClientCharacterRosterCache.getSnapshot();
-        if (roster == null || !roster.isWaitingForFirstCharacter()) {
+        if (roster == null || !roster.isWaitingForFirstCharacter()
+                && !roster.isJournalHeld()) {
             screenWasOpen = false;
             return;
         }
@@ -95,8 +111,10 @@ public final class FirstVisit {
             if (screenWasOpen) {
                 screenWasOpen = false;
                 minecraft.displayGuiScreen(new GuiIngameMenu());
-            } else {
+            } else if (roster.isWaitingForFirstCharacter()) {
                 CharacterEditorPage.openFirst();
+            } else {
+                WindowScreen.openPage(CharactersPage.PAGE_ID);
             }
             return;
         }

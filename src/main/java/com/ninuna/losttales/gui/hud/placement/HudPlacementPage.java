@@ -565,9 +565,9 @@ public final class HudPlacementPage extends PageContent {
         options.add(panelSwitch("quick_loot", HudPanel.QUICK_LOOT,
                 LostTalesConfig.showQuickLootHud, LOOT_GLYPH));
         options.add(panelSwitch("quest", HudPanel.QUEST_TRACKER,
-                LostTalesConfig.showQuestHud, QUEST_GLYPH));
-        String chosen = LostTalesConfig.normalizeHudPreset(
-                LostTalesConfig.hudPlacementPreset);
+                LostTalesConfig.showQuestTracker, QUEST_GLYPH));
+        String chosen = LostTalesConfig.normalizeHudLayout(
+                LostTalesConfig.hudPanelLayout);
         List<HudLayout> layouts = HudLayouts.all();
         List<PageOption> words = new ArrayList<PageOption>(layouts.size());
         for (HudLayout layout : layouts) {
@@ -597,7 +597,7 @@ public final class HudPlacementPage extends PageContent {
     @Override
     public boolean takeOption(String id) {
         if (id.startsWith(OPTION_LAYOUT_PREFIX)) {
-            LostTalesConfig.applyHudPreset(id.substring(
+            LostTalesConfig.applyHudLayout(id.substring(
                     OPTION_LAYOUT_PREFIX.length()));
             return true;
         }
@@ -613,7 +613,7 @@ public final class HudPlacementPage extends PageContent {
         } else if ("quick_loot".equals(panel)) {
             LostTalesConfig.showQuickLootHud = !LostTalesConfig.showQuickLootHud;
         } else if ("quest".equals(panel)) {
-            LostTalesConfig.showQuestHud = !LostTalesConfig.showQuestHud;
+            LostTalesConfig.showQuestTracker = !LostTalesConfig.showQuestTracker;
         } else {
             return true;
         }

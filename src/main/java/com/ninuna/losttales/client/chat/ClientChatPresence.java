@@ -20,13 +20,13 @@ import org.lwjgl.input.Mouse;
  * Presence as this client knows it: what the server says each account's
  * identities show, with their status lines, and what this player chose
  * and set for each of its own. A choice is made in the identity button's
- * menu — for the character spoken as on a roleplaying tab, for the
+ * menu — for the character spoken as on a roleplaying page, for the
  * account on the others — remembered for the server it was made on
  * ({@link ClientChatPresenceChoices}) and told to the server, which
  * decides what everyone else sees of it; a status line alike. Whether
  * anybody is at the keyboard is sampled once a tick ({@link ChatAutoAway})
  * and told as it changes. Do Not Disturb holds the mention cue silent in
- * the tabs that speak as the identity it was chosen for; mentions still
+ * the pages that speak as the identity it was chosen for; mentions still
  * count and tint.
  *
  * <p>A choice shows on this player's own heads and lists at once, as
@@ -240,21 +240,21 @@ public final class ClientChatPresence {
     }
 
     /**
-     * The identity a tab shows, whose status its identity button's menu
-     * sets: the chat identity on a roleplaying tab, the account on every
+     * The identity a page shows, whose status its identity button's menu
+     * sets: the chat identity on a roleplaying page, the account on every
      * other conversation, the character played on a page.
      */
-    static ChatPresenceIdentity speakerOf(WindowPage tab) {
+    static ChatPresenceIdentity speakerOf(WindowPage page) {
         ClientChatIdentities.Identity identity =
-                ClientChatIdentities.effectiveFor(tab);
+                ClientChatIdentities.effectiveFor(page);
         return identity == null || identity.account
                 ? ChatPresenceIdentity.ACCOUNT
                 : ChatPresenceIdentity.character(identity.characterId);
     }
 
-    /** Whether the mention cue stays silent in a tab: its speaker is not to be disturbed. */
-    static boolean holdsCues(ConversationPage tab) {
-        return chosen(speakerOf(tab)) == ChatPresence.DO_NOT_DISTURB;
+    /** Whether the mention cue stays silent in a page: its speaker is not to be disturbed. */
+    static boolean holdsCues(ConversationPage page) {
+        return chosen(speakerOf(page)) == ChatPresence.DO_NOT_DISTURB;
     }
 
     /**

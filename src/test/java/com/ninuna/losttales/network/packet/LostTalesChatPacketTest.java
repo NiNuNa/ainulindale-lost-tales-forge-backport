@@ -1275,7 +1275,7 @@ public final class LostTalesChatPacketTest {
      * back from the end of a packet keeps saying what it means when
      * another field is appended after this one.
      */
-    private static int scopeTailBytes(String scopeValue) {
+    static int scopeTailBytes(String scopeValue) {
         ByteBuf probe = Unpooled.buffer();
         LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
         // Behind the scope, for a line quoting nothing: whether it quotes
@@ -1304,6 +1304,10 @@ public final class LostTalesChatPacketTest {
         LostTalesPacketCodec.writeUtf8String(probe, "", 4096);
         probe.writeBoolean(false);
         probe.writeBoolean(false);
+        // Last, how far it carried and the size step its reader reads it
+        // at, a byte each.
+        probe.writeByte(0);
+        probe.writeByte(0);
         return probe.readableBytes();
     }
 }

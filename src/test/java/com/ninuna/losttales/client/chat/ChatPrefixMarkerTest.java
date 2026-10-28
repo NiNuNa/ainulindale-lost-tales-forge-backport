@@ -9,8 +9,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A line's channel prefix belongs to the closed feed, where one stack
- * carries every channel; the open screen's tabs name the channel, so it
+ * A line's channel prefix belongs to the feed, where one stack
+ * carries every channel; the open screen's pages name the channel, so it
  * takes no width there. It carries its exact colour.
  */
 public final class ChatPrefixMarkerTest {

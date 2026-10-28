@@ -28,8 +28,8 @@ public final class ServerConfigSnapshotTest {
         config.get("client", "showHud", true, "Client only.");
         config.get("discord", "pollIntervalSeconds", 3, "How often.", 2, 60);
         config.get("discord", "botToken", "", "Secret.");
-        config.get("discord", "channelBindings", new String[] {"ooc=DISABLED;channel=;webhook="},
-                "Bindings.");
+        config.get("discord", "channelLinks", new String[] {"ooc=DISABLED;channel=;webhook="},
+                "Links.");
         config.get("chat", "proximityRadius", 24.5D, "Blocks.", 1.0D, 512.0D);
         Property style = config.get("chat", "style", "plain", "Style.");
         style.setValidValues(new String[] {"plain", "embed"});
@@ -53,10 +53,10 @@ public final class ServerConfigSnapshotTest {
         ServerConfigEntry radius = ServerConfigSnapshot.find(entries, "chat", "proximityRadius");
         assertEquals(ServerConfigEntry.Type.DOUBLE, radius.getType());
         assertEquals("24.5", radius.getValue());
-        ServerConfigEntry bindings = ServerConfigSnapshot.find(entries, "discord", "channelBindings");
-        assertTrue(bindings.isList());
+        ServerConfigEntry channelLinks = ServerConfigSnapshot.find(entries, "discord", "channelLinks");
+        assertTrue(channelLinks.isList());
         assertEquals(Collections.singletonList("ooc=DISABLED;channel=;webhook="),
-                bindings.getValues());
+                channelLinks.getValues());
         ServerConfigEntry style = ServerConfigSnapshot.find(entries, "chat", "style");
         assertEquals(Arrays.asList("plain", "embed"), style.getValidValues());
         // Sorted by category, then key.

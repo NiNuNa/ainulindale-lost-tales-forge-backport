@@ -65,7 +65,7 @@ public final class LostTalesQuestActionPacketTest {
         assertTrue(roundTrip(LostTalesQuestActionPacket.ACTION_ABANDON, "")
                 .isMalformed());
         // Stopping all tracking names no quest.
-        assertFalse(roundTrip(LostTalesQuestActionPacket.ACTION_UNPIN, "")
+        assertFalse(roundTrip(LostTalesQuestActionPacket.ACTION_UNTRACK, "")
                 .isMalformed());
     }
 

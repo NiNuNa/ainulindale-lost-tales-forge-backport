@@ -10,7 +10,11 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Vec3;
 
-/** Server-owned, short-lived projectile aim intent for offset cameras. */
+/**
+ * The aim a player shooting over the shoulder asks for, kept on the
+ * server for half a second and given to the next projectile they loose
+ * while it still points within 45 degrees of where they look.
+ */
 public final class LostTalesThirdPersonAimService {
     private static final double MINIMUM_DIRECTION_LENGTH = 0.90D;
     private static final double MAXIMUM_DIRECTION_LENGTH = 1.10D;

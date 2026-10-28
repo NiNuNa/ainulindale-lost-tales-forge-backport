@@ -14,17 +14,17 @@ public final class DiscordServerNoticesTest {
 
     @Test
     public void playerNoticesNameThePlayerAsPlainText() {
-        DiscordNotice joined = DiscordServerNotices.playerJoined(ENGLISH, "Steve",
+        DiscordNotice joined = DiscordServerNotices.playerJoined("Steve",
                 "https://heads/Steve");
         assertEquals(DiscordNotice.Kind.PLAYER_JOINED, joined.getKind());
-        assertEquals("✅ Steve joined the game", joined.getText());
+        assertEquals("✅ Steve joined the game", joined.getText(ENGLISH));
         assertEquals("https://heads/Steve", joined.getIconUrl());
         assertEquals(LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN),
                 joined.getColor());
 
-        DiscordNotice left = DiscordServerNotices.playerLeft(ENGLISH, " Steve ", "");
+        DiscordNotice left = DiscordServerNotices.playerLeft(" Steve ", "");
         assertEquals(DiscordNotice.Kind.PLAYER_LEFT, left.getKind());
-        assertEquals("👋 Steve left the game", left.getText());
+        assertEquals("👋 Steve left the game", left.getText(ENGLISH));
         assertEquals("", left.getIconUrl());
         assertEquals(LostTalesColors.rgb(LostTalesColors.SALMON),
                 left.getColor());
@@ -32,15 +32,36 @@ public final class DiscordServerNoticesTest {
         // The author row renders no markdown, so nothing is escaped and
         // a name reads exactly as it is; a team colour code is dropped.
         assertEquals("✅ x_y_z joined the game",
-                DiscordServerNotices.playerJoined(ENGLISH, "x_y_z", null).getText());
+                DiscordServerNotices.playerJoined("x_y_z", null).getText(ENGLISH));
         assertEquals("✅ **bold** joined the game",
-                DiscordServerNotices.playerJoined(ENGLISH, "**bold**", null).getText());
+                DiscordServerNotices.playerJoined("**bold**", null).getText(ENGLISH));
         assertEquals("✅ @everyone joined the game",
-                DiscordServerNotices.playerJoined(ENGLISH, "@everyone", null).getText());
+                DiscordServerNotices.playerJoined("@everyone", null).getText(ENGLISH));
         assertEquals("✅ Steve joined the game",
-                DiscordServerNotices.playerJoined(ENGLISH, "§aSteve§r", null).getText());
+                DiscordServerNotices.playerJoined("§aSteve§r", null).getText(ENGLISH));
         assertEquals("✅  joined the game",
-                DiscordServerNotices.playerJoined(ENGLISH, null, null).getText());
+                DiscordServerNotices.playerJoined(null, null).getText(ENGLISH));
+    }
+
+    /** A join reads in the linked channel's own words; the name stays as it is. */
+    @Test
+    public void aJoinIsWordedInEachChannelsLanguage() {
+        com.ninuna.losttales.util.LostTalesWords german =
+                new com.ninuna.losttales.util.LostTalesWords() {
+                    @Override
+                    public String format(String key, Object... arguments) {
+                        return "chat.losttales.discord.notice.joined".equals(key)
+                                ? arguments[0] + " ist da" : key;
+                    }
+                };
+        DiscordNotice joined = DiscordServerNotices.playerJoined("Steve", "");
+        assertEquals("✅ Steve ist da", joined.getText(german));
+        assertEquals("✅ Steve joined the game", joined.getText(ENGLISH));
+        assertTrue(!joined.isEmpty());
+        assertTrue(DiscordServerNotices.playerDied(" ", "").isEmpty());
+        // A death is the game's own line in every channel.
+        assertEquals("💀 Steve fell", DiscordServerNotices.playerDied("Steve fell", "")
+                .getText(german));
     }
 
     @Test
@@ -48,7 +69,7 @@ public final class DiscordServerNoticesTest {
         DiscordNotice death = DiscordServerNotices.playerDied(
                 "Aragorn was slain by Mordor Orc", "https://heads/Steve");
         assertEquals(DiscordNotice.Kind.PLAYER_DIED, death.getKind());
-        assertEquals("💀 Aragorn was slain by Mordor Orc", death.getText());
+        assertEquals("💀 Aragorn was slain by Mordor Orc", death.getText(ENGLISH));
         assertEquals("https://heads/Steve", death.getIconUrl());
         assertEquals(LostTalesColors.rgb(LostTalesColors.PLUM_GRAY),
                 death.getColor());
@@ -58,7 +79,7 @@ public final class DiscordServerNoticesTest {
                 "");
         assertEquals(DiscordNotice.Kind.ACHIEVEMENT, earned.getKind());
         assertEquals("🏆 Aragorn has just earned the achievement "
-                + "[Taking Inventory]", earned.getText());
+                + "[Taking Inventory]", earned.getText(ENGLISH));
         assertEquals(LostTalesColors.rgb(LostTalesColors.HONEY),
                 earned.getColor());
 
@@ -66,7 +87,7 @@ public final class DiscordServerNoticesTest {
         assertEquals("💀 Steve was slain by Bob using Sword",
                 DiscordServerNotices.playerDied(
                         "Steve was slain by Bob\nusing §b§lSword§r", "")
-                        .getText());
+                        .getText(ENGLISH));
     }
 
     @Test
@@ -77,8 +98,8 @@ public final class DiscordServerNoticesTest {
         }
         DiscordNotice notice = DiscordServerNotices.playerDied(
                 name.toString(), "");
-        assertEquals(DiscordNotice.MAX_TEXT_LENGTH, notice.getText().length());
-        assertTrue(notice.getText().endsWith("..."));
+        assertEquals(DiscordNotice.MAX_TEXT_LENGTH, notice.getText(ENGLISH).length());
+        assertTrue(notice.getText(ENGLISH).endsWith("..."));
     }
 
 

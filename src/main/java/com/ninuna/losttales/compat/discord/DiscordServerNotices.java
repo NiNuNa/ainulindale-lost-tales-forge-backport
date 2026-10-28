@@ -10,8 +10,8 @@ import java.util.List;
  * The words, colours and icons of the bridge's own posts, and the words
  * of the channel topic: short, one line each, and the same every time,
  * so a Discord reader learns them at a glance. The words are the lang
- * file's, in the server's language; a death or an achievement is the
- * game's own line. Each kind of notice has a fixed icon and a fixed edge
+ * file's, in the language of the linked channel they go to (DISC-30); a
+ * death or an achievement is the game's own line. Each kind of notice has a fixed icon and a fixed edge
  * colour from the mod's own palette — green for a player arriving,
  * salmon for leaving, a subdued plum for a death, honey for an
  * achievement — so a glance at the channel says what happened before the
@@ -24,26 +24,23 @@ public final class DiscordServerNotices {
     private static final String LEFT = "👋";
     private static final String DIED = "💀";
     private static final String ACHIEVED = "🏆";
-    private static final String SEPARATOR = " • ";
+    /** What stands between the status's parts, on Discord alone. */
+    static final String SEPARATOR = " • ";
     /** Discord caps a channel topic at 1024 characters; ours is far shorter. */
     private static final int MAX_TOPIC_LENGTH = 1024;
     private DiscordServerNotices() {}
 
     /** {@code ✅ Name joined the game}, with the account's head. */
-    public static DiscordNotice playerJoined(LostTalesWords words, String name,
-                                             String iconUrl) {
-        return new DiscordNotice(DiscordNotice.Kind.PLAYER_JOINED,
-                JOINED + " " + words.format(
-                        "chat.losttales.discord.notice.joined", plain(name)),
+    public static DiscordNotice playerJoined(String name, String iconUrl) {
+        return new DiscordNotice(DiscordNotice.Kind.PLAYER_JOINED, JOINED,
+                "chat.losttales.discord.notice.joined", plain(name),
                 iconUrl, LostTalesColors.rgb(LostTalesColors.MEADOW_GREEN));
     }
 
     /** {@code 👋 Name left the game}, with the account's head. */
-    public static DiscordNotice playerLeft(LostTalesWords words, String name,
-                                           String iconUrl) {
-        return new DiscordNotice(DiscordNotice.Kind.PLAYER_LEFT,
-                LEFT + " " + words.format(
-                        "chat.losttales.discord.notice.left", plain(name)),
+    public static DiscordNotice playerLeft(String name, String iconUrl) {
+        return new DiscordNotice(DiscordNotice.Kind.PLAYER_LEFT, LEFT,
+                "chat.losttales.discord.notice.left", plain(name),
                 iconUrl, LostTalesColors.rgb(LostTalesColors.SALMON));
     }
 
@@ -55,8 +52,8 @@ public final class DiscordServerNotices {
      */
     public static DiscordNotice playerDied(String deathMessage,
                                            String iconUrl) {
-        return new DiscordNotice(DiscordNotice.Kind.PLAYER_DIED,
-                DIED + " " + plain(deathMessage), iconUrl,
+        return new DiscordNotice(DiscordNotice.Kind.PLAYER_DIED, DIED, null,
+                plain(deathMessage), iconUrl,
                 LostTalesColors.rgb(LostTalesColors.PLUM_GRAY));
     }
 
@@ -67,15 +64,15 @@ public final class DiscordServerNotices {
      */
     public static DiscordNotice achievement(String announcement,
                                             String iconUrl) {
-        return new DiscordNotice(DiscordNotice.Kind.ACHIEVEMENT,
-                ACHIEVED + " " + plain(announcement), iconUrl,
+        return new DiscordNotice(DiscordNotice.Kind.ACHIEVEMENT, ACHIEVED, null,
+                plain(announcement), iconUrl,
                 LostTalesColors.rgb(LostTalesColors.HONEY));
     }
 
     /**
      * {@code Server online • 3/20 players • play.example.org • 20 TPS}:
      * the server's status, the same parts the Server's status line in the
-     * game shows ({@link ChatServerStatus}), in the server's words.
+     * game shows ({@link ChatServerStatus}), in the linked channel's words.
      */
     public static String onlineTopic(LostTalesWords words,
                                      List<String> status) {
@@ -87,7 +84,7 @@ public final class DiscordServerNotices {
         return bound(topic.toString());
     }
 
-    /** {@code Server offline}, in the server's words. */
+    /** {@code Server offline}, in the linked channel's words. */
     public static String offlineTopic(LostTalesWords words) {
         return words.format("chat.losttales.discord.topic.offline");
     }

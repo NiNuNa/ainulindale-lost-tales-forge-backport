@@ -15,7 +15,7 @@ import com.ninuna.losttales.chat.server.ChatChannelPolicy;
  * own webhooks, so a message can never go round. A private channel
  * (a fellowship, a whisper, a console) and a channel heard only nearby
  * (Proximity, a server's own with {@code rule:proximity}) are refused here
- * before any binding is asked, so no configuration can carry them
+ * before any link is asked, so no configuration can carry them
  * (DISC-03). A channel only some players may read, Operator Chat among
  * them, may be linked: on Discord the channel's own permissions then
  * decide who reads it, and whoever links it is told so

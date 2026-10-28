@@ -5,11 +5,10 @@ import com.ninuna.losttales.config.NextStartOptions;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigApplyResult;
 import com.ninuna.losttales.config.server.ServerConfigChange;
+import com.ninuna.losttales.config.server.ServerConfigChangeValidator;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.config.server.ServerConfigEntry;
 import com.ninuna.losttales.config.server.ServerConfigSnapshot;
-import cpw.mods.fml.common.FMLCommonHandler;
-import cpw.mods.fml.relauncher.Side;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +31,8 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
 
     /** What the lang key of each of the command's answers begins with. */
     static final String SAY = "chat.losttales.command.config.";
+    /** The reason the page gives a key that is nowhere in the file. */
+    private static final String NO_SUCH_KEY = ServerConfigChangeValidator.REASON + "no_such_key";
 
     public LostTalesCommandConfig() {
         super("config");
@@ -52,10 +53,6 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
     public void processCommand(ICommandSender sender, String[] args) {
         if (args == null || args.length == 0) {
             sendUsage(sender);
-            return;
-        }
-        if (FMLCommonHandler.instance().getEffectiveSide() != Side.SERVER) {
-            say(sender, EnumChatFormatting.RED, SAY + "side_only");
             return;
         }
         String action = args[0];
@@ -110,7 +107,7 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
         ServerConfigEntry entry = ServerConfigSnapshot.find(
                 LostTalesServerConfigService.snapshot(), args[1], args[2]);
         if (entry == null) {
-            say(sender, EnumChatFormatting.RED, SAY + "no_key", args[1], args[2]);
+            sayNotFound(sender, args[1], args[2]);
             return;
         }
         say(sender, EnumChatFormatting.GRAY, SAY + "entry", entry.qualifiedName(),
@@ -135,7 +132,7 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
         ServerConfigEntry entry = ServerConfigSnapshot.find(
                 LostTalesServerConfigService.snapshot(), args[1], args[2]);
         if (entry == null) {
-            say(sender, EnumChatFormatting.RED, SAY + "no_key", args[1], args[2]);
+            sayNotFound(sender, args[1], args[2]);
             return;
         }
         List<String> values = Arrays.asList(args).subList(3, args.length);
@@ -145,6 +142,23 @@ public final class LostTalesCommandConfig extends LostTalesCommandBase {
                         joinWith(values, " "));
         report(sender, LostTalesServerConfigService.apply(
                 java.util.Collections.singletonList(change)));
+    }
+
+    /**
+     * Why {@code category.key} is not one the command reads, as the
+     * settings page says it ({@link LostTalesServerConfigService#offTheSurface}):
+     * a client setting, the role command's, the Discord command's, or no
+     * such key at all.
+     */
+    private static void sayNotFound(ICommandSender sender, String category, String key) {
+        ServerConfigApplyResult.Refusal refusal =
+                LostTalesServerConfigService.offTheSurface(category, key);
+        if (NO_SUCH_KEY.equals(refusal.getReasonKey())) {
+            say(sender, EnumChatFormatting.RED, SAY + "no_key", category, key);
+            return;
+        }
+        say(sender, EnumChatFormatting.RED, SAY + "refused", refusal.getName(),
+                words(refusal.getReasonKey(), refusal.getReasonArguments().toArray()));
     }
 
     /**

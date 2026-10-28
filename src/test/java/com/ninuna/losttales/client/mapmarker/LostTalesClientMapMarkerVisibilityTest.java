@@ -6,16 +6,14 @@ import static org.junit.Assert.assertTrue;
 import com.ninuna.losttales.mapmarker.LostTalesMapMarkerSource;
 import org.junit.Test;
 
-/** Regression coverage for the intentionally different map/compass policy. */
+/** Which markers the map shows, and as what. */
 public final class LostTalesClientMapMarkerVisibilityTest {
     @Test
-    public void hiddenUndiscoveredMarkerIsCompassVisibleButMapHidden() {
+    public void aHiddenUndiscoveredMarkerStaysOffTheMap() {
         LostTalesMapMarkerData marker = marker(true, true, false);
 
         assertFalse(LostTalesClientMapMarkerVisibility
                 .isUndiscoveredRegionVisible(marker));
-        assertTrue(LostTalesClientMapMarkerVisibility
-                .isUndiscoveredCompassVisible(marker));
         assertFalse(LostTalesClientMapMarkerVisibility
                 .isMapVisible(marker));
     }

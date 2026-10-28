@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
 import com.ninuna.losttales.network.server.LostTalesServerPacketDispatcher;
@@ -43,6 +44,8 @@ public final class LostTalesChatTypingPacket implements IMessage {
     private UUID identityCharacterId;
     /** Whether the message would sign as the Narrator; see the send packet. */
     private boolean narrating;
+    /** How far the line would carry where it is heard nearby; see the send packet. */
+    private ChatSpeechRange range = ChatSpeechRange.TALK;
     private boolean malformed;
 
     public LostTalesChatTypingPacket() {}
@@ -91,6 +94,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
             }
             this.targetCharacterId = namedCharacter == 0 ? null
                     : new UUID(buffer.readLong(), buffer.readLong());
+            this.range = ChatSpeechRange.fromCode(buffer.readUnsignedByte());
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -103,6 +107,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
             this.identityKind = LostTalesChatSendPacket.IDENTITY_DEFAULT;
             this.identityCharacterId = null;
             this.narrating = false;
+            this.range = ChatSpeechRange.TALK;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -130,6 +135,7 @@ public final class LostTalesChatTypingPacket implements IMessage {
             buffer.writeLong(this.targetCharacterId.getMostSignificantBits());
             buffer.writeLong(this.targetCharacterId.getLeastSignificantBits());
         }
+        buffer.writeByte(this.range.code());
     }
 
     private void validate() {
@@ -151,7 +157,10 @@ public final class LostTalesChatTypingPacket implements IMessage {
                         == LostTalesChatSendPacket.IDENTITY_CHARACTER
                         && this.identityCharacterId == null)
                 || (this.narrating && this.identityKind
-                        == LostTalesChatSendPacket.IDENTITY_ACCOUNT)) {
+                        == LostTalesChatSendPacket.IDENTITY_ACCOUNT)
+                || this.range == null
+                || (this.range != ChatSpeechRange.TALK
+                        && !ChatSpeechRange.appliesTo(channel))) {
             throw new IllegalArgumentException("invalid chat typing request");
         }
     }
@@ -170,6 +179,16 @@ public final class LostTalesChatTypingPacket implements IMessage {
     }
     /** Whether the message would sign as the Narrator. */
     public boolean isNarrating() { return this.narrating; }
+
+    /** The same request for a line said at {@code range}: talk for none. */
+    public LostTalesChatTypingPacket range(ChatSpeechRange range) {
+        this.range = range == null ? ChatSpeechRange.TALK : range;
+        validate();
+        return this;
+    }
+
+    /** How far the line would carry where it is heard nearby. */
+    public ChatSpeechRange getRange() { return this.range; }
     public boolean isMalformed() { return this.malformed; }
 
     public static final class Handler implements IMessageHandler<
@@ -198,7 +217,8 @@ public final class LostTalesChatTypingPacket implements IMessage {
                                     message.getIdentityCharacterId(),
                                     message.isNarrating(),
                                     message.getTargetIdentity(),
-                                    message.getTargetCharacterId());
+                                    message.getTargetCharacterId(),
+                                    message.getRange());
                         }
                     });
             return null;

@@ -12,10 +12,10 @@ import java.io.File;
  * config/losttales/
  *   client/   client.cfg, third-person.cfg, camera_presets/, chat/, map_markers.txt,
  *             windows/&lt;account uuid&gt;.txt, views/ (the player's own view files),
- *             hud_layouts/ (the player's own HUD layouts)
+ *             hud_layouts/ (the player's own HUD layouts), motion/ (the Motion Lab's)
  *   server/   server.cfg, roles.cfg, channels.cfg
  *   quests/, skills/, deeds/, races/, capes/, kits/, missives/, map_markers/,
- *   structures/, lore_characters/
+ *   structures/, lore_characters/, accessories/, armour/
  *                      the server's own content files (MOD-17), read as it starts
  * </pre>
  *

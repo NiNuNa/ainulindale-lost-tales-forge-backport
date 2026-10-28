@@ -37,7 +37,7 @@ public final class LostTalesQuestDefinitionNbt {
     private static final String KEY_INTERACTION = "Interaction";
     private static final String KEY_MARKERS = "Markers";
     private static final String KEY_JOURNAL_LOG = "JournalLog";
-    private static final String KEY_DIALOGUE = "Dialogue";
+    private static final String KEY_CONVERSATION = "Conversation";
     private static final String KEY_WORDS = "Words";
     private static final String KEY_RULES = "Rules";
     private static final String KEY_STAGES = "Stages";
@@ -70,7 +70,7 @@ public final class LostTalesQuestDefinitionNbt {
         tag.setTag(KEY_INTERACTION, writeStringMap(quest.getInteraction()));
         tag.setTag(KEY_MARKERS, writeStringMap(quest.getMarkers()));
         tag.setTag(KEY_JOURNAL_LOG, writeStringMap(quest.getJournalLog()));
-        tag.setTag(KEY_DIALOGUE, writeStringMap(quest.getDialogue()));
+        tag.setTag(KEY_CONVERSATION, writeStringMap(quest.getConversation()));
         tag.setTag(KEY_WORDS, writeStringMap(quest.getWords()));
         tag.setTag(KEY_RULES, writeStringMap(quest.getRules()));
 
@@ -153,7 +153,7 @@ public final class LostTalesQuestDefinitionNbt {
                 readStringMap(tag.getTagList(KEY_INTERACTION, Constants.NBT.TAG_COMPOUND)),
                 readStringMap(tag.getTagList(KEY_MARKERS, Constants.NBT.TAG_COMPOUND)),
                 readStringMap(tag.getTagList(KEY_JOURNAL_LOG, Constants.NBT.TAG_COMPOUND)),
-                readStringMap(tag.getTagList(KEY_DIALOGUE, Constants.NBT.TAG_COMPOUND)),
+                readStringMap(tag.getTagList(KEY_CONVERSATION, Constants.NBT.TAG_COMPOUND)),
                 Collections.<String, String>emptyMap(),
                 stages,
                 false,
@@ -177,7 +177,7 @@ public final class LostTalesQuestDefinitionNbt {
                 || !isStringMapReasonable(tag, KEY_INTERACTION)
                 || !isStringMapReasonable(tag, KEY_MARKERS)
                 || !isStringMapReasonable(tag, KEY_JOURNAL_LOG)
-                || !isStringMapReasonable(tag, KEY_DIALOGUE)
+                || !isStringMapReasonable(tag, KEY_CONVERSATION)
                 || !isStringMapReasonable(tag, KEY_WORDS)
                 || !isStringMapReasonable(tag, KEY_RULES)
                 || !MissiveWords.isWellFormed(readStringMap(tag.getTagList(
@@ -257,8 +257,8 @@ public final class LostTalesQuestDefinitionNbt {
     /**
      * Whether the string map under {@code key} is one this layout writes:
      * a list of at most {@link #MAX_MAP_ENTRIES} compounds, each a
-     * {@code Key} and a {@code Value} within their lengths. Generated
-     * missives store their maps the same way.
+     * {@code Key} and a {@code Value} within their lengths. Missives
+     * store their maps the same way.
      */
     public static boolean isStringMapReasonable(
             NBTTagCompound owner, String key) {

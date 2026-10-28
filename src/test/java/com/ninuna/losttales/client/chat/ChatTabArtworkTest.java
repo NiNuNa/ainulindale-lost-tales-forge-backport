@@ -37,7 +37,7 @@ public final class ChatTabArtworkTest {
         // A tab draws its pieces whole and stands on the window's top
         // rule, so the row is one row taller than the artwork; a
         // re-export at another height moves the row with it.
-        assertEquals("A tab is its pieces whole, plus the rule they stand on",
+        assertEquals("A page is its pieces whole, plus the rule they stand on",
                 TabRow.HEIGHT,
                 LostTalesUiSheet.TAB_LEFT.getHeight() + 1);
     }

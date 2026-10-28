@@ -3,7 +3,7 @@ package com.ninuna.losttales.network.server;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.compat.minecraft.PlayerItemUseAccess;
 import com.ninuna.losttales.thirdperson.ChargeTierCalculator;
-import com.ninuna.losttales.thirdperson.ThirdPersonChargeItemPolicy;
+import com.ninuna.losttales.thirdperson.ChargeItemPolicy;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChargeTierSyncPacket;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -22,7 +22,11 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 
-/** Server authority for charge-tier tracking and projectile bonuses. */
+/**
+ * How far a player has drawn a bow or other charged weapon, worked out on
+ * the server, and what its charge tier gives the projectile it looses:
+ * speed, damage and knockback, and a critical hit from tier 2.
+ */
 public final class LostTalesChargeService {
     private static final String CHARGE_TIER_TAG =
             "LostTalesChargeTier";
@@ -128,7 +132,7 @@ public final class LostTalesChargeService {
         UUID playerId = player.getUniqueID();
         ItemStack stack = PlayerItemUseAccess.getItemInUse(player);
         if (!LostTalesConfig.enableChargeTiers
-                || !ThirdPersonChargeItemPolicy
+                || !ChargeItemPolicy
                 .supportsChargeTiers(stack)) {
             ChargeState previous = STATES.remove(playerId);
             if (previous != null) {
@@ -154,7 +158,7 @@ public final class LostTalesChargeService {
 
     private static int resolveCurrentTier(EntityPlayerMP player) {
         ItemStack stack = PlayerItemUseAccess.getItemInUse(player);
-        return ThirdPersonChargeItemPolicy.supportsChargeTiers(stack)
+        return ChargeItemPolicy.supportsChargeTiers(stack)
                 ? resolveTier(player, stack) : 0;
     }
 
@@ -165,7 +169,7 @@ public final class LostTalesChargeService {
                         - PlayerItemUseAccess.getItemInUseCount(player));
         return ChargeTierCalculator.resolveTier(
                 useTicks,
-                ThirdPersonChargeItemPolicy.getFullDrawTicks(stack),
+                ChargeItemPolicy.getFullDrawTicks(stack),
                 LostTalesConfig.chargeTierOneTicks,
                 LostTalesConfig.chargeTierTwoTicks,
                 LostTalesConfig.chargeTierThreeTicks);

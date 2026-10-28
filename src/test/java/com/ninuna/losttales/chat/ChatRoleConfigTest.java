@@ -265,6 +265,45 @@ public final class ChatRoleConfigTest {
                 Collections.<UUID>emptySet(), Collections.<UUID>emptySet()).isEmpty());
     }
 
+    /**
+     * A role with more members than a line holds is written over several
+     * entries, each inside a line the config takes, and read back whole;
+     * a rewrite replaces all of them.
+     */
+    @Test
+    public void manyMembersAreWrittenOverSeveralLinesAndReadBackWhole() {
+        Set<UUID> accounts = new HashSet<UUID>();
+        Set<UUID> characters = new HashSet<UUID>();
+        for (int index = 0; index < 150; index++) {
+            accounts.add(new UUID(0x1000L, index));
+            characters.add(new UUID(0x2000L, index));
+        }
+        String longestId = "a2345678901234567890123456789012";
+        List<String> written = ChatRoleConfig.withMembers(new String[] {"builder=" + STEVE},
+                longestId, accounts, characters);
+        int perLine = ChatRoleConfig.MEMBERS_PER_LINE;
+        assertEquals(1 + (300 + perLine - 1) / perLine, written.size());
+        assertEquals("builder=" + STEVE, written.get(0));
+        for (String entry : written) {
+            assertTrue(entry.length() + " letters",
+                    entry.length() <= com.ninuna.losttales.config.server
+                            .ServerConfigChangeValidator.MAX_VALUE_LENGTH);
+        }
+        ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {
+                longestId + "=name:Long", "builder=name:Builder"},
+                written.toArray(new String[written.size()]), collect);
+        assertTrue(warnings.toString(), warnings.isEmpty());
+        assertEquals(accounts, catalog.membersOf(longestId));
+        assertEquals(characters, catalog.characterMembersOf(longestId));
+        assertEquals(Collections.singleton(STEVE), catalog.membersOf("builder"));
+
+        // A rewrite with fewer members leaves none of the old entries behind.
+        List<String> fewer = ChatRoleConfig.withMembers(
+                written.toArray(new String[written.size()]), longestId,
+                Collections.singleton(ALEX), Collections.<UUID>emptySet());
+        assertEquals(Arrays.asList("builder=" + STEVE, longestId + "=" + ALEX), fewer);
+    }
+
     @Test
     public void gatesNameTheRolesAChannelAsksFor() {
         ChatRoleCatalog catalog = ChatRoleConfig.parse(new String[] {

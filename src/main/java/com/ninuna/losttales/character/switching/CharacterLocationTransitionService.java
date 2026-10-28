@@ -17,7 +17,12 @@ import net.minecraft.nbt.NBTTagCompound;
 
 import java.util.List;
 
-/** Performs validated, lifecycle-owned character position transitions. */
+/**
+ * Moves a player to where a saved life stands: its position, its starting
+ * waypoint or the world's spawn, into another dimension too. A change of
+ * dimension made here is marked as the switch's own, so the lifecycle
+ * tracker does not take it for a portal.
+ */
 public final class CharacterLocationTransitionService {
 
     private static final int SAFE_Y_SEARCH = 24;

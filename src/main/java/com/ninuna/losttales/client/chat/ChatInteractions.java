@@ -36,7 +36,7 @@ final class ChatInteractions {
         SPOILER,
         /** A long message's Read more opens it, its Show less folds it. */
         FOLD,
-        /** A channel link brings its tab forward. */
+        /** A channel link brings its page forward. */
         CHANNEL_LINK,
         /** A reply's quote leads to the message it quotes. */
         REPLY_JUMP,

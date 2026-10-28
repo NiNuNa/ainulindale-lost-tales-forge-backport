@@ -11,16 +11,41 @@ import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
 /**
  * Where the count of how many fellowships a member's character may lead
  * comes from (FEL-08): the LOTR state that is the character's own. A
  * character played now is counted from its account's live LOTR data, by
  * the caller; any other from the progression saved with it as it was
  * last played, here. Where none can be read, it may lead one.
+ *
+ * <p>An account whose saved state cannot be read is logged once, not at
+ * every count: static state, cleared with the server's other stores
+ * through {@link FellowshipSyncManager#clear}.</p>
  */
 final class FellowshipLeadLimits {
 
+    /** The accounts whose saved state could not be read, logged once each. */
+    private static final Set<UUID> LOGGED = new HashSet<UUID>();
+
     private FellowshipLeadLimits() {}
+
+    /** Forgets which accounts were logged, as the server starts or stops. */
+    static void clear() {
+        synchronized (LOGGED) {
+            LOGGED.clear();
+        }
+    }
+
+    /** Whether an unreadable state of {@code ownerId}'s is news to log: true the first time only. */
+    static boolean firstUnreadable(UUID ownerId) {
+        synchronized (LOGGED) {
+            return LOGGED.add(ownerId);
+        }
+    }
 
     /** How many fellowships the member's character may lead, from the state saved with it. */
     static int savedLimitOf(World world, FellowshipMember member) {
@@ -39,8 +64,11 @@ final class FellowshipLeadLimits {
             return savedProgressionOf(CharacterPlayerStateStorage.get(world,
                     member.getOwnerId()), member);
         } catch (RuntimeException unreadable) {
-            LostTalesLog.warning("The saved LOTR state of fellowship member %s could not be read: %s",
-                    member.getIdentityId(), unreadable.toString());
+            if (firstUnreadable(member.getOwnerId())) {
+                LostTalesLog.warning("The saved LOTR state of fellowship member %s could not "
+                                + "be read: %s; it may lead one fellowship",
+                        member.getIdentityId(), unreadable.toString());
+            }
             return null;
         }
     }

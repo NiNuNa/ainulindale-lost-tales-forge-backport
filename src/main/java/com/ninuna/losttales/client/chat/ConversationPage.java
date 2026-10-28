@@ -5,7 +5,7 @@ import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatCodeNames;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatRolePresentation;
-import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.chat.ChatPageIds;
 import com.ninuna.losttales.client.window.OptionGlyph;
 import com.ninuna.losttales.client.window.PageHelp;
 import com.ninuna.losttales.client.window.PageCategory;
@@ -27,7 +27,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
 
 /**
- * A conversation's tab: a channel, and for a whisper the <em>identity</em>
+ * A conversation's page: a channel, and for a whisper the <em>identity</em>
  * the conversation is with, the identity of this player's own it is held
  * as — or the NPC, since LOTR speech is addressed to one player and reads
  * as a whisper from the NPC. It is the chat's kind of {@link WindowPage}.
@@ -40,11 +40,11 @@ import net.minecraft.util.StatCollector;
  * switching to Beren shows none of it. The accounts are still carried —
  * they are who the message is routed to, always reachable whatever
  * either happens to be playing — but it is the two identities that name
- * the tab and keep the threads apart.</p>
+ * the page and keep the threads apart.</p>
  *
- * <p>Every plain channel is one tab; every whisper conversation is one
+ * <p>Every plain channel is one page; every whisper conversation is one
  * more, all of them on the {@link ChatChannel#WHISPER} channel, NPCs
- * kept apart from players of the same name. Tabs are values — equal when
+ * kept apart from players of the same name. Pages are values — equal when
  * channel, account, identity, own identity, kind and copy agree, names
  * compared case-insensitively — and are what windows hold, lines are
  * filed under, and the selection points at.</p>
@@ -57,7 +57,7 @@ import net.minecraft.util.StatCollector;
  * conversation itself, its first copy ({@link #conversation}).</p>
  */
 public final class ConversationPage extends WindowPage {
-    /** A conversation's options, behind its tab's three dots and on its tool strip. */
+    /** A conversation's options, behind its page's three dots and on its tool strip. */
     private static final String MENU_MARK_READ = "mark_read";
     private static final String MENU_JUMP_UNREAD = "jump_unread";
     private static final String MENU_NOTIFY = "notify";
@@ -98,25 +98,25 @@ public final class ConversationPage extends WindowPage {
             LostTalesUiSheet.AREA, LostTalesUiSheet.AREA_HOVER,
             "gui.losttales.chat.area.show", "gui.losttales.chat.area.hide");
 
-    private static final String WHISPER_ID_PREFIX = ChatTabIds.WHISPER_PREFIX;
-    private static final String NPC_ID_PREFIX = ChatTabIds.NPC_PREFIX;
+    private static final String WHISPER_ID_PREFIX = ChatPageIds.WHISPER_PREFIX;
+    private static final String NPC_ID_PREFIX = ChatPageIds.NPC_PREFIX;
     /**
-     * Between the account and the identity in a tab's id. A Minecraft
+     * Between the account and the identity in a page's id. A Minecraft
      * account name cannot hold one, so the account is always the part
      * before the first of them and an identity may hold as many as it
      * likes. An id without one is the account's own conversation.
      */
-    private static final char IDENTITY_SEPARATOR = ChatTabIds.SEPARATOR;
-    private static final String OWNER_MARK = ChatTabIds.OWNER_MARK;
+    private static final char IDENTITY_SEPARATOR = ChatPageIds.SEPARATOR;
+    private static final String OWNER_MARK = ChatPageIds.OWNER_MARK;
     /**
      * The last segment of a scoped plain channel's id, after a
-     * separator: the conversation the tab is, a faction or a fellowship.
+     * separator: the conversation the page is, a faction or a fellowship.
      * A conversation and not a character — two characters in one faction
      * are in the same conversation, and it outlives either of them.
      */
-    private static final String SCOPE_MARK = ChatTabIds.SCOPE_MARK;
+    private static final String SCOPE_MARK = ChatPageIds.SCOPE_MARK;
     /**
-     * One interned tab per channel, by the channel itself. A map rather
+     * One interned page per channel, by the channel itself. A map rather
      * than a position: the set of channels is open, so there is no fixed
      * length to index into.
      */
@@ -131,7 +131,7 @@ public final class ConversationPage extends WindowPage {
     /** This player's identity the conversation is held as; empty for the account. */
     private final String ownerKey;
     private final boolean npc;
-    /** Which copy of the conversation the tab is: 1 for the conversation itself. */
+    /** Which copy of the conversation the page is: 1 for the conversation itself. */
     private final int instance;
 
     private ConversationPage(ChatChannel channel, String partner, String identity,
@@ -153,16 +153,16 @@ public final class ConversationPage extends WindowPage {
     }
 
     /**
-     * The tab of a plain channel; null for the whisper channel, whose
-     * tabs each name a partner and come from {@link #whisper}. This is
+     * The page of a plain channel; null for the whisper channel, whose
+     * pages each name a partner and come from {@link #whisper}. This is
      * the entry the row and the layout hold, one per channel. A channel
      * that is more than one conversation
-     * ({@link ChatChannel#isScoped}) files its lines under a tab
+     * ({@link ChatChannel#isScoped}) files its lines under a page
      * per identity — see {@link #of(ChatChannel, String)} — and the one
      * being read is {@link #viewed}.
      */
     public static ConversationPage of(ChatChannel channel) {
-        // A whisper is always with someone: it has no plain tab.
+        // A whisper is always with someone: it has no plain page.
         if (channel == null || channel == ChatChannel.WHISPER) {
             return null;
         }
@@ -170,7 +170,7 @@ public final class ConversationPage extends WindowPage {
         // set of channels is open: a server names its own, and they are
         // registered long after this class is first read. Kept by id and
         // rebuilt when the registry hands out a new object for that id,
-        // so the tab always names the channel in force.
+        // so the page always names the channel in force.
         String key = channel.getId();
         ConversationPage cached = PLAIN.get(key);
         if (cached == null || cached.channel != channel) {
@@ -180,9 +180,9 @@ public final class ConversationPage extends WindowPage {
         return cached;
     }
 
-    /** A conversation's tab, or null for any other kind of tab. */
-    public static ConversationPage from(WindowPage tab) {
-        return tab instanceof ConversationPage ? (ConversationPage)tab : null;
+    /** A conversation's page, or null for any other kind of page. */
+    public static ConversationPage from(WindowPage page) {
+        return page instanceof ConversationPage ? (ConversationPage)page : null;
     }
 
     /** The conversation in front of a window; null for a page in front, or no window. */
@@ -191,79 +191,79 @@ public final class ConversationPage extends WindowPage {
     }
 
     /**
-     * The tab whose lines are shown while this one is on screen. A
+     * The page whose lines are shown while this one is on screen. A
      * channel that is one conversation is its own; a scoped channel's
      * row entry stands for the conversation its copy's identity is in,
      * so the lines shown under it are that identity's; and a person's
      * row entry stands for the conversation that person has with the
-     * identity the copy speaks as. The row holds one Faction tab and one
-     * tab per person; which conversation each copy shows follows who it
+     * identity the copy speaks as. The row holds one Faction page and one
+     * page per person; which conversation each copy shows follows who it
      * speaks as, and nothing else in the layout has to know.
      */
-    public static ConversationPage viewed(ConversationPage tab) {
-        if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
-            return tab;
+    public static ConversationPage viewed(ConversationPage page) {
+        if (page == null || page.npc || page.ownerKey.length() > 0) {
+            return page;
         }
-        if (tab.isWhisper()) {
-            return copy(whisper(tab.partner, tab.identity,
-                    ClientChatIdentities.viewIdentityKey(tab)), tab.instance);
+        if (page.isWhisper()) {
+            return copy(whisper(page.partner, page.identity,
+                    ClientChatIdentities.viewIdentityKey(page)), page.instance);
         }
-        if (tab.channel == null || !tab.channel.isScoped()) {
-            return tab;
+        if (page.channel == null || !page.channel.isScoped()) {
+            return page;
         }
-        return copy(of(tab.channel,
-                ClientChatChannelState.scopeKeyRead(tab)), tab.instance);
+        return copy(of(page.channel,
+                ClientChatChannelState.scopeKeyRead(page)), page.instance);
     }
 
     /**
-     * The conversation a tab stands for as the character played reads
-     * it, whoever its copies speak as: what the closed feed shows, which
+     * The conversation a page stands for as the character played reads
+     * it, whoever its copies speak as: what the feed shows, which
      * always follows the character played.
      */
-    public static ConversationPage playedConversation(ConversationPage tab) {
-        if (tab == null || tab.npc || tab.ownerKey.length() > 0) {
-            return tab == null ? null : tab.conversation();
+    public static ConversationPage playedConversation(ConversationPage page) {
+        if (page == null || page.npc || page.ownerKey.length() > 0) {
+            return page == null ? null : page.conversation();
         }
-        if (tab.isWhisper()) {
-            return whisper(tab.partner, tab.identity,
+        if (page.isWhisper()) {
+            return whisper(page.partner, page.identity,
                     ClientChatIdentities.activeIdentityKey());
         }
-        if (tab.channel == null || !tab.channel.isScoped()) {
-            return tab.conversation();
+        if (page.channel == null || !page.channel.isScoped()) {
+            return page.conversation();
         }
-        return of(tab.channel, ClientChatChannelState.playedScopeKey(tab.channel));
+        return of(page.channel, ClientChatChannelState.playedScopeKey(page.channel));
     }
 
     /**
-     * The row entry a tab belongs to: the plain channel tab for a
-     * faction's conversation, the person's tab for a whisper conversation
-     * held as one identity, and the tab itself for everything else, a
+     * The row entry a page belongs to: the plain channel page for a
+     * faction's conversation, the person's page for a whisper conversation
+     * held as one identity, and the page itself for everything else, a
      * fellowship's conversation among them. The row holds one entry per
-     * channel, per person and per fellowship, so a line's own tab is not
-     * always a tab a window can hold; anything asking the layout about a
+     * channel, per person and per fellowship, so a line's own page is not
+     * always a page a window can hold; anything asking the layout about a
      * line asks about this.
      */
-    public static ConversationPage row(ConversationPage tab) {
-        if (tab == null || tab.npc || tab.ownerKey.length() == 0
-                || tab.isFellowship()) {
-            return tab;
+    public static ConversationPage row(ConversationPage page) {
+        if (page == null || page.npc || page.ownerKey.length() == 0
+                || page.isFellowship()) {
+            return page;
         }
-        return copy(tab.isWhisper() ? whisper(tab.partner, tab.identity)
-                : of(tab.channel), tab.instance);
+        return copy(page.isWhisper() ? whisper(page.partner, page.identity)
+                : of(page.channel), page.instance);
     }
 
     /**
-     * The conversation a tab shows ({@link #viewed}), as itself rather than
+     * The conversation a page shows ({@link #viewed}), as itself rather than
      * as one of its copies: what its lines are filed under.
      */
-    public static ConversationPage viewedConversation(ConversationPage tab) {
-        ConversationPage view = viewed(tab);
+    public static ConversationPage viewedConversation(ConversationPage page) {
+        ConversationPage view = viewed(page);
         return view == null ? null : view.conversation();
     }
 
     /** Copy {@code instance} of a conversation; null stays null. */
-    private static ConversationPage copy(ConversationPage tab, int instance) {
-        return tab == null ? null : tab.withInstance(instance);
+    private static ConversationPage copy(ConversationPage page, int instance) {
+        return page == null ? null : page.withInstance(instance);
     }
 
     /**
@@ -271,7 +271,7 @@ public final class ConversationPage extends WindowPage {
      * itself: a Gondor line and a Rohan line are two conversations, and
      * every character of this player in Gondor reads the same one. A
      * channel that is only ever one conversation ignores the scope and
-     * answers with its one tab, and so does an empty scope — the
+     * answers with its one page, and so does an empty scope — the
      * account is in no faction, so it is in no conversation.
      */
     public static ConversationPage of(ChatChannel channel, String scopeKey) {
@@ -296,7 +296,7 @@ public final class ConversationPage extends WindowPage {
     }
 
     /**
-     * The whisper tab with one identity of an account, held as one of
+     * The whisper page with one identity of an account, held as one of
      * this player's own identities: {@code ownerKey} is the character's
      * id ({@link #ownerKeyOf}), or empty for the account.
      */
@@ -312,7 +312,7 @@ public final class ConversationPage extends WindowPage {
     }
 
     /**
-     * The conversation tab with a named NPC: a whisper nobody is on the
+     * The conversation page with a named NPC: a whisper nobody is on the
      * other end of, so replies are echoed locally rather than sent.
      */
     public static ConversationPage npc(String name) {
@@ -330,21 +330,21 @@ public final class ConversationPage extends WindowPage {
      */
     public String getPartnerIdentity() { return this.identity; }
     /**
-     * This player's identity the tab is read and spoken as: a
+     * This player's identity the page is read and spoken as: a
      * character's id, lower-cased, or empty for the account. A whisper
      * conversation carries the identity it is held as, and a person's
-     * row entry none; a plain tab carries one only on a channel that is
+     * row entry none; a plain page carries one only on a channel that is
      * more than one conversation.
      */
     public String getOwnerKey() { return this.ownerKey; }
     public boolean isWhisper() { return this.channel == ChatChannel.WHISPER; }
-    /** Whether the tab is one fellowship's conversation, named by the fellowship's id. */
+    /** Whether the page is one fellowship's conversation, named by the fellowship's id. */
     public boolean isFellowship() {
         return this.channel == ChatChannel.FELLOWSHIP && this.ownerKey.length() > 0;
     }
     /**
-     * Whether the tab is a conversation the server it is held on keeps
-     * apart: a whisper with a player, or a fellowship's. Its tab is
+     * Whether the page is a conversation the server it is held on keeps
+     * apart: a whisper with a player, or a fellowship's. Its page is
      * remembered for that server, not in the layout, and goes when the
      * session ends.
      */
@@ -353,7 +353,7 @@ public final class ConversationPage extends WindowPage {
     }
     /**
      * The other end a line typed here is sent to: a whisper's partner, a
-     * fellowship's id; empty for every other tab.
+     * fellowship's id; empty for every other page.
      */
     public String target() {
         return isWhisper() ? this.partner : isFellowship() ? this.ownerKey : "";
@@ -363,7 +363,7 @@ public final class ConversationPage extends WindowPage {
 
     /**
      * The id an NPC's lines in this conversation are signed with, one for
-     * its name as its tab is; null for any other tab. The creature cannot
+     * its name as its page is; null for any other page. The creature cannot
      * give one: a client of this game version makes a new random id up for
      * a creature every time it comes into view, so its lines would stop
      * running on, and its card lose its faction, after every return.
@@ -393,7 +393,7 @@ public final class ConversationPage extends WindowPage {
                     : this.channel.getId() + IDENTITY_SEPARATOR
                             + SCOPE_MARK + this.ownerKey;
         }
-        return ChatTabIds.whisperConversationId(this.partner, this.identity,
+        return ChatPageIds.whisperConversationId(this.partner, this.identity,
                 this.ownerKey);
     }
 
@@ -425,6 +425,7 @@ public final class ConversationPage extends WindowPage {
     @Override
     public void forgetCopy() {
         ClientChatIdentities.forget(this);
+        ChatSpeechRanges.forget(this);
         if (this.instance > 1) {
             ClientChatChannelViews.forgetCopy(this);
             ChatLayout.forgetCopy(this);
@@ -432,10 +433,11 @@ public final class ConversationPage extends WindowPage {
         }
     }
 
-    /** A duplicated copy speaks as the copy it was made from. */
+    /** A duplicated copy speaks as the copy it was made from, and at its range. */
     @Override
     public void duplicatedFrom(WindowPage source) {
         ClientChatIdentities.inherit(from(source), this);
+        ChatSpeechRanges.inherit(from(source), this);
     }
 
     /**
@@ -502,17 +504,17 @@ public final class ConversationPage extends WindowPage {
         if (!(other instanceof ConversationPage)) {
             return false;
         }
-        ConversationPage tab = (ConversationPage)other;
+        ConversationPage page = (ConversationPage)other;
         // By the channel's id, never the object: a channel a server
         // defines is registered again with every access broadcast, and
-        // two tabs naming the same channel must stay the same tab across
+        // two pages naming the same channel must stay the same page across
         // that. It is also what keeps this in step with hashCode.
-        return tab.channel.getId().equals(this.channel.getId())
-                && tab.npc == this.npc
-                && tab.partnerKey.equals(this.partnerKey)
-                && tab.identityKey.equals(this.identityKey)
-                && tab.ownerKey.equals(this.ownerKey)
-                && tab.instance == this.instance;
+        return page.channel.getId().equals(this.channel.getId())
+                && page.npc == this.npc
+                && page.partnerKey.equals(this.partnerKey)
+                && page.identityKey.equals(this.identityKey)
+                && page.ownerKey.equals(this.ownerKey)
+                && page.instance == this.instance;
     }
 
     @Override
@@ -582,7 +584,7 @@ public final class ConversationPage extends WindowPage {
     }
 
     /**
-     * Unsent words in this copy, unless it is the tab being typed in:
+     * Unsent words in this copy, unless it is the page being typed in:
      * those are in the field. Each copy keeps a draft of its own.
      */
     @Override
@@ -609,7 +611,7 @@ public final class ConversationPage extends WindowPage {
     }
 
     /**
-     * Only a plain channel's own tab: a whisper and one conversation of
+     * Only a plain channel's own page: a whisper and one conversation of
      * a scoped channel end with the session. The row holds the channel;
      * which conversation it shows follows the identity being read.
      */
@@ -646,8 +648,8 @@ public final class ConversationPage extends WindowPage {
 
     /** The timestamp area and the member list out again, the list at its own width. */
     @Override
-    public void resetView() {
-        ChatLayout.resetView(this);
+    public void resetPanels() {
+        ChatLayout.resetPanels(this);
     }
 
     /** Every conversation's cog opens the one Chat Settings. */
@@ -735,10 +737,10 @@ public final class ConversationPage extends WindowPage {
     /**
      * A messenger's channel options, in the tool strip's order. Mark as
      * Read, the counters and the divider gone at once, and Jump to First
-     * Unread, the tab brought forward and its history taken to where the
+     * Unread, the page brought forward and its history taken to where the
      * unread run begins; each greyed while nothing waits unread. Then Chat
      * Feed Settings and Notification Settings (Everything, Only Mentions
-     * or Nothing: which lines reach the closed feed, and which chime),
+     * or Nothing: which lines reach the feed, and which chime),
      * each opening its three words in a sub-window of its own: the
      * channel's own settings. Their glyphs wear the colour of the word
      * chosen.
@@ -750,23 +752,23 @@ public final class ConversationPage extends WindowPage {
         boolean divided = ClientChatChannelViews.unreadDividerLine(conversation) != null;
         boolean unread = ClientChatChannelViews.hasUnread(conversation) || divided;
         options.add(PageOption.action(MENU_MARK_READ,
-                word("gui.losttales.chat.tab.mark_read"), READ_GLYPH)
-                .unavailable(unread ? "" : word("gui.losttales.chat.tab.nothing_unread"))
+                word("gui.losttales.chat.page.mark_read"), READ_GLYPH)
+                .unavailable(unread ? "" : word("gui.losttales.chat.page.nothing_unread"))
                 .inGroup(GROUP_READING, "")
-                .reachesEveryPage(word("gui.losttales.chat.tab.mark_all_read")));
+                .reachesEveryPage(word("gui.losttales.chat.page.mark_all_read")));
         options.add(PageOption.action(MENU_JUMP_UNREAD,
-                word("gui.losttales.chat.tab.jump_unread"), JUMP_GLYPH)
-                .unavailable(divided ? "" : word("gui.losttales.chat.tab.nothing_unread"))
+                word("gui.losttales.chat.page.jump_unread"), JUMP_GLYPH)
+                .unavailable(divided ? "" : word("gui.losttales.chat.page.nothing_unread"))
                 .inGroup(GROUP_READING, ""));
         // The feed's own settings, every conversation's, stand under the
         // words that say what of this one reaches it.
-        options.add(pick(MENU_FEED, "gui.losttales.chat.tab.feed",
+        options.add(pick(MENU_FEED, "gui.losttales.chat.page.feed",
                 ChatLayout.feedChoice(conversation), FEED_GLYPHS)
                 .withSettings(Settings.Place.FEED)
-                .reachesEveryPage(word("gui.losttales.chat.tab.feed_all")));
-        options.add(pick(MENU_NOTIFY, "gui.losttales.chat.tab.notify",
+                .reachesEveryPage(word("gui.losttales.chat.page.feed_all")));
+        options.add(pick(MENU_NOTIFY, "gui.losttales.chat.page.notify",
                 ChatLayout.notification(conversation), BELL_GLYPHS)
-                .reachesEveryPage(word("gui.losttales.chat.tab.notify_all")));
+                .reachesEveryPage(word("gui.losttales.chat.page.notify_all")));
         // What is addressed to the player, counted beside its button.
         options.add(ChatInbox.option(ChatInbox.Kind.CONVERSATIONS)
                 .inGroup(GROUP_SETTINGS, ""));
@@ -830,7 +832,7 @@ public final class ConversationPage extends WindowPage {
                 screen.jumpToTab(this);
             }
             if (first != null) {
-                // The rows exist once the tab has been drawn; the next
+                // The rows exist once the page has been drawn; the next
                 // draw lands on the run's first line.
                 LostTalesChatPresentation.requestJump(first.intValue());
             }
@@ -840,8 +842,8 @@ public final class ConversationPage extends WindowPage {
 
     /** Whether it is one of the two consoles, the command key's. */
     public boolean isConsole() {
-        return this.channel == ChatChannel.CLIENT_CONSOLE
-                || this.channel == ChatChannel.SERVER_CONSOLE;
+        return this.channel == ChatChannel.CONSOLE
+                || this.channel == ChatChannel.SERVER_LOG;
     }
 
     /**

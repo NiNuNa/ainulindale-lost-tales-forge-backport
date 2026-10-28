@@ -42,7 +42,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/** Transaction coordinator for active-character identity and versioned player state. */
+/**
+ * Switches a player between their characters through the switch journal,
+ * and writes the played character's saved life at checkpoints, respawns,
+ * changes of dimension and logout.
+ */
 public final class CharacterSwitchCoordinator {
 
     private static final int MAX_CACHED_REQUESTS = 32;
@@ -124,7 +128,10 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Login/admin recovery: reconcile journals and restore an interrupted switch. */
+    /**
+     * At a join or an operator's recover: settles the account's journal
+     * against the live player, putting back a switch cut short.
+     */
     public CharacterErrorId recover(EntityPlayerMP player) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterErrorId.INVALID_PLAYER;
@@ -179,7 +186,11 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Respawn finalization stores the post-death vanilla state; it never restores pre-death data. */
+    /**
+     * At a respawn: writes the live player as the played character's saved
+     * life and settles the death. A saved life from before the death never
+     * comes back.
+     */
     public CharacterErrorId handleRespawn(EntityPlayerMP player) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterErrorId.INVALID_PLAYER;
@@ -242,7 +253,7 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Dimension replacement reconciles metadata but keeps the live entity state. */
+    /** At a change of dimension: writes the played character's saved life from the live player. */
     public CharacterErrorId handleDimensionChange(EntityPlayerMP player) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return CharacterErrorId.INVALID_PLAYER;
@@ -278,7 +289,10 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Durable death marker prevents a reconnect from restoring pre-drop state. */
+    /**
+     * Marks the account's death unsettled on disk, so no journal repair at
+     * a later join puts back a life from before the death.
+     */
     public void markDeathPending(EntityPlayerMP player) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return;
@@ -301,7 +315,7 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Captures the identity being played on clean logout, except during unresolved death. */
+    /** At logout: writes the played character's saved life, unless a death is unsettled. */
     public void saveActiveStateOnLogout(EntityPlayerMP player) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return;
@@ -330,7 +344,11 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Periodic durability checkpoint. Transitioning players are retried next cycle. */
+    /**
+     * The periodic save of the played character's life. A player in the
+     * middle of a switch, a respawn or a change of dimension waits for the
+     * next round; false then, and while a freeze or a held journal stops it.
+     */
     public boolean checkpointActiveState(EntityPlayerMP player) {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return true;
@@ -364,7 +382,7 @@ public final class CharacterSwitchCoordinator {
         }
     }
 
-    /** Saves every connected character before runtime caches are cleared. */
+    /** Writes every online player's played character as the server stops. Answers how many. */
     public int checkpointAllOnlinePlayers(MinecraftServer server) {
         if (server == null || server.getConfigurationManager() == null) {
             return 0;
@@ -1116,6 +1134,11 @@ public final class CharacterSwitchCoordinator {
         if (account.isFrozen() || transaction.isHeld()) {
             return CharacterErrorId.SWITCH_RECOVERY_REQUIRED;
         }
+
+        // The saved life reaches the disk before the journal names it, so a
+        // crash between the two files never leaves the journal naming a
+        // generation that is not there.
+        CharacterPlayerStateStorage.flush(world);
 
         // A null source is the ghost of a first switch, so a null active
         // id matches a journal still on its source.

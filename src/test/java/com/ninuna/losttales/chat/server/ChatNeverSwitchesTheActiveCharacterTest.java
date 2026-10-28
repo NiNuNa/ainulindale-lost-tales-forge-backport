@@ -17,13 +17,13 @@ import org.junit.Test;
 /**
  * The identity the chat speaks and reads as is the chat's own choice and
  * changes nothing about the character being played: picking another
- * identity in a tab is a presentation choice, not a character switch.
+ * identity in a page is a presentation choice, not a character switch.
  * Nothing in the chat may reach the switch, so this reads the compiled
  * classes of both chat packages and refuses any mention of the types
  * that perform one — the same bytecode check that keeps client code out
  * of the common chat classes.
  *
- * <p>Reading the roster is expected and allowed; it is how a tab knows
+ * <p>Reading the roster is expected and allowed; it is how a page knows
  * which identities the player has. Only writing to it is refused.</p>
  */
 public final class ChatNeverSwitchesTheActiveCharacterTest {

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest.missive;
 
+import com.ninuna.losttales.network.packet.LostTalesMissiveCodec;
 import java.util.Collections;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -16,7 +17,7 @@ public final class LostTalesMissiveNbtTest {
 
     private static LostTalesMissiveData letter() {
         return LostTalesMissiveData.builder(
-                "losttales:missive/generated/test", "kill")
+                "losttales:missive/test", "kill")
                 .titleId("clear_the_paths")
                 .generationWorldTime(1200L)
                 .objective(new LostTalesMissiveObjectiveData("kill_wolves",
@@ -44,18 +45,34 @@ public final class LostTalesMissiveNbtTest {
         assertFalse(quest.isRestartable());
     }
 
+    /** A letter holds no more objectives than its page is sent. */
     @Test
     public void excessiveObjectiveListIsRejected() {
-        NBTTagCompound missive = new NBTTagCompound();
-        missive.setString("QuestId", "losttales:missive/generated/test");
-        missive.setString("QuestType", "gather");
-        missive.setBoolean("Written", false);
-        missive.setString("TitleId", "clear_the_paths");
-        NBTTagList objectives = new NBTTagList();
-        for (int i = 0; i < LostTalesMissiveNbt.MAX_OBJECTIVES + 1; i++) {
-            objectives.appendTag(new NBTTagCompound());
+        NBTTagCompound missive = LostTalesMissiveNbt.writeToNBT(letter());
+        NBTTagList objectives = missive.getTagList("Objectives", 10);
+        NBTTagCompound one = objectives.getCompoundTagAt(0);
+        for (int i = 1; i < LostTalesMissiveCodec.MAX_OBJECTIVES; i++) {
+            NBTTagCompound more = (NBTTagCompound) one.copy();
+            more.setString("Id", "kill_wolves_" + i);
+            objectives.appendTag(more);
         }
-        missive.setTag("Objectives", objectives);
+        assertNotNull("as many as the page is sent read",
+                LostTalesMissiveNbt.readFromNBT(missive));
+        NBTTagCompound past = (NBTTagCompound) one.copy();
+        past.setString("Id", "kill_wolves_past");
+        objectives.appendTag(past);
+
+        assertNull(LostTalesMissiveNbt.readFromNBT(missive));
+    }
+
+    /** An objective that cannot be read makes the whole letter one that cannot be read. */
+    @Test
+    public void anUnreadableObjectiveRefusesTheLetter() {
+        NBTTagCompound missive = LostTalesMissiveNbt.writeToNBT(letter());
+        NBTTagCompound blank = new NBTTagCompound();
+        blank.setString("Id", " ");
+        blank.setString("Type", "kill");
+        missive.getTagList("Objectives", 10).appendTag(blank);
 
         assertNull(LostTalesMissiveNbt.readFromNBT(missive));
     }
@@ -63,7 +80,7 @@ public final class LostTalesMissiveNbtTest {
     @Test
     public void nonCompoundObjectiveListIsRejected() {
         NBTTagCompound missive = new NBTTagCompound();
-        missive.setString("QuestId", "losttales:missive/generated/test");
+        missive.setString("QuestId", "losttales:missive/test");
         missive.setString("QuestType", "gather");
         missive.setBoolean("Written", false);
         missive.setString("TitleId", "clear_the_paths");

@@ -25,10 +25,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Invitation-specific operations kept separate from the core fellowship lifecycle.
- *
- * Every method is package-private and must be invoked while holding the
- * synchronized {@link FellowshipService} mutation boundary.
+ * The invitations: sending one, answering it, taking it back, and the
+ * cleanup of those that ran out or no longer stand. Called only from
+ * {@link FellowshipService}'s synchronized methods, so each request is one
+ * step.
  */
 final class FellowshipInvitationCoordinator {
 
@@ -346,20 +346,28 @@ final class FellowshipInvitationCoordinator {
                 true, fellowship, invitation, null);
     }
 
+    /**
+     * The player's fellowships and invitations; the invitations pruned
+     * first unless {@code prune} is false, where the sync pruned them once
+     * for every player it reaches.
+     */
     FellowshipInvitationState getInvitationState(
             EntityPlayerMP player,
             FellowshipService.ActiveIdentityContext active,
-            FellowshipWorldData fellowshipData) {
+            FellowshipWorldData fellowshipData,
+            boolean prune) {
         FellowshipInvitationWorldData invitationData = getWritableData(player.worldObj);
         if (invitationData == null) {
             return FellowshipInvitationState.failure(
                     FellowshipErrorId.INVITATION_STORAGE_READ_ONLY);
         }
-        pruneInvalidInvitations(
-                fellowshipData,
-                invitationData,
-                active.characterData,
-                System.currentTimeMillis());
+        if (prune) {
+            pruneInvalidInvitations(
+                    fellowshipData,
+                    invitationData,
+                    active.characterData,
+                    System.currentTimeMillis());
+        }
 
         List<Fellowship> fellowships = fellowshipData.getFellowshipsForIdentity(
                 active.gameplayId());

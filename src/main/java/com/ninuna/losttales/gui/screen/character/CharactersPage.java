@@ -1170,8 +1170,12 @@ public final class CharactersPage extends PageContent
             return items;
         }
         CharacterRosterSnapshot snapshot = snapshot();
+        // While the last switch waits for an administrator, nothing here
+        // can be done, and each button says why (CHAR-45).
         String busy = isPending()
-                ? I18n.format("gui.losttales.character.working") : "";
+                ? I18n.format("gui.losttales.character.working")
+                : snapshot != null && snapshot.isJournalHeld()
+                ? I18n.format("gui.losttales.character.error.switch_journal_held") : "";
         if (snapshot == null) {
             String refresh = I18n.format("gui.losttales.character.refresh");
             items.add(orBusy(BarItem.button(REFRESH, refresh,

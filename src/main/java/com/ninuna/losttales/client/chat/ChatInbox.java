@@ -109,10 +109,10 @@ public final class ChatInbox {
 
     private ChatInbox() {}
 
-    /** The kind an Inbox opened from {@code tab} lists. */
-    static Kind kindOf(Object tab) {
-        if (tab instanceof OtherPage) {
-            String id = ((OtherPage)tab).page().id;
+    /** The kind an Inbox opened from {@code page} lists. */
+    static Kind kindOf(Object page) {
+        if (page instanceof OtherPage) {
+            String id = ((OtherPage)page).page().id;
             if (QuestJournalPage.PAGE_ID.equals(id)) {
                 return Kind.QUEST_NEWS;
             }
@@ -291,7 +291,7 @@ public final class ChatInbox {
             if (!listed(chatLineId)) {
                 continue;
             }
-            ConversationPage tab = ClientChatChannelViews.tabOf(chatLineId);
+            ConversationPage page = ClientChatChannelViews.pageOf(chatLineId);
             LostTalesChatMessagePacket packet = ClientChatMessages.get(
                     ClientChatMessageIds.messageIdOf(chatLineId)).packet;
             String name = plain(packet.getIdentityName());
@@ -305,7 +305,7 @@ public final class ChatInbox {
                     : name + ": " + plain(packet.getMessage());
             if (holds(label, words)) {
                 rows.add(new MenuWindow.Entry(LINE + chatLineId, label, false,
-                        -1, tab)
+                        -1, page)
                         .withValue(ChatTimestampFormatter.formatDrawnStamp(
                                 packet.getTimestampMillis(), now))
                         .withTip(StatCollector.translateToLocal(
@@ -340,7 +340,7 @@ public final class ChatInbox {
     private static boolean listed(int chatLineId) {
         ClientChatMessages.Remembered remembered = ClientChatMessages.get(
                 ClientChatMessageIds.messageIdOf(chatLineId));
-        return ClientChatChannelViews.tabOf(chatLineId) != null
+        return ClientChatChannelViews.pageOf(chatLineId) != null
                 && remembered != null
                 && !LostTalesChatMessagePacket.isSystemSender(
                         remembered.packet.getSenderId());

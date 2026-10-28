@@ -11,7 +11,7 @@ import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.Locale;
 import java.util.UUID;
 
-/** Persistent server-authoritative record for one roleplaying character. */
+/** One character as the server keeps it: its name, look, faction, profile and slot. */
 public class RoleplayCharacter {
 
     public static final int CURRENT_DATA_VERSION = 11;

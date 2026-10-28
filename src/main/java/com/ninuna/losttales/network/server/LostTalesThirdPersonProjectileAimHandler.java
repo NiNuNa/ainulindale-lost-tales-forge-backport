@@ -9,7 +9,7 @@ import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.entity.projectile.EntityThrowable;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 
-/** Applies validated aim only to newly spawned player projectiles. */
+/** Gives a projectile a player has just loosed its charge tier and the aim they asked for. */
 public final class LostTalesThirdPersonProjectileAimHandler {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)

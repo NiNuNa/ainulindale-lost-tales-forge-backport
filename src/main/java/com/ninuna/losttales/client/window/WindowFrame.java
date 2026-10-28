@@ -108,7 +108,7 @@ public class WindowFrame {
     float stackShare = 1.0F;
     /**
      * The box the window shows while its page fills it, or glides to or
-     * from that ({@link ContentView}): its row, strip and bar lie past
+     * from that ({@link Borderless}): its row, strip and bar lie past
      * this box's edges, and nothing past them is drawn or pointed at.
      * Null while the window shows whole. Set by the screen every frame.
      */
@@ -546,7 +546,7 @@ public class WindowFrame {
 
     /**
      * How far the window stands toward its page filling it, 0..1
-     * ({@link ContentView}): above 0, only the box it shows is drawn.
+     * ({@link Borderless}): above 0, only the box it shows is drawn.
      */
     public float contentShare() {
         if (this.fillLegTo == Window.ScreenFill.CONTENT) {

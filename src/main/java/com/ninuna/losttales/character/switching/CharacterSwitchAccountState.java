@@ -3,7 +3,7 @@ package com.ninuna.losttales.character.switching;
 import com.ninuna.losttales.util.LostTalesMath;
 import java.util.UUID;
 
-/** Persistent account-owned switch cooldown, lifecycle lockout, and journal state. */
+/** One account's switch cooldown, its freeze, an unsettled death and its switch journal. */
 public final class CharacterSwitchAccountState {
 
     public static final int CURRENT_DATA_VERSION = 2;

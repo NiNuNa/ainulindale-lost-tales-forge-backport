@@ -27,7 +27,7 @@ import java.util.Set;
 public final class LostTalesQuestRegistry {
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> SERVER_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
-    private static final Map<String, LostTalesQuestDefinition> RUNTIME_QUESTS_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private static final Map<String, LostTalesQuestDefinition> MISSIVES_BY_ID = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static List<LostTalesQuestDefinition> sortedQuests = Collections.emptyList();
     /** Of the sorted quests, those a touched block may start. */
     private static List<LostTalesQuestDefinition> blockGiven = Collections.emptyList();
@@ -70,7 +70,7 @@ public final class LostTalesQuestRegistry {
             return fileQuest;
         }
         LostTalesQuestDefinition serverQuest = SERVER_QUESTS_BY_ID.get(questId);
-        return serverQuest != null ? serverQuest : RUNTIME_QUESTS_BY_ID.get(questId);
+        return serverQuest != null ? serverQuest : MISSIVES_BY_ID.get(questId);
     }
 
     /**
@@ -88,8 +88,8 @@ public final class LostTalesQuestRegistry {
         SERVER_QUESTS_BY_ID.clear();
         for (LostTalesQuestDefinition quest : result.quests) {
             SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
-            // A server file's quest stands over a runtime quest of its id.
-            RUNTIME_QUESTS_BY_ID.remove(quest.getId());
+            // A server file's quest stands over a missive of its id.
+            MISSIVES_BY_ID.remove(quest.getId());
         }
         rebuildSortedQuests();
         for (String problem : result.problems) {
@@ -126,7 +126,7 @@ public final class LostTalesQuestRegistry {
         SERVER_QUESTS_BY_ID.clear();
         for (LostTalesQuestDefinition quest : server.quests) {
             SERVER_QUESTS_BY_ID.put(quest.getId(), quest);
-            RUNTIME_QUESTS_BY_ID.remove(quest.getId());
+            MISSIVES_BY_ID.remove(quest.getId());
         }
         loaded = true;
         rebuildSortedQuests();
@@ -208,25 +208,25 @@ public final class LostTalesQuestRegistry {
      * nothing made in the game can stand in for a written quest. The owning
      * system keeps the definition itself and registers it again after a load.
      */
-    public static synchronized boolean registerRuntimeQuest(LostTalesQuestDefinition quest) {
+    public static synchronized boolean registerMissive(LostTalesQuestDefinition quest) {
         ensureLoaded();
-        if (!mayRegisterRuntime(quest)) {
+        if (!mayRegisterMissive(quest)) {
             return false;
         }
-        RUNTIME_QUESTS_BY_ID.put(quest.getId(), quest);
+        MISSIVES_BY_ID.put(quest.getId(), quest);
         rebuildSortedQuests();
         return true;
     }
 
-    public static synchronized int registerRuntimeQuests(Collection<LostTalesQuestDefinition> quests) {
+    public static synchronized int registerMissives(Collection<LostTalesQuestDefinition> quests) {
         ensureLoaded();
         if (quests == null || quests.isEmpty()) {
             return 0;
         }
         int registered = 0;
         for (LostTalesQuestDefinition quest : quests) {
-            if (mayRegisterRuntime(quest)) {
-                RUNTIME_QUESTS_BY_ID.put(quest.getId(), quest);
+            if (mayRegisterMissive(quest)) {
+                MISSIVES_BY_ID.put(quest.getId(), quest);
                 registered++;
             }
         }
@@ -236,7 +236,7 @@ public final class LostTalesQuestRegistry {
         return registered;
     }
 
-    private static boolean mayRegisterRuntime(LostTalesQuestDefinition quest) {
+    private static boolean mayRegisterMissive(LostTalesQuestDefinition quest) {
         return quest != null && LostTalesQuestIds.fits(quest.getId())
                 && !STATIC_QUESTS_BY_ID.containsKey(quest.getId())
                 && !SERVER_QUESTS_BY_ID.containsKey(quest.getId());
@@ -247,17 +247,17 @@ public final class LostTalesQuestRegistry {
      * names: the missives some quest log still holds. What every log has
      * forgotten goes, so the list stays as long as the logs are.
      */
-    public static synchronized void retainRuntimeQuests(Set<String> held) {
+    public static synchronized void retainMissives(Set<String> held) {
         ensureLoaded();
-        if (held != null && RUNTIME_QUESTS_BY_ID.keySet().retainAll(held)) {
+        if (held != null && MISSIVES_BY_ID.keySet().retainAll(held)) {
             rebuildSortedQuests();
         }
     }
 
-    public static synchronized void clearRuntimeQuests() {
+    public static synchronized void clearMissives() {
         ensureLoaded();
-        if (!RUNTIME_QUESTS_BY_ID.isEmpty()) {
-            RUNTIME_QUESTS_BY_ID.clear();
+        if (!MISSIVES_BY_ID.isEmpty()) {
+            MISSIVES_BY_ID.clear();
             rebuildSortedQuests();
         }
     }
@@ -266,7 +266,7 @@ public final class LostTalesQuestRegistry {
         LinkedHashMap<String, LostTalesQuestDefinition> merged = new LinkedHashMap<String, LostTalesQuestDefinition>();
         merged.putAll(STATIC_QUESTS_BY_ID);
         merged.putAll(SERVER_QUESTS_BY_ID);
-        merged.putAll(RUNTIME_QUESTS_BY_ID);
+        merged.putAll(MISSIVES_BY_ID);
 
         List<LostTalesQuestDefinition> sorted = new ArrayList<LostTalesQuestDefinition>(merged.values());
         Collections.sort(sorted, new Comparator<LostTalesQuestDefinition>() {

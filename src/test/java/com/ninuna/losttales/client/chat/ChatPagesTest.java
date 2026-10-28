@@ -31,8 +31,8 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A page is a tab no conversation stands behind: it has no channel, one
- * tab per page, an id of its own the layout file keeps, and a window of
+ * A page is a page no conversation stands behind: it has no channel, one
+ * page per page, an id of its own the layout file keeps, and a window of
  * its own that opens at a page's size and comes back where it last stood,
  * however many windows stand.
  */
@@ -90,14 +90,14 @@ public final class ChatPagesTest {
     public void aPageIsATabOfItsOwnAndNoConversation() {
         OtherPage page = WindowPages.tab(PAGE);
         assertNotNull(page);
-        assertSame("one tab per page", page, WindowPages.tab(PAGE));
+        assertSame("one page per page", page, WindowPages.tab(PAGE));
         assertEquals("page:" + PAGE, page.id());
         assertEquals(page, WindowPage.fromId(page.id()));
         assertNull("a page is no conversation", ConversationPage.from(page));
         assertNull("no channel goes by a page's id", ConversationPage.fromId(page.id()));
         assertFalse(page.equals(ConversationPage.of(ChatChannel.GLOBAL)));
         assertFalse(ConversationPage.of(ChatChannel.GLOBAL).equals(page));
-        assertNull("an unregistered page is no tab", WindowPages.tab("nobody"));
+        assertNull("an unregistered page is no page", WindowPages.tab("nobody"));
         assertNull(WindowPage.fromId("page:nobody"));
     }
 
@@ -151,7 +151,7 @@ public final class ChatPagesTest {
         WindowLayout.setActiveTab(page);
         assertTrue(WindowLayout.showsPage(window));
 
-        ChatTabActions actions = new ChatTabActions(new ChatInputBar(),
+        ChatPageActions actions = new ChatPageActions(new ChatInputBar(),
                 new ChatInputCompletion(null), new ChatComposer());
         actions.bind(null, new GuiTextField(null, 0, 0, 100, 12));
         actions.selectChannel(global);
@@ -175,7 +175,7 @@ public final class ChatPagesTest {
         WindowLayout.openTab(page, window.getId());
         WindowLayout.setActiveTab(page);
 
-        ChatTabActions actions = new ChatTabActions(new ChatInputBar(),
+        ChatPageActions actions = new ChatPageActions(new ChatInputBar(),
                 new ChatInputCompletion(null), new ChatComposer());
         actions.bind(null, new GuiTextField(null, 0, 0, 100, 12));
         actions.syncSelection();
@@ -233,12 +233,12 @@ public final class ChatPagesTest {
     }
 
     /**
-     * Closing the conversation typed in brings forward the tab to its
+     * Closing the conversation typed in brings forward the page to its
      * right, a page here, and the input waits in the window's other
      * conversation.
      */
     @Test
-    public void closingTheConversationTypedInBringsTheTabToItsRightForward() {
+    public void closingTheConversationTypedInBringsThePageToItsRightForward() {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         Window window = WindowLayout.windowOf(global);
@@ -251,7 +251,7 @@ public final class ChatPagesTest {
         ClientChatChannelState.select(global);
         WindowLayout.setActiveTab(global);
         assertTrue(ClientChatChannelState.close(global));
-        assertEquals("the tab to its right", page, window.getActiveTab());
+        assertEquals("the page to its right", page, window.getActiveTab());
         assertEquals(ooc, ClientChatChannelState.getSelected());
     }
 
@@ -267,8 +267,8 @@ public final class ChatPagesTest {
         WindowLayout.setLocked(window.getId(), true);
         WindowLayout.removeTabs(new WindowLayout.TabFilter() {
             @Override
-            public boolean matches(WindowPage tab) {
-                return page.equals(tab);
+            public boolean matches(WindowPage other) {
+                return page.equals(other);
             }
         });
         assertNull(WindowLayout.windowOf(page));

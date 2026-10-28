@@ -77,8 +77,8 @@ public final class ChatLineWrapperTest {
 
     /**
      * Each state pays only for the header runs it draws inline: the
-     * closed feed reserves the channel prefix, and the open screen does
-     * not — its tabs name the channel — so the whole width belongs to
+     * feed reserves the channel prefix, and the open screen does
+     * not — its pages name the channel — so the whole width belongs to
      * the name and body. "Global: " is 48px, "&lt;N&gt; " is 24.
      */
     @Test

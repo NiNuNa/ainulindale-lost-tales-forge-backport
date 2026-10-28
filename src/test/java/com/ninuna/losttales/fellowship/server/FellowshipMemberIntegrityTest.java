@@ -33,6 +33,14 @@ import static org.junit.Assert.assertTrue;
  */
 public final class FellowshipMemberIntegrityTest {
 
+    private static final FellowshipService.LeadLimits ONE_EACH =
+            new FellowshipService.LeadLimits() {
+                @Override
+                public int of(FellowshipMember member) {
+                    return 1;
+                }
+            };
+
     @Test
     public void aMemberNamingNoCharacterIsRemoved() {
         UUID accountId = UUID.randomUUID();
@@ -49,8 +57,7 @@ public final class FellowshipMemberIntegrityTest {
         UUID fellowshipId = UUID.randomUUID();
         fellowships.saveFellowship(new Fellowship(fellowshipId, accountId, members,
                 Collections.<UUID>emptyList(), "Grey Company", null,
-                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L,
-                Fellowship.CURRENT_DATA_VERSION));
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L));
 
         FellowshipService.getInstance().ensureFellowshipIntegrity(
                 null, fellowships, characters);
@@ -94,7 +101,7 @@ public final class FellowshipMemberIntegrityTest {
 
         List<UUID> changed = new ArrayList<UUID>();
         assertEquals(1, FellowshipService.repairMemberReferences(fellowships, characters,
-                Collections.<UUID>emptySet(), changed));
+                Collections.<UUID>emptySet(), ONE_EACH, changed));
         assertEquals(Arrays.asList(renamed, emptied), changed);
         assertEquals("Aldric the Bold",
                 fellowships.getFellowship(renamed).getMember(aldric).getCharacterName());
@@ -131,10 +138,90 @@ public final class FellowshipMemberIntegrityTest {
                 fellowships.getQuarantinedEntryCount());
     }
 
+    /**
+     * A leader that no longer stands hands the lead on as a living leader
+     * does: to the first joined who may lead one fellowship more, never to
+     * a figure nobody holds.
+     */
+    @Test
+    public void aLeaderThatNoLongerStandsHandsTheLeadOnByTheOneRule() {
+        UUID beren = new UUID(11L, 11L);
+        UUID celeb = new UUID(12L, 12L);
+        UUID figure = new UUID(13L, 13L);
+        UUID berensAccount = new UUID(2L, 2L);
+        UUID celebsAccount = new UUID(3L, 3L);
+        CharacterWorldData characters = new CharacterWorldData(CharacterWorldData.DATA_NAME);
+        character(characters, berensAccount, beren, "Beren");
+        character(characters, celebsAccount, celeb, "Celeb");
+
+        FellowshipWorldData fellowships = new FellowshipWorldData(FellowshipWorldData.DATA_NAME);
+        UUID nobody = new UUID(30L, 30L);
+        List<FellowshipMember> members = new ArrayList<FellowshipMember>();
+        members.add(new FellowshipMember(nobody, new UUID(4L, 4L), "Nobody", 1L,
+                FellowshipColor.RED));
+        members.add(new FellowshipMember(figure, FellowshipMember.UNHELD, "Gandalf", 2L,
+                FellowshipColor.PURPLE));
+        members.add(new FellowshipMember(beren, berensAccount, "Beren", 3L,
+                FellowshipColor.BLUE));
+        members.add(new FellowshipMember(celeb, celebsAccount, "Celeb", 4L,
+                FellowshipColor.GREEN));
+        UUID grey = new UUID(20L, 20L);
+        fellowships.saveFellowship(new Fellowship(grey, nobody, members,
+                Collections.<UUID>emptyList(), "Grey Company", null,
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L));
+        fellowships.saveFellowship(company(new UUID(21L, 21L), new FellowshipMember(beren,
+                berensAccount, "Beren", 1L, FellowshipColor.BLUE)));
+
+        List<UUID> changed = new ArrayList<UUID>();
+        assertEquals(1, FellowshipService.repairMemberReferences(fellowships, characters,
+                Collections.singleton(figure), ONE_EACH, changed));
+        Fellowship back = fellowships.getFellowship(grey);
+        assertEquals("Beren leads as many as he may, and nobody holds the figure",
+                celeb, back.getLeaderIdentityId());
+        assertNull(back.getMember(nobody));
+        assertEquals(3, back.getMemberCount());
+    }
+
+    /** A leader that no longer stands with nobody held to follow it ends the fellowship. */
+    @Test
+    public void aLeaderThatNoLongerStandsWithNobodyToFollowEndsTheFellowship() {
+        UUID figure = new UUID(13L, 13L);
+        FellowshipWorldData fellowships = new FellowshipWorldData(FellowshipWorldData.DATA_NAME);
+        UUID nobody = new UUID(30L, 30L);
+        List<FellowshipMember> members = new ArrayList<FellowshipMember>();
+        members.add(new FellowshipMember(nobody, new UUID(4L, 4L), "Nobody", 1L,
+                FellowshipColor.RED));
+        members.add(new FellowshipMember(figure, FellowshipMember.UNHELD, "Gandalf", 2L,
+                FellowshipColor.PURPLE));
+        UUID grey = new UUID(20L, 20L);
+        fellowships.saveFellowship(new Fellowship(grey, nobody, members,
+                Collections.<UUID>emptyList(), "Grey Company", null,
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L));
+
+        List<UUID> changed = new ArrayList<UUID>();
+        assertEquals(1, FellowshipService.repairMemberReferences(fellowships,
+                new CharacterWorldData(CharacterWorldData.DATA_NAME),
+                Collections.singleton(figure), ONE_EACH, changed));
+        assertNull(fellowships.getFellowship(grey));
+        assertEquals(Collections.singletonList(grey), changed);
+    }
+
+    private static void character(CharacterWorldData characters, UUID account, UUID id,
+                                  String name) {
+        CharacterRoster roster = characters.getOrCreateRoster(account);
+        roster.addCharacter(RoleplayCharacter.builder(id, account)
+                .slot(0)
+                .name(name)
+                .race(CharacterRaceRegistry.HUMAN)
+                .bodyType(CharacterBodyTypeRegistry.MASCULINE)
+                .skin("losttales:human_bree_masculine_0")
+                .build());
+        characters.saveRoster(roster);
+    }
+
     private static Fellowship company(UUID fellowshipId, FellowshipMember leader) {
         return new Fellowship(fellowshipId, leader.getIdentityId(),
                 Collections.singletonList(leader), Collections.<UUID>emptyList(),
-                "Grey Company", null, EnumSet.allOf(FellowshipSwitch.class), 1L, 0L,
-                Fellowship.CURRENT_DATA_VERSION);
+                "Grey Company", null, EnumSet.allOf(FellowshipSwitch.class), 1L, 0L);
     }
 }

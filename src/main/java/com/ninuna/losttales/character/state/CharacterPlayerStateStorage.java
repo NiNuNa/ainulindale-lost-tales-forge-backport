@@ -7,7 +7,7 @@ import net.minecraft.world.storage.MapStorage;
 
 import java.util.UUID;
 
-/** Resolves one isolated character player-state file per Minecraft account. */
+/** Finds an account's saved-life store, one file per account, in dimension 0's storage. */
 public final class CharacterPlayerStateStorage {
 
     private CharacterPlayerStateStorage() {}

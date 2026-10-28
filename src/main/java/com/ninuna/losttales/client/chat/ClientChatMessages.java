@@ -12,7 +12,7 @@ import java.util.LinkedHashMap;
  *
  * <p>A message is drawn from a good deal more than its words: who
  * signed it and in what colours, the head beside the name, the title,
- * the tab it was filed under, the items and places it shared. When the
+ * the page it was filed under, the items and places it shared. When the
  * server says one of them now reads differently, only the words have
  * changed — so the line is <em>rebuilt</em> from everything it was
  * built from the first time, with the new text in place of the old,
@@ -32,8 +32,8 @@ final class ClientChatMessages {
 
     /** Remembers what a printed message was built from. */
     static synchronized void remember(LostTalesChatMessagePacket packet,
-                                      ConversationPage tab, int[] showcaseIds) {
-        remember(packet, tab, showcaseIds, ChatBodyKind.MESSAGE, null);
+                                      ConversationPage page, int[] showcaseIds) {
+        remember(packet, page, showcaseIds, ChatBodyKind.MESSAGE, null);
     }
 
     /**
@@ -42,14 +42,14 @@ final class ClientChatMessages {
      * so the line is built again exactly as it was.
      */
     static synchronized void remember(LostTalesChatMessagePacket packet,
-                                      ConversationPage tab, int[] showcaseIds,
+                                      ConversationPage page, int[] showcaseIds,
                                       ChatBodyKind kind, IChatComponent body) {
-        if (packet == null || tab == null
+        if (packet == null || page == null
                 || !ChatMessageIds.isServerId(packet.getMessageId())) {
             return;
         }
         ENTRIES.put(Long.valueOf(packet.getMessageId()),
-                new Remembered(packet, tab, showcaseIds, false, kind, body));
+                new Remembered(packet, page, showcaseIds, false, kind, body));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
             Iterator<Long> oldest = ENTRIES.keySet().iterator();
             oldest.next();
@@ -73,7 +73,7 @@ final class ClientChatMessages {
         // is forgotten next; the message is edited from here on, and a
         // later rebuild of the line keeps saying so.
         ENTRIES.put(Long.valueOf(messageId),
-                new Remembered(packet, entry.tab, entry.showcaseIds, true,
+                new Remembered(packet, entry.page, entry.showcaseIds, true,
                         entry.kind, entry.body));
     }
 
@@ -89,7 +89,7 @@ final class ClientChatMessages {
             return;
         }
         ENTRIES.put(Long.valueOf(messageId), new Remembered(packet,
-                entry.tab, entry.showcaseIds, entry.edited, entry.kind,
+                entry.page, entry.showcaseIds, entry.edited, entry.kind,
                 entry.body));
     }
 
@@ -124,7 +124,7 @@ final class ClientChatMessages {
     /** One message, and everything drawing it again needs. */
     static final class Remembered {
         final LostTalesChatMessagePacket packet;
-        final ConversationPage tab;
+        final ConversationPage page;
         final int[] showcaseIds;
         /** Whether the message has been edited; its line says so. */
         final boolean edited;
@@ -136,11 +136,11 @@ final class ClientChatMessages {
          */
         final IChatComponent body;
 
-        private Remembered(LostTalesChatMessagePacket packet, ConversationPage tab,
+        private Remembered(LostTalesChatMessagePacket packet, ConversationPage page,
                            int[] showcaseIds, boolean edited,
                            ChatBodyKind kind, IChatComponent body) {
             this.packet = packet;
-            this.tab = tab;
+            this.page = page;
             this.showcaseIds = showcaseIds;
             this.edited = edited;
             this.kind = kind == null ? ChatBodyKind.MESSAGE : kind;

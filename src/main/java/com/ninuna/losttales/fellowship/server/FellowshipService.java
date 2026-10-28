@@ -504,7 +504,7 @@ public final class FellowshipService {
         FellowshipMarkWorldData marks = getWritableMarkData(player.worldObj);
         if (marks == null) {
             return FellowshipOperationResult.failure(
-                    FellowshipErrorId.MARKER_STORAGE_READ_ONLY, fellowship);
+                    FellowshipErrorId.MARK_STORAGE_READ_ONLY, fellowship);
         }
         FellowshipMark mark = fellowshipMarkOf(marks, markId, fellowshipId);
         if (mark == null) {
@@ -542,7 +542,7 @@ public final class FellowshipService {
         }
         FellowshipMarkWorldData marks = getWritableMarkData(player.worldObj);
         if (marks == null) {
-            return new MarkContext(FellowshipErrorId.MARKER_STORAGE_READ_ONLY,
+            return new MarkContext(FellowshipErrorId.MARK_STORAGE_READ_ONLY,
                     fellowship, null, null);
         }
         return new MarkContext(FellowshipErrorId.NONE, fellowship, marks,
@@ -814,11 +814,14 @@ public final class FellowshipService {
     }
 
     /**
-     * Who leads once the leader's character is deleted: the first joined of
-     * the others who lead fewer fellowships than they may, each counted as
-     * {@link #transferLeadership} counts it, else the first joined of them. The limit only orders the choice, because a
-     * fellowship must not end when nobody in it may lead one more. Null
-     * while nobody else is in it.
+     * Who leads once the leader goes without handing the lead on: its
+     * character deleted or released, or its entry quarantined. The one rule
+     * of succession: the first joined of the others somebody holds who lead
+     * fewer fellowships than they may, each counted as
+     * {@link #transferLeadership} counts it, else the first joined of them.
+     * The limit only orders the choice, because a fellowship must not end
+     * when nobody in it may lead one more. Null while nobody else held is
+     * in it.
      */
     static UUID successorOf(FellowshipWorldData data, Fellowship fellowship, UUID leaving,
                             LeadLimits limits) {
@@ -876,7 +879,7 @@ public final class FellowshipService {
         FellowshipMarkWorldData marks = getWritableMarkData(player.worldObj);
         if (marks == null) {
             return FellowshipOperationResult.failure(
-                    FellowshipErrorId.MARKER_STORAGE_READ_ONLY, fellowship);
+                    FellowshipErrorId.MARK_STORAGE_READ_ONLY, fellowship);
         }
         double x = quantizeTrackingCoordinate(markerX);
         double z = quantizeTrackingCoordinate(markerZ);
@@ -911,7 +914,7 @@ public final class FellowshipService {
         FellowshipMarkWorldData marks = getWritableMarkData(player.worldObj);
         if (marks == null) {
             return FellowshipOperationResult.failure(
-                    FellowshipErrorId.MARKER_STORAGE_READ_ONLY, fellowship);
+                    FellowshipErrorId.MARK_STORAGE_READ_ONLY, fellowship);
         }
         FellowshipMember member = fellowship == null ? null : fellowship.getMember(identityId);
         FellowshipMark goHere = marks.getGoHere(identityId);
@@ -998,6 +1001,16 @@ public final class FellowshipService {
     }
 
     public synchronized FellowshipInvitationState getInvitationState(EntityPlayerMP player) {
+        return getInvitationState(player, true);
+    }
+
+    /**
+     * The player's state; {@code prune} false where the sync it goes with
+     * pruned the invitations once for every player it reaches
+     * ({@link #pruneInvitations}).
+     */
+    synchronized FellowshipInvitationState getInvitationState(EntityPlayerMP player,
+                                                              boolean prune) {
         ActiveIdentityContext active = resolveActiveIdentity(player);
         if (!active.isValid()) {
             return FellowshipInvitationState.failure(active.errorId);
@@ -1015,7 +1028,27 @@ public final class FellowshipService {
             return FellowshipInvitationState.failure(
                     FellowshipErrorId.CHARACTER_STORAGE_READ_ONLY);
         }
-        return this.invitationCoordinator.getInvitationState(player, active, fellowshipData);
+        return this.invitationCoordinator.getInvitationState(player, active, fellowshipData,
+                prune);
+    }
+
+    /**
+     * Removes the invitations that ran out or no longer stand, once for a
+     * sync that reaches many players. Nothing while a store cannot be
+     * written; each state then refuses as it would.
+     */
+    synchronized void pruneInvitations(World world) {
+        FellowshipWorldData fellowshipData = getFellowshipData(world);
+        CharacterWorldData characterData = getCharacterData(world);
+        FellowshipInvitationWorldData invitationData =
+                this.invitationCoordinator.getWritableData(world);
+        if (fellowshipData == null || characterData == null || invitationData == null
+                || fellowshipData.isReadOnlyForNewerVersion()
+                || !ensureFellowshipIntegrity(world, fellowshipData, characterData)) {
+            return;
+        }
+        this.invitationCoordinator.pruneInvalidInvitations(fellowshipData, invitationData,
+                characterData, System.currentTimeMillis());
     }
 
     /** The fellowships of the character a player plays; none while it cannot be told. */
@@ -1093,7 +1126,7 @@ public final class FellowshipService {
         }
         if (marks == null) {
             return FellowshipOperationResult.failure(
-                    FellowshipErrorId.MARKER_STORAGE_READ_ONLY, null);
+                    FellowshipErrorId.MARK_STORAGE_READ_ONLY, null);
         }
         if (!ensureFellowshipIntegrity(world, fellowshipData, characterData)) {
             return FellowshipOperationResult.failure(
@@ -1213,7 +1246,11 @@ public final class FellowshipService {
         }
     }
 
-    /** Validates the persistent stores and removes stale invitations and marks. */
+    /**
+     * Checks the members against the rosters once since the world loaded,
+     * and removes the invitations and marks that no longer stand. False
+     * while a store cannot be read or written.
+     */
     public synchronized boolean ensureIntegrity(World world) {
         FellowshipWorldData fellowshipData = getFellowshipData(world);
         CharacterWorldData characterData = getCharacterData(world);
@@ -1289,7 +1326,7 @@ public final class FellowshipService {
             return null;
         }
         int members = repairMemberReferences(fellowshipData, characterData,
-                loreFigures(world), new ArrayList<UUID>());
+                loreFigures(world), leadLimitsIn(world), new ArrayList<UUID>());
         if (members < 0) {
             return null;
         }
@@ -1334,7 +1371,7 @@ public final class FellowshipService {
         }
         List<UUID> changed = new ArrayList<UUID>();
         if (repairMemberReferences(fellowshipData, characterData, loreFigures(world),
-                changed) < 0) {
+                leadLimitsIn(world), changed) < 0) {
             return false;
         }
         fellowshipData.markCharacterReferencesValidated();
@@ -1347,15 +1384,18 @@ public final class FellowshipService {
     /**
      * Quarantines every member that no longer stands, brings the names of
      * the others up to date, has a figure claimed since it was released
-     * taken up by its holder, and mends a fellowship's leader or ends one
-     * nobody plays a member of. Adds each fellowship it changed or ended to
-     * {@code changed}, and returns how many members it removed: -1, having
-     * changed nothing, where the quarantine has no room for them all, which
-     * leaves the store closed.
+     * taken up by its holder, and ends a fellowship nobody plays a member
+     * of. A leader quarantined hands the lead on first, as
+     * {@link #successorOf} picks; with nobody to take it the fellowship
+     * ends. Adds each fellowship it changed or ended to {@code changed},
+     * and returns how many members it removed: -1, having changed nothing,
+     * where the quarantine has no room for them all, which leaves the store
+     * closed.
      */
     static int repairMemberReferences(FellowshipWorldData fellowshipData,
                                       CharacterWorldData characterData,
-                                      Set<UUID> figures, List<UUID> changed) {
+                                      Set<UUID> figures, LeadLimits limits,
+                                      List<UUID> changed) {
         int removed = 0;
         CharacterIndex index = characterData.characterIndex();
         List<Fellowship> fellowships = new ArrayList<Fellowship>(fellowshipData.getFellowships());
@@ -1372,15 +1412,22 @@ public final class FellowshipService {
         }
         for (Fellowship fellowship : fellowships) {
             boolean altered = false;
+            boolean leaderGoes = false;
             for (FellowshipMember member : new ArrayList<FellowshipMember>(fellowship.getMembers())) {
                 UUID identityId = member.getIdentityId();
                 String removalReason = memberRemovalReason(member, index, figures);
                 if (removalReason != null) {
                     fellowshipData.quarantine(removalReason,
                             fellowship.getFellowshipId(), identityId);
-                    fellowship.removeMember(identityId);
                     altered = true;
                     removed++;
+                    // The leader goes last, once every other member stands
+                    // as it will.
+                    if (fellowship.isLeader(identityId)) {
+                        leaderGoes = true;
+                    } else {
+                        fellowship.removeMember(identityId);
+                    }
                     continue;
                 }
                 RoleplayCharacter character = index.find(identityId);
@@ -1400,13 +1447,19 @@ public final class FellowshipService {
                     altered = true;
                 }
             }
-            if (!fellowship.hasHeldMemberBesides(null)) {
+            boolean leaderless = false;
+            if (leaderGoes) {
+                UUID leaving = fellowship.getLeaderIdentityId();
+                leaderless = !fellowship.transferLeadership(successorOf(
+                        fellowshipData, fellowship, leaving, limits));
+                if (!leaderless) {
+                    fellowship.removeMember(leaving);
+                }
+            }
+            if (leaderless || !fellowship.hasHeldMemberBesides(null)) {
                 fellowshipData.removeFellowship(fellowship.getFellowshipId());
                 changed.add(fellowship.getFellowshipId());
                 continue;
-            }
-            if (fellowship.repairLeaderIfNecessary()) {
-                altered = true;
             }
             if (altered) {
                 fellowshipData.saveFellowship(fellowship);

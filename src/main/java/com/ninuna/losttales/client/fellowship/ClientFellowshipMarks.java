@@ -20,11 +20,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Client-only view of the marks the fellowship state carries, as the map
- * shows them: each fellowship's marks, a camp in the colour this player
- * wears in it, and the go-here marks of the player and of the members of
- * the fellowship travelled with, each in its owner's colour. Built again
- * whenever another state arrives; never authoritative.
+ * The marks the fellowship state carries, as the map shows them: each
+ * fellowship's marks, a camp in the colour this player wears in it, and
+ * the go-here marks of the player and of the members of the fellowship
+ * travelled with, each in its owner's colour. Built again whenever another
+ * state arrives.
  */
 public final class ClientFellowshipMarks {
 
@@ -121,13 +121,13 @@ public final class ClientFellowshipMarks {
         }
         List<LostTalesMapMarkerData> markers = new ArrayList<LostTalesMapMarkerData>();
         for (FellowshipMark mark : state.getMarks()) {
-            markers.add(mark.isGoHere() ? goHereMarker(state, mark)
+            markers.add(mark.isGoHere() ? goHereMark(state, mark)
                     : fellowshipMarker(state, mark));
         }
         return Collections.unmodifiableList(markers);
     }
 
-    private static LostTalesMapMarkerData goHereMarker(FellowshipStateSnapshot state,
+    private static LostTalesMapMarkerData goHereMark(FellowshipStateSnapshot state,
                                                        FellowshipMark mark) {
         return new LostTalesMapMarkerData(
                 mark.getMarkerId(),

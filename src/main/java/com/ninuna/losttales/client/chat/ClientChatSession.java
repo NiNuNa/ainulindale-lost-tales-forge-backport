@@ -26,7 +26,7 @@ public final class ClientChatSession {
     /**
      * Called as the client finishes connecting. Returns true when this is
      * the same place the chat on screen came from, in which case the
-     * history, its tabs and its conversations are kept; false when the
+     * history, its pages and its conversations are kept; false when the
      * player has arrived somewhere else and the chat starts clean.
      */
     public static boolean resume(Minecraft minecraft) {

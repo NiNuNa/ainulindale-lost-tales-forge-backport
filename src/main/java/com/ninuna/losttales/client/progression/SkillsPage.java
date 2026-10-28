@@ -50,7 +50,7 @@ import org.lwjgl.opengl.GL11;
  * the left, then the deeds; on the right the skill picked, its level and
  * how far to the next, what counts toward it, and its perk tree, a perk
  * taken from the bar; or every deed, by category, and how far each
- * stands. A stand-in look, the journal's, until Nils paints its own.
+ * stands. It wears the journal's look until it has one of its own.
  */
 public final class SkillsPage extends PageContent {
     /** The code name the page is registered and remembered under. */

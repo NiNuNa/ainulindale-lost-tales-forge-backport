@@ -66,7 +66,7 @@ public final class TabMenusTest {
         assertEquals(Settings.Place.CHAT,
                 ConversationPage.of(ChatChannel.GLOBAL).settingsPlace());
         assertEquals(Settings.Place.CHAT,
-                ConversationPage.of(ChatChannel.CLIENT_CONSOLE).settingsPlace());
+                ConversationPage.of(ChatChannel.CONSOLE).settingsPlace());
     }
 
     /**
@@ -120,7 +120,7 @@ public final class TabMenusTest {
     @Test
     public void pagesStandUnderTheirCategories() {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
-        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage console = ConversationPage.of(ChatChannel.CONSOLE);
         ConversationPage whisper = ConversationPage.whisper("Steve", "");
         List<MenuWindow.Entry> rows = Arrays.asList(
                 new MenuWindow.Entry(BARE.id(), "Bare", false, -1, BARE),

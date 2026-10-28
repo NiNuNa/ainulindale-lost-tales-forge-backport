@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Immutable presentation shared by Lost Tales and LOTR quests. */
+/** One quest as the journal shows it: a Lost Tales quest, a world quest, a LOTR mini-quest or a rumour. */
 public final class ClientQuestEntry {
     public enum Source {
         LOST_TALES,

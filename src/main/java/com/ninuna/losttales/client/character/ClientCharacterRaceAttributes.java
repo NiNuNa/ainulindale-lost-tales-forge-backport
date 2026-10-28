@@ -8,7 +8,7 @@ import net.minecraft.world.World;
 
 import java.util.Locale;
 
-/** Client-only formatting helpers for LOTR-derived race gameplay profiles. */
+/** A race's health, speed and attack as the Character Editor writes them. */
 public final class ClientCharacterRaceAttributes {
 
     private ClientCharacterRaceAttributes() {}

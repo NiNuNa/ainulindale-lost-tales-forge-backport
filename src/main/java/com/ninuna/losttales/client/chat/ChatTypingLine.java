@@ -12,7 +12,7 @@ import net.minecraft.util.StatCollector;
  * and dim one after another as the dots over a typing head do
  * ({@link ChatTypingDots}). The dots change brightness only, never
  * place, since slow motion on pixel art reads as a jump. The window's
- * trailing strip and the closed feed's typing row both draw it.
+ * trailing strip and the feed's typing row both draw it.
  */
 final class ChatTypingLine {
     private static final String DOT = ".";

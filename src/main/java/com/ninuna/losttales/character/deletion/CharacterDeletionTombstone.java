@@ -4,7 +4,11 @@ import com.ninuna.losttales.character.model.RoleplayCharacter;
 
 import java.util.UUID;
 
-/** Durable metadata and snapshot reference for a recoverable deletion. */
+/**
+ * A deleted character: its record, the generation of its saved life it
+ * comes back with, and when it may be purged. Prepared before the roster
+ * changes, committed once it has.
+ */
 public final class CharacterDeletionTombstone {
 
     public static final int CURRENT_DATA_VERSION = 1;

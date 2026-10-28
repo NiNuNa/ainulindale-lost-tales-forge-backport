@@ -20,7 +20,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * The server's own quests and the world quests on the wire: a definition
- * keeps its world and dialogue blocks, a list sent in place of the
+ * keeps its world and conversation blocks, a list sent in place of the
  * client's clears it even when empty while one added to it sends nothing
  * for nothing, each player is sent only their own part, and a payload of
  * any other shape is refused whole.
@@ -30,7 +30,7 @@ public final class LostTalesWorldQuestPacketsTest {
             "00000000-0000-0000-0000-00000000a1d1");
 
     @Test
-    public void aServerQuestKeepsItsWorldAndDialogueBlocks() {
+    public void aServerQuestKeepsItsWorldAndConversationBlocks() {
         LostTalesQuestDefinition quest = WorldQuestFixtures.greenway();
         List<LostTalesServerQuestSyncPacket> packets =
                 LostTalesServerQuestSyncPacket.packetsFor(

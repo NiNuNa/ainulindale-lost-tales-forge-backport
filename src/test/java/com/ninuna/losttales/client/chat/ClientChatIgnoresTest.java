@@ -23,6 +23,10 @@ public final class ClientChatIgnoresTest {
             UUID.fromString("00000000-0000-0000-0000-00000000000a");
     private static final UUID ACCOUNT_B =
             UUID.fromString("00000000-0000-0000-0000-00000000000b");
+    private static final UUID ALDRIC =
+            UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    private static final UUID NAMESAKE =
+            UUID.fromString("00000000-0000-0000-0000-0000000000b1");
 
     @Rule
     public final TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -55,35 +59,51 @@ public final class ClientChatIgnoresTest {
     }
 
     /**
-     * One character of an account can be ignored on its own: its lines
-     * and its presence go, the account's other characters stay, and
-     * the file keeps it, spaces in the name and all.
+     * One character of an account can be ignored on its own, by its id
+     * (CHAT-61): the account's other characters stay, a namesake is never
+     * hidden, and the file keeps it, spaces in the name and all.
      */
     @Test
-    public void aCharacterIsIgnoredOnItsOwn() throws Exception {
+    public void aCharacterIsIgnoredOnItsOwnByItsId() throws Exception {
         File configDir = temporaryFolder.newFolder();
         ClientChatIgnores.initialize(configDir, ACCOUNT);
-        assertTrue(ClientChatIgnores.ignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
-        assertTrue(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "aldric the bold"));
-        assertFalse(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "Aldric"));
-        assertFalse(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_B, "Aldric the Bold"));
+        assertTrue(ClientChatIgnores.ignoreCharacter(ACCOUNT_A, ALDRIC,
+                "Aldric the Bold"));
+        assertTrue(ClientChatIgnores.isIgnoredCharacter(ALDRIC));
+        assertFalse(ClientChatIgnores.isIgnoredCharacter(NAMESAKE));
         assertFalse(ClientChatIgnores.isIgnored(ACCOUNT_A));
-        assertTrue(ClientChatIgnores.isIgnoredIdentityName("ALDRIC THE BOLD"));
         assertFalse(ClientChatIgnores.isIgnoredName("Aldric the Bold"));
         assertEquals(1, ClientChatIgnores.count());
 
         ClientChatIgnores.initialize(configDir, ACCOUNT);
-        assertTrue(ClientChatIgnores.isIgnoredIdentity(ACCOUNT_A, "Aldric the Bold"));
-        assertTrue(ClientChatIgnores.isIgnoredIdentityName("aldric the bold"));
+        assertTrue(ClientChatIgnores.isIgnoredCharacter(ALDRIC));
+        assertEquals("Aldric the Bold", ClientChatIgnores.ignored().get(0).name);
+        assertEquals(ACCOUNT_A, ClientChatIgnores.ignored().get(0).accountId);
         assertEquals(1, ClientChatIgnores.count());
 
-        assertTrue(ClientChatIgnores.unignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
-        assertFalse(ClientChatIgnores.unignoreIdentity(ACCOUNT_A, "Aldric the Bold"));
-        assertFalse(ClientChatIgnores.isIgnoredIdentityName("aldric the bold"));
+        assertTrue(ClientChatIgnores.unignoreCharacter(ALDRIC));
+        assertFalse(ClientChatIgnores.unignoreCharacter(ALDRIC));
         ClientChatIgnores.initialize(configDir, ACCOUNT);
         assertEquals(0, ClientChatIgnores.count());
-        assertFalse(ClientChatIgnores.ignoreIdentity(null, "x"));
-        assertFalse(ClientChatIgnores.ignoreIdentity(ACCOUNT_A, "  "));
+        assertFalse(ClientChatIgnores.ignoreCharacter(null, ALDRIC, "x"));
+        assertFalse(ClientChatIgnores.ignoreCharacter(ACCOUNT_A, null, "x"));
+    }
+
+    /**
+     * A file line names a character by its account and its id; one naming
+     * no character id is dropped, and the lines read back as written.
+     */
+    @Test
+    public void aCharacterLineReadsBackAsItIsWritten() throws Exception {
+        ClientChatIgnores.initialize(temporaryFolder.newFolder(), ACCOUNT);
+        ClientChatIgnores.parseLine("ignore-character " + ACCOUNT_A + " "
+                + ALDRIC + " Aldric of the Hills");
+        ClientChatIgnores.parseLine("ignore-character " + ACCOUNT_A
+                + " Aldric");
+        assertEquals(1, ClientChatIgnores.count());
+        assertEquals(java.util.Collections.singletonList("ignore-character "
+                + ACCOUNT_A + " " + ALDRIC + " Aldric of the Hills"),
+                ClientChatIgnores.describe());
     }
 
     @Test

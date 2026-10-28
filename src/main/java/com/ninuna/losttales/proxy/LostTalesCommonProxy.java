@@ -249,7 +249,10 @@ public class LostTalesCommonProxy {
         MinecraftForge.EVENT_BUS.register(projectileAimHandler);
         MinecraftForge.EVENT_BUS.register(chargeService);
         MinecraftForge.EVENT_BUS.register(waystoneGenerationHandler);
-        MinecraftForge.EVENT_BUS.register(new ChatConsoleCommandHandler());
+        // Commands on the Forge bus, RCON's waiting commands on the server tick.
+        ChatConsoleCommandHandler consoleCommands = new ChatConsoleCommandHandler();
+        MinecraftForge.EVENT_BUS.register(consoleCommands);
+        FMLCommonHandler.instance().bus().register(consoleCommands);
         MinecraftForge.EVENT_BUS.register(new ChatSpeechGate());
         MinecraftForge.EVENT_BUS.register(new ChatArrivals());
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new ChatWelcome());
@@ -291,9 +294,11 @@ public class LostTalesCommonProxy {
         if (!Boolean.getBoolean(
                 LostTalesClassTransformer.ACCESSORY_CONTAINER_ACTIVE_PROPERTY)
                 || !Boolean.getBoolean(
-                LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY)) {
+                LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY)
+                || !com.ninuna.losttales.accessory.player.AccessoryDeathHooks
+                .serverDropLanded()) {
             FMLLog.severe("[%s] Accessory lifecycle transformers are incomplete; "
-                            + "the ring slot will reject server-side insertion",
+                            + "the ring slot takes nothing",
                     LostTalesMetaData.MOD_ID);
         }
         ELostTalesStructure.initAndRegisterStructures();
@@ -457,128 +462,178 @@ public class LostTalesCommonProxy {
     public void handleFastTravelArrival(
             LostTalesFastTravelArrivalPacket packet) {}
 
+    /**
+     * Sets the server's stores up for this world. Each step runs through
+     * {@link ServerStep}: one that throws is logged and the rest still run.
+     */
     public void onServerStarting(FMLServerStartingEvent event) {
-        // Before the reload, not after: the reload registers the channels
-        // this server's config defines, and resetting afterwards would
-        // take them straight back out again. Every other static store
-        // below holds nothing the reload puts there.
-        ChatChannel.resetToBuiltIn();
-        ChatCommandText.resetServerNames();
+        // Before the reload, not after: the reload registers the channels,
+        // icons and words this server's config defines, and resetting
+        // afterwards would take them straight back out again. Every other
+        // static store below holds nothing the reload puts there.
+        ServerStep.run("ChatChannel.resetToBuiltIn", () -> ChatChannel.resetToBuiltIn());
+        ServerStep.run("ChatChannelIconCatalog.resetToDefaults",
+                () -> ChatChannelIconCatalog.resetToDefaults());
+        ServerStep.run("ChatProfanityCatalog.resetToBundled",
+                () -> ChatProfanityCatalog.resetToBundled());
+        ServerStep.run("ChatCommandText.resetServerNames",
+                () -> ChatCommandText.resetServerNames());
         // Then the config, so the roles, gates, channels and settings
         // everything below reads are the ones on disk now: the files may
         // have been edited since pre-init, and a client hosting a world
         // installs its catalogue here rather than at pre-init.
-        LostTalesConfig.reload();
+        ServerStep.run("LostTalesConfig.reload", () -> LostTalesConfig.reload());
         // The world's clock next: whatever lets data expire below, and on
         // the first ticks, asks it whether a jump of the clock holds that
         // back (DATA-09).
-        WorldClock.reset();
-        WorldClock.observe(event.getServer());
-        CharacterLifecycleStateTracker.markServerStarting();
+        ServerStep.run("WorldClock.reset", () -> WorldClock.reset());
+        ServerStep.run("WorldClock.observe", () -> WorldClock.observe(event.getServer()));
+        ServerStep.run("CharacterLifecycleStateTracker.markServerStarting",
+                () -> CharacterLifecycleStateTracker.markServerStarting());
         // No figure until the files are read after the races below, so
-        // the recovery the stores start with waits for that read.
-        LoreCharacterRegistry.clear();
-        initializeLoreCharacterOwnership(event);
-        CharacterStateCheckpointHandler.reset();
-        CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
-        AccessoryInventorySyncManager.clearAll();
-        AccessoryEffectService.clearAll();
-        LostTalesServerTaskQueue.startAccepting();
-        LostTalesRequestRateLimiter.clear();
-        LostTalesThirdPersonAimService.clear();
-        LostTalesChargeService.clear();
-        FellowshipSyncManager.clear();
-        FellowshipMirrors.clear();
-        LotrSharedWaypoints.clear();
-        FellowshipMemberStatusSyncManager.clear();
-        FellowshipTrackingSyncManager.clear();
-        FellowshipDeclines.clear();
-        FellowshipQuestProgressCoordinator.getInstance().clear();
-        MissiveBoardWatches.clear();
-        LostTalesMapMarkerSyncManager.clear();
-        LostTalesLotrWaystoneTravelAdapter.clear();
-        com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits.clear();
-        LostTalesChatRoleRosterWatcher.clear();
-        ChatMessageIdAllocator.reset();
-        ChatHistory.clear();
-        ChatConsoleStream.clear();
-        com.ninuna.losttales.chat.server.ChatReports.clear();
+        // nothing recovers a claim or release before that read.
+        ServerStep.run("LoreCharacterRegistry.clear", () -> LoreCharacterRegistry.clear());
+        ServerStep.run("initializeLoreCharacterOwnership",
+                () -> initializeLoreCharacterOwnership(event));
+        ServerStep.run("CharacterStateCheckpointHandler.reset",
+                () -> CharacterStateCheckpointHandler.reset());
+        ServerStep.run("CharacterSwitchCoordinator.clearAllRuntimeState",
+                () -> CharacterSwitchCoordinator.getInstance().clearAllRuntimeState());
+        ServerStep.run("AccessoryInventorySyncManager.clearAll",
+                () -> AccessoryInventorySyncManager.clearAll());
+        ServerStep.run("AccessoryEffectService.clearAll", () -> AccessoryEffectService.clearAll());
+        ServerStep.run("LostTalesServerTaskQueue.startAccepting",
+                () -> LostTalesServerTaskQueue.startAccepting());
+        ServerStep.run("LostTalesRequestRateLimiter.clear",
+                () -> LostTalesRequestRateLimiter.clear());
+        ServerStep.run("LostTalesThirdPersonAimService.clear",
+                () -> LostTalesThirdPersonAimService.clear());
+        ServerStep.run("LostTalesChargeService.clear", () -> LostTalesChargeService.clear());
+        ServerStep.run("FellowshipSyncManager.clear", () -> FellowshipSyncManager.clear());
+        ServerStep.run("FellowshipMirrors.clear", () -> FellowshipMirrors.clear());
+        ServerStep.run("LotrSharedWaypoints.clear", () -> LotrSharedWaypoints.clear());
+        ServerStep.run("FellowshipMemberStatusSyncManager.clear",
+                () -> FellowshipMemberStatusSyncManager.clear());
+        ServerStep.run("FellowshipTrackingSyncManager.clear",
+                () -> FellowshipTrackingSyncManager.clear());
+        ServerStep.run("FellowshipDeclines.clear", () -> FellowshipDeclines.clear());
+        ServerStep.run("FellowshipQuestProgressCoordinator.clear",
+                () -> FellowshipQuestProgressCoordinator.getInstance().clear());
+        ServerStep.run("MissiveBoardWatches.clear", () -> MissiveBoardWatches.clear());
+        ServerStep.run("LostTalesMapMarkerSyncManager.clear",
+                () -> LostTalesMapMarkerSyncManager.clear());
+        ServerStep.run("LostTalesLotrWaystoneTravelAdapter.clear",
+                () -> LostTalesLotrWaystoneTravelAdapter.clear());
+        ServerStep.run("LostTalesWaystoneVisits.clear",
+                () -> com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits.clear());
+        ServerStep.run("LostTalesChatRoleRosterWatcher.clear",
+                () -> LostTalesChatRoleRosterWatcher.clear());
+        ServerStep.run("ChatMessageIdAllocator.reset", () -> ChatMessageIdAllocator.reset());
+        ServerStep.run("ChatHistory.clear", () -> ChatHistory.clear());
+        ServerStep.run("ChatConsoleStream.clear", () -> ChatConsoleStream.clear());
+        ServerStep.run("ChatReports.clear",
+                () -> com.ninuna.losttales.chat.server.ChatReports.clear());
         // After the channels and the config above, since every kept
         // line names its channel by id: the save's recent lines and the
         // console's kept events come back as the live stores, and the
         // save follows them from here.
-        ChatHistoryStorage.restore(event.getServer());
+        ServerStep.run("ChatHistoryStorage.restore",
+                () -> ChatHistoryStorage.restore(event.getServer()));
         // Straight after the history, whose kept messages decide which of
         // the save's Discord links come back, and before the bridge
         // starts below, which paces its topics by the save's topic
         // writes. Every server gets its own, so nothing reaches it from
         // the world before.
-        LostTalesDiscordBridge.getInstance().restoreSaved(event.getServer());
-        ChatCommandContexts.clear();
-        LostTalesChatService.clear();
-        ChatIdentitySelection.clear();
-        ChatPresenceService.clear();
-        com.ninuna.losttales.chat.server.ChatServerStatus.clear();
-        // Generated quests belong to the world that made them; each
+        ServerStep.run("LostTalesDiscordBridge.restoreSaved",
+                () -> LostTalesDiscordBridge.getInstance().restoreSaved(event.getServer()));
+        ServerStep.run("ChatCommandContexts.clear", () -> ChatCommandContexts.clear());
+        ServerStep.run("LostTalesChatService.clear", () -> LostTalesChatService.clear());
+        ServerStep.run("ChatIdentitySelection.clear", () -> ChatIdentitySelection.clear());
+        ServerStep.run("ChatPresenceService.clear", () -> ChatPresenceService.clear());
+        ServerStep.run("ChatServerStatus.clear",
+                () -> com.ninuna.losttales.chat.server.ChatServerStatus.clear());
+        // Missives belong to the world that made them; each
         // player's saved data registers its own again as it loads.
-        LostTalesQuestRegistry.clearRuntimeQuests();
+        ServerStep.run("LostTalesQuestRegistry.clearMissives",
+                () -> LostTalesQuestRegistry.clearMissives());
         // The server's own quest files, as they are on disk now.
-        LostTalesQuestRegistry.loadServerQuests();
+        ServerStep.run("LostTalesQuestRegistry.loadServerQuests",
+                () -> LostTalesQuestRegistry.loadServerQuests());
         // The skills and race starts, bundled and the server's own.
-        ProgressionCatalog.load();
+        ServerStep.run("ProgressionCatalog.load", () -> ProgressionCatalog.load());
         // The races and capes, bundled and the server's own, after the
         // skills their starts name (CHAR-38, CHAR-39).
-        com.ninuna.losttales.character.server.CharacterRaceCatalog.load(
-                event.getServer().worldServerForDimension(0));
+        ServerStep.run("CharacterRaceCatalog.load", () -> {
+            com.ninuna.losttales.character.server.CharacterRaceCatalog.load(
+                    event.getServer().worldServerForDimension(0));
+        });
         // The lore characters, bundled and the server's own, after the
         // races they stand on (CHAR-43); then the claims and releases a
         // stop broke off, which wait for them.
-        LoreCharacterRegistry.load();
-        LoreCharacterTransferCoordinator.getInstance().recoverAll(
-                event.getServer().worldServerForDimension(0));
+        ServerStep.run("LoreCharacterRegistry.load", () -> LoreCharacterRegistry.load());
+        ServerStep.run("LoreCharacterTransferCoordinator.recoverAll", () -> {
+            LoreCharacterTransferCoordinator.getInstance().recoverAll(
+                    event.getServer().worldServerForDimension(0));
+        });
         // The server's own waystone houses and map marker files (MOD-17);
         // the marker store seeds itself from the files only after this.
-        com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles.loadServer();
+        ServerStep.run("LostTalesMapMarkerFiles.loadServer",
+                () -> com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles.loadServer());
         // The armour weights and named sets, bundled and the server's own
         // (CONTENT-06, CONTENT-07), before the kits that mark relics.
-        Armour.load();
+        ServerStep.run("Armour.load", () -> Armour.load());
         // The starting kits, checked against the server's races and relic
         // sets, so read once both are set (CHAR-40, CONTENT-11).
-        com.ninuna.losttales.character.kit.StartingKits.load();
+        ServerStep.run("StartingKits.load",
+                () -> com.ninuna.losttales.character.kit.StartingKits.load());
         // The accessories, bundled and the server's own (ACC-01), before
         // any player's ring is read.
-        Accessories.load();
+        ServerStep.run("Accessories.load", () -> Accessories.load());
         // The missive templates, bundled and the server's own (QUEST-42).
-        com.ninuna.losttales.quest.missive.MissiveTemplates.load();
-        ProgressionService.clear();
-        CountWatch.clear();
-        PerkRuntime.clearServer();
-        PerkCombatEvents.clear();
-        PerkAnimalEvents.clear();
-        ArmourEvents.clear();
-        DeedEvents.clear();
-        com.ninuna.losttales.quest.world.WorldQuestSchedules.logProblems();
-        ServerQuestSync.clear();
-        QuestLogSync.clear();
-        com.ninuna.losttales.quest.QuestFellows.clear();
-        com.ninuna.losttales.quest.QuestOfferPause.clear();
-        com.ninuna.losttales.quest.LostTalesQuestRewardHelper.clear();
-        WorldQuests.clear();
-        LostTalesServerBroadcastHook.clear();
-        ChatArrivals.clear();
-        ChatWelcome.clear();
-        CharacterJoin.clear();
-        com.ninuna.losttales.character.server.CharacterSyncManager.clear();
-        ChatConsoleCommandHandler.clear();
-        DiscordGameEventRelay.clear();
-        LostTalesDiscordBridge.getInstance().resetSession();
-        ChatMemberDirectory.clear();
-        com.ninuna.losttales.chat.server.ChatMemberWatches.clear();
-        ChatAuditLog.onServerStarting();
-        LostTalesMobAggroEventHandler.clearAll();
-        LotrRaceProfileAdapter.getInstance().clear();
-        ELostTalesCommand.initAndRegisterCommands(event);
-        LostTalesDiscordBridge.getInstance().start();
+        ServerStep.run("MissiveTemplates.load",
+                () -> com.ninuna.losttales.quest.missive.MissiveTemplates.load());
+        ServerStep.run("ProgressionService.clear", () -> ProgressionService.clear());
+        ServerStep.run("CountWatch.clear", () -> CountWatch.clear());
+        ServerStep.run("PerkRuntime.clearServer", () -> PerkRuntime.clearServer());
+        ServerStep.run("PerkCombatEvents.clear", () -> PerkCombatEvents.clear());
+        ServerStep.run("PerkAnimalEvents.clear", () -> PerkAnimalEvents.clear());
+        ServerStep.run("ArmourEvents.clear", () -> ArmourEvents.clear());
+        ServerStep.run("DeedEvents.clear", () -> DeedEvents.clear());
+        ServerStep.run("WorldQuestSchedules.logProblems",
+                () -> com.ninuna.losttales.quest.world.WorldQuestSchedules.logProblems());
+        ServerStep.run("ServerQuestSync.clear", () -> ServerQuestSync.clear());
+        ServerStep.run("QuestLogSync.clear", () -> QuestLogSync.clear());
+        ServerStep.run("QuestFellows.clear", () -> com.ninuna.losttales.quest.QuestFellows.clear());
+        ServerStep.run("QuestOfferPause.clear",
+                () -> com.ninuna.losttales.quest.QuestOfferPause.clear());
+        ServerStep.run("LostTalesQuestRewardHelper.clear",
+                () -> com.ninuna.losttales.quest.LostTalesQuestRewardHelper.clear());
+        ServerStep.run("MissiveSeals.clear",
+                () -> com.ninuna.losttales.quest.missive.MissiveSeals.clear());
+        ServerStep.run("WorldQuests.clear", () -> WorldQuests.clear());
+        ServerStep.run("LostTalesServerBroadcastHook.clear",
+                () -> LostTalesServerBroadcastHook.clear());
+        ServerStep.run("ChatArrivals.clear", () -> ChatArrivals.clear());
+        ServerStep.run("ChatWelcome.clear", () -> ChatWelcome.clear());
+        ServerStep.run("CharacterJoin.clear", () -> CharacterJoin.clear());
+        ServerStep.run("CharacterSyncManager.clear",
+                () -> com.ninuna.losttales.character.server.CharacterSyncManager.clear());
+        ServerStep.run("ChatConsoleCommandHandler.clear", () -> ChatConsoleCommandHandler.clear());
+        ServerStep.run("DiscordGameEventRelay.clear", () -> DiscordGameEventRelay.clear());
+        ServerStep.run("LostTalesDiscordBridge.resetSession",
+                () -> LostTalesDiscordBridge.getInstance().resetSession());
+        ServerStep.run("ChatMemberDirectory.clear", () -> ChatMemberDirectory.clear());
+        ServerStep.run("ChatMemberWatches.clear",
+                () -> com.ninuna.losttales.chat.server.ChatMemberWatches.clear());
+        ServerStep.run("ChatAuditLog.onServerStarting", () -> ChatAuditLog.onServerStarting());
+        ServerStep.run("LostTalesMobAggroEventHandler.clearAll",
+                () -> LostTalesMobAggroEventHandler.clearAll());
+        ServerStep.run("LotrRaceProfileAdapter.clear",
+                () -> LotrRaceProfileAdapter.getInstance().clear());
+        ServerStep.run("ELostTalesCommand.initAndRegisterCommands",
+                () -> ELostTalesCommand.initAndRegisterCommands(event));
+        ServerStep.run("LostTalesDiscordBridge.start",
+                () -> LostTalesDiscordBridge.getInstance().start());
     }
 
     private static void initializeLoreCharacterOwnership(
@@ -603,9 +658,6 @@ public class LostTalesCommonProxy {
                                 + "read-only (%s); claims and releases are disabled",
                         LostTalesMetaData.MOD_ID,
                         transfers.getReadOnlyReason());
-            } else {
-                LoreCharacterTransferCoordinator.getInstance().recoverAll(
-                        event.getServer().worldServerForDimension(0));
             }
         } catch (RuntimeException exception) {
             FMLLog.severe("[%s] Failed to initialize lore-character ownership storage: %s",
@@ -627,106 +679,162 @@ public class LostTalesCommonProxy {
         com.ninuna.losttales.chat.server.ChatServerStatus.started();
     }
 
+    /**
+     * Lets the server's stores go and empties them for the next world.
+     * Each step runs through {@link ServerStep}: one that throws is logged
+     * and the rest still run.
+     */
     public void onServerStopping(FMLServerStoppingEvent event) {
         // The Server Log's entry for the stop, the pair of the one the
         // start records: shown to its readers still online, and kept by
         // the history's snapshot below, so the Console shows it when the
         // server is next up. First, before the ids are reset below.
-        LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
-                ChatConsoleEvent.Severity.INFO,
-                LostTalesServerBroadcastHook.SERVER_NAME,
-                "Server shutting down");
+        ServerStep.run("LostTalesChatService.console", () -> {
+            LostTalesChatService.console(ChatConsoleEvent.Kind.SERVER,
+                    ChatConsoleEvent.Severity.INFO,
+                    LostTalesServerBroadcastHook.SERVER_NAME,
+                    "Server shutting down");
+        });
         // The offline topic, queued before the stop, which gives the
         // worker a bounded moment to send it.
-        LostTalesDiscordBridge.getInstance().onServerStopping();
-        LostTalesDiscordBridge.getInstance().stop();
+        ServerStep.run("LostTalesDiscordBridge.onServerStopping",
+                () -> LostTalesDiscordBridge.getInstance().onServerStopping());
+        ServerStep.run("LostTalesDiscordBridge.stop",
+                () -> LostTalesDiscordBridge.getInstance().stop());
         // Once the bridge has stopped adding to them, the links and the
         // topic writes, the offline one among them, go to the save the
         // worlds are written with after this event, and the live ones are
         // emptied for the next world.
-        LostTalesDiscordBridge.getInstance().releaseSaved();
-        LostTalesServerTaskQueue.stopAcceptingAndClear();
-        CharacterLifecycleStateTracker.markServerStopping();
-        int checkpointed = CharacterSwitchCoordinator.getInstance()
-                .checkpointAllOnlinePlayers(MinecraftServer.getServer());
-        FMLLog.info("[%s] Shutdown character checkpoint completed for %d online accounts",
-                LostTalesMetaData.MOD_ID, Integer.valueOf(checkpointed));
-        // The last time seen goes to the save the worlds are written with.
-        WorldClock.observe(MinecraftServer.getServer());
-        WorldClock.reset();
-        CharacterStateCheckpointHandler.reset();
-        CharacterSwitchCoordinator.getInstance().clearAllRuntimeState();
-        AccessoryInventorySyncManager.clearAll();
-        AccessoryEffectService.clearAll();
-        LostTalesRequestRateLimiter.clear();
-        LostTalesThirdPersonAimService.clear();
-        LostTalesChargeService.clear();
-        FellowshipSyncManager.clear();
-        FellowshipMirrors.clear();
-        LotrSharedWaypoints.clear();
-        FellowshipMemberStatusSyncManager.clear();
-        FellowshipTrackingSyncManager.clear();
-        FellowshipDeclines.clear();
-        FellowshipQuestProgressCoordinator.getInstance().clear();
-        MissiveBoardWatches.clear();
-        LostTalesQuestRegistry.clearServerQuests();
-        ProgressionCatalog.clear();
-        com.ninuna.losttales.character.server.CharacterRaceCatalog.clear();
-        LoreCharacterRegistry.clear();
-        com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles.clearServer();
-        com.ninuna.losttales.character.kit.StartingKits.clear();
-        Accessories.clearServer();
-        Armour.clearServer();
-        com.ninuna.losttales.quest.missive.MissiveTemplates.clear();
-        ProgressionService.clear();
-        CountWatch.clear();
-        PerkRuntime.clearServer();
-        PerkCombatEvents.clear();
-        PerkAnimalEvents.clear();
-        ArmourEvents.clear();
-        DeedEvents.clear();
-        ServerQuestSync.clear();
-        QuestLogSync.clear();
-        com.ninuna.losttales.quest.QuestFellows.clear();
-        com.ninuna.losttales.quest.QuestOfferPause.clear();
-        com.ninuna.losttales.quest.LostTalesQuestRewardHelper.clear();
-        WorldQuests.clear();
-        LostTalesMapMarkerSyncManager.clear();
-        LostTalesLotrWaystoneTravelAdapter.clear();
-        com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits.clear();
-        LostTalesChatRoleRosterWatcher.clear();
-        ChatChannel.resetToBuiltIn();
-        ChatChannelIconCatalog.resetToDefaults();
-        ChatProfanityCatalog.resetToBundled();
-        ChatCommandText.resetServerNames();
-        ChatMessageIdAllocator.reset();
+        ServerStep.run("LostTalesDiscordBridge.releaseSaved",
+                () -> LostTalesDiscordBridge.getInstance().releaseSaved());
+        ServerStep.run("LostTalesServerTaskQueue.stopAcceptingAndClear",
+                () -> LostTalesServerTaskQueue.stopAcceptingAndClear());
+        ServerStep.run("CharacterLifecycleStateTracker.markServerStopping",
+                () -> CharacterLifecycleStateTracker.markServerStopping());
+        ServerStep.run("CharacterSwitchCoordinator.checkpointAllOnlinePlayers", () -> {
+            int checkpointed = CharacterSwitchCoordinator.getInstance()
+                    .checkpointAllOnlinePlayers(MinecraftServer.getServer());
+            FMLLog.info("[%s] Shutdown character checkpoint completed for %d online accounts",
+                    LostTalesMetaData.MOD_ID, Integer.valueOf(checkpointed));
+        });
+        // The last time seen and the clean stop's mark go to the save the
+        // worlds are written with (DATA-09).
+        ServerStep.run("WorldClock.stopped", () -> WorldClock.stopped(MinecraftServer.getServer()));
+        ServerStep.run("CharacterStateCheckpointHandler.reset",
+                () -> CharacterStateCheckpointHandler.reset());
+        ServerStep.run("CharacterSwitchCoordinator.clearAllRuntimeState",
+                () -> CharacterSwitchCoordinator.getInstance().clearAllRuntimeState());
+        ServerStep.run("AccessoryInventorySyncManager.clearAll",
+                () -> AccessoryInventorySyncManager.clearAll());
+        ServerStep.run("AccessoryEffectService.clearAll", () -> AccessoryEffectService.clearAll());
+        ServerStep.run("LostTalesRequestRateLimiter.clear",
+                () -> LostTalesRequestRateLimiter.clear());
+        ServerStep.run("LostTalesThirdPersonAimService.clear",
+                () -> LostTalesThirdPersonAimService.clear());
+        ServerStep.run("LostTalesChargeService.clear", () -> LostTalesChargeService.clear());
+        ServerStep.run("FellowshipSyncManager.clear", () -> FellowshipSyncManager.clear());
+        ServerStep.run("FellowshipMirrors.clear", () -> FellowshipMirrors.clear());
+        ServerStep.run("LotrSharedWaypoints.clear", () -> LotrSharedWaypoints.clear());
+        ServerStep.run("FellowshipMemberStatusSyncManager.clear",
+                () -> FellowshipMemberStatusSyncManager.clear());
+        ServerStep.run("FellowshipTrackingSyncManager.clear",
+                () -> FellowshipTrackingSyncManager.clear());
+        ServerStep.run("FellowshipDeclines.clear", () -> FellowshipDeclines.clear());
+        ServerStep.run("FellowshipQuestProgressCoordinator.clear",
+                () -> FellowshipQuestProgressCoordinator.getInstance().clear());
+        ServerStep.run("MissiveBoardWatches.clear", () -> MissiveBoardWatches.clear());
+        ServerStep.run("LostTalesQuestRegistry.clearServerQuests",
+                () -> LostTalesQuestRegistry.clearServerQuests());
+        ServerStep.run("ProgressionCatalog.clear", () -> ProgressionCatalog.clear());
+        ServerStep.run("CharacterRaceCatalog.clear",
+                () -> com.ninuna.losttales.character.server.CharacterRaceCatalog.clear());
+        ServerStep.run("LoreCharacterRegistry.clear", () -> LoreCharacterRegistry.clear());
+        ServerStep.run("LostTalesMapMarkerFiles.clearServer",
+                () -> com.ninuna.losttales.mapmarker.LostTalesMapMarkerFiles.clearServer());
+        ServerStep.run("StartingKits.clear",
+                () -> com.ninuna.losttales.character.kit.StartingKits.clear());
+        ServerStep.run("Accessories.clearServer", () -> Accessories.clearServer());
+        ServerStep.run("Armour.clearServer", () -> Armour.clearServer());
+        ServerStep.run("MissiveTemplates.clear",
+                () -> com.ninuna.losttales.quest.missive.MissiveTemplates.clear());
+        ServerStep.run("ProgressionService.clear", () -> ProgressionService.clear());
+        ServerStep.run("CountWatch.clear", () -> CountWatch.clear());
+        ServerStep.run("PerkRuntime.clearServer", () -> PerkRuntime.clearServer());
+        ServerStep.run("PerkCombatEvents.clear", () -> PerkCombatEvents.clear());
+        ServerStep.run("PerkAnimalEvents.clear", () -> PerkAnimalEvents.clear());
+        ServerStep.run("ArmourEvents.clear", () -> ArmourEvents.clear());
+        ServerStep.run("DeedEvents.clear", () -> DeedEvents.clear());
+        ServerStep.run("ServerQuestSync.clear", () -> ServerQuestSync.clear());
+        ServerStep.run("QuestLogSync.clear", () -> QuestLogSync.clear());
+        ServerStep.run("QuestFellows.clear", () -> com.ninuna.losttales.quest.QuestFellows.clear());
+        ServerStep.run("QuestOfferPause.clear",
+                () -> com.ninuna.losttales.quest.QuestOfferPause.clear());
+        ServerStep.run("LostTalesQuestRewardHelper.clear",
+                () -> com.ninuna.losttales.quest.LostTalesQuestRewardHelper.clear());
+        ServerStep.run("MissiveSeals.clear",
+                () -> com.ninuna.losttales.quest.missive.MissiveSeals.clear());
+        ServerStep.run("WorldQuests.clear", () -> WorldQuests.clear());
+        ServerStep.run("LostTalesMapMarkerSyncManager.clear",
+                () -> LostTalesMapMarkerSyncManager.clear());
+        ServerStep.run("LostTalesLotrWaystoneTravelAdapter.clear",
+                () -> LostTalesLotrWaystoneTravelAdapter.clear());
+        ServerStep.run("LostTalesWaystoneVisits.clear",
+                () -> com.ninuna.losttales.mapmarker.LostTalesWaystoneVisits.clear());
+        ServerStep.run("LostTalesChatRoleRosterWatcher.clear",
+                () -> LostTalesChatRoleRosterWatcher.clear());
+        ServerStep.run("ChatChannel.resetToBuiltIn", () -> ChatChannel.resetToBuiltIn());
+        ServerStep.run("ChatChannelIconCatalog.resetToDefaults",
+                () -> ChatChannelIconCatalog.resetToDefaults());
+        ServerStep.run("ChatProfanityCatalog.resetToBundled",
+                () -> ChatProfanityCatalog.resetToBundled());
+        ServerStep.run("ChatRoleCatalog.installServer",
+                () -> com.ninuna.losttales.chat.ChatRoleCatalog.installServer(null));
+        ServerStep.run("ChatChannelGates.install",
+                () -> com.ninuna.losttales.chat.ChatChannelGates.install(null));
+        ServerStep.run("LostTalesPermissionCatalog.install",
+                () -> com.ninuna.losttales.permission.LostTalesPermissionCatalog.install(null));
+        ServerStep.run("ChatCommandText.resetServerNames",
+                () -> ChatCommandText.resetServerNames());
+        ServerStep.run("ChatMessageIdAllocator.reset", () -> ChatMessageIdAllocator.reset());
         // The save takes the history's last state before the store is
         // cleared: the worlds are saved after this event, and what
         // they write is that snapshot.
-        ChatHistoryStorage.release();
-        ChatHistory.clear();
-        ChatConsoleStream.clear();
-        com.ninuna.losttales.chat.server.ChatReports.clear();
-        ChatCommandContexts.clear();
-        LostTalesChatService.clear();
-        ChatIdentitySelection.clear();
-        ChatPresenceService.clear();
-        com.ninuna.losttales.chat.server.ChatServerStatus.clear();
-        // Generated quests belong to the world that made them; each
+        ServerStep.run("ChatHistoryStorage.release", () -> ChatHistoryStorage.release());
+        ServerStep.run("ChatHistory.clear", () -> ChatHistory.clear());
+        ServerStep.run("ChatConsoleStream.clear", () -> ChatConsoleStream.clear());
+        ServerStep.run("ChatReports.clear",
+                () -> com.ninuna.losttales.chat.server.ChatReports.clear());
+        ServerStep.run("ChatCommandContexts.clear", () -> ChatCommandContexts.clear());
+        ServerStep.run("LostTalesChatService.clear", () -> LostTalesChatService.clear());
+        ServerStep.run("ChatIdentitySelection.clear", () -> ChatIdentitySelection.clear());
+        ServerStep.run("ChatPresenceService.clear", () -> ChatPresenceService.clear());
+        ServerStep.run("ChatServerStatus.clear",
+                () -> com.ninuna.losttales.chat.server.ChatServerStatus.clear());
+        // Missives belong to the world that made them; each
         // player's saved data registers its own again as it loads.
-        LostTalesQuestRegistry.clearRuntimeQuests();
-        LostTalesServerBroadcastHook.clear();
-        ChatArrivals.clear();
-        ChatWelcome.clear();
-        CharacterJoin.clear();
-        com.ninuna.losttales.character.server.CharacterSyncManager.clear();
-        ChatConsoleCommandHandler.clear();
-        DiscordGameEventRelay.clear();
-        LostTalesDiscordBridge.getInstance().resetSession();
-        ChatMemberDirectory.clear();
-        com.ninuna.losttales.chat.server.ChatMemberWatches.clear();
-        ChatAuditLog.onServerStopping();
-        LostTalesMobAggroEventHandler.clearAll();
-        LotrRaceProfileAdapter.getInstance().clear();
+        ServerStep.run("LostTalesQuestRegistry.clearMissives",
+                () -> LostTalesQuestRegistry.clearMissives());
+        ServerStep.run("LostTalesServerBroadcastHook.clear",
+                () -> LostTalesServerBroadcastHook.clear());
+        ServerStep.run("ChatArrivals.clear", () -> ChatArrivals.clear());
+        ServerStep.run("ChatWelcome.clear", () -> ChatWelcome.clear());
+        ServerStep.run("CharacterJoin.clear", () -> CharacterJoin.clear());
+        ServerStep.run("CharacterSyncManager.clear",
+                () -> com.ninuna.losttales.character.server.CharacterSyncManager.clear());
+        ServerStep.run("ChatConsoleCommandHandler.clear", () -> ChatConsoleCommandHandler.clear());
+        ServerStep.run("DiscordGameEventRelay.clear", () -> DiscordGameEventRelay.clear());
+        ServerStep.run("LostTalesDiscordBridge.resetSession",
+                () -> LostTalesDiscordBridge.getInstance().resetSession());
+        ServerStep.run("ChatMemberDirectory.clear", () -> ChatMemberDirectory.clear());
+        ServerStep.run("ChatMemberWatches.clear",
+                () -> com.ninuna.losttales.chat.server.ChatMemberWatches.clear());
+        ServerStep.run("ChatAuditLog.onServerStopping", () -> ChatAuditLog.onServerStopping());
+        // The clock is forgotten once the stores above are let go: until
+        // then whatever asks what is held still gets the world's hold.
+        ServerStep.run("WorldClock.reset", () -> WorldClock.reset());
+        ServerStep.run("LostTalesMobAggroEventHandler.clearAll",
+                () -> LostTalesMobAggroEventHandler.clearAll());
+        ServerStep.run("LotrRaceProfileAdapter.clear",
+                () -> LotrRaceProfileAdapter.getInstance().clear());
     }
 }

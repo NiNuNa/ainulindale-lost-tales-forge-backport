@@ -85,7 +85,7 @@ public final class ChatAbsentReader implements ChatChannelPolicy.Reader {
 
     @Override
     public boolean readsConsole() {
-        return holds(LostTalesCapability.CHAT_SERVER_CONSOLE_READ);
+        return holds(LostTalesCapability.CHAT_SERVER_LOG_READ);
     }
 
     /**

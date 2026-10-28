@@ -154,8 +154,8 @@ public final class DiscordMessageLinksTest {
         assertEquals(Arrays.asList("111", "444"), links.discordLinesIn("channel:5"));
         assertEquals(Arrays.asList("333"), links.discordLinesIn("channel:6"));
         assertTrue(links.discordLinesIn(null).isEmpty());
-        assertEquals("ooc", links.copiesOf(2000L).get(0).bindingId);
-        assertEquals("", links.copiesOf(1000L).get(0).bindingId);
+        assertEquals("ooc", links.copiesOf(2000L).get(0).channelLinkId);
+        assertEquals("", links.copiesOf(1000L).get(0).channelLinkId);
     }
 
     @Test
@@ -203,9 +203,9 @@ public final class DiscordMessageLinksTest {
         assertEquals(1, links.copiesOf(1000L).size());
         DiscordMessageLinks.Copy copy = links.copiesOf(1000L).get(0);
         // A restored copy corrects through no webhook of its own; the
-        // bridge finds one among the bindings of its message's channel.
+        // bridge finds one among the links of its message's channel.
         assertEquals("", copy.webhookUrl);
-        assertEquals("ooc", copy.bindingId);
+        assertEquals("ooc", copy.channelLinkId);
         assertEquals("-# h\n", copy.header);
     }
 

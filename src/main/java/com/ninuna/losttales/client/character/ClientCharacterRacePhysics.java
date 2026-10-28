@@ -14,9 +14,9 @@ import net.minecraft.entity.player.EntityPlayer;
 import java.util.List;
 
 /**
- * Mirrors server-authoritative race dimensions on client-side player entities.
- * Width and height are not sent through vanilla entity metadata in 1.7.10, so
- * remote players use the synchronized active-character appearance cache.
+ * Gives every player in your world the size of the race they play, as the
+ * server does. The game sends no width or height, so the size comes from
+ * each player's look as the server sent it.
  */
 public final class ClientCharacterRacePhysics {
 

@@ -69,8 +69,8 @@ public final class WindowLayoutStoreTest {
     @Test
     public void aSplitRoundTripsOnItsWindowsLine() {
         WindowLayoutStore.load(Arrays.asList(
-                "window w1 locked=false x=0.00 y=0.00 split=ooc,global,down,0.6000 split=global,operator,across,0.5000 active=global tabs=global,ooc,client_console",
-                "window w2 locked=false x=0.00 y=100.00 split=client_console,nowhere,across,0.5000 active=operator tabs=operator"));
+                "window w1 locked=false x=0.00 y=0.00 split=ooc,global,down,0.6000 split=global,operator,across,0.5000 active=global tabs=global,ooc,console",
+                "window w2 locked=false x=0.00 y=100.00 split=console,nowhere,across,0.5000 active=operator tabs=operator"));
         Window first = WindowLayout.window("w1");
         WindowSplit split = first.splitOf(ConversationPage.of(ChatChannel.GLOBAL));
         assertNotNull(split);
@@ -98,7 +98,7 @@ public final class WindowLayoutStoreTest {
                 "view v9",
                 "view menu",
                 "window w1 view=v2 locked=true borderless=held x=10.00 y=20.00 active=global tabs=global,ooc",
-                "window w2 view=consoles locked=false x=0.00 y=0.00 active=client_console tabs=client_console"));
+                "window w2 view=consoles locked=false x=0.00 y=0.00 active=console tabs=console"));
         assertEquals("Hunting Party", Views.byId("v2").title());
         assertEquals(1, Views.custom().size());
         assertEquals(Views.byId("v2"), WindowLayout.viewOf(WindowLayout.window("w1")));
@@ -127,7 +127,7 @@ public final class WindowLayoutStoreTest {
     @Test
     public void rememberedConversationsRoundTripPerPlace() {
         WindowLayoutStore.load(Arrays.asList(
-                "window w1 locked=false x=0.00 y=0.00 active=client_console tabs=client_console",
+                "window w1 locked=false x=0.00 y=0.00 active=console tabs=console",
                 "window w2 locked=false x=0.00 y=100.00 active=global tabs=global,ooc",
                 "conversation\tserver:a\tw2\twhisper:Steve|Aldric",
                 "closedconversation\tserver:a\twhisper:Bob",
@@ -155,7 +155,7 @@ public final class WindowLayoutStoreTest {
     public void aWindowFillingTheScreenRoundTrips() {
         WindowLayoutStore.load(Arrays.asList(
                 "window w1 locked=false x=10.00 y=20.00 height=150.00"
-                        + " fill=full active=client_console tabs=client_console,operator",
+                        + " fill=full active=console tabs=console,operator",
                 "window w2 locked=false x=0.00 y=100.00 active=global tabs=global",
                 "window w3 locked=false x=0.00 y=50.00 fill=top_right"
                         + " active=ooc tabs=ooc",
@@ -428,8 +428,8 @@ public final class WindowLayoutStoreTest {
         assertTrue(lines.contains("feed x=12.25 y=88.00"));
         assertTrue(lines.contains("toolbar collapsed=true"));
         assertTrue(lines.toString(), lines.contains("window w1 view=consoles"
-                + " locked=false x=50.00 y=50.00 active=client_console"
-                + " tabs=client_console,server_console"));
+                + " locked=false x=50.00 y=50.00 active=console"
+                + " tabs=console,server_log"));
         assertTrue(lines.toString(), lines.contains("window w2 view=channels"
                 + " locked=false x=3.00 y=97.50 active=ooc"
                 + " tabs=global,proximity,ooc"));
@@ -497,10 +497,10 @@ public final class WindowLayoutStoreTest {
                 "closed operator extra",
                 "closed operator",
                 "notify\tnothing\tnothing",
-                "notify\tnothing\tclient_console",
+                "notify\tnothing\tconsole",
                 "notify\tloud\tfaction",
                 "notify\tmentions",
-                "feedchoice\tmentions\tclient_console",
+                "feedchoice\tmentions\tconsole",
                 "feedchoice\tloud\tfaction",
                 "feedchoice\tnothing",
                 "muted global",
@@ -527,12 +527,12 @@ public final class WindowLayoutStoreTest {
         assertEquals(0.0D, w2.getOffsetX(), 0.0D);
         assertEquals(12.0D, w2.getOffsetY(), 0.0D);
         assertEquals(Arrays.asList(ChatChannel.PROXIMITY, ChatChannel.FACTION,
-                ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE,
-                ChatChannel.SERVER_CONSOLE), ChatLayout.closedChannels());
+                ChatChannel.OPERATOR, ChatChannel.CONSOLE,
+                ChatChannel.SERVER_LOG), ChatLayout.closedChannels());
         assertEquals(ChatLineChoice.NOTHING,
-                ChatLayout.notification(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
+                ChatLayout.notification(ConversationPage.of(ChatChannel.CONSOLE)));
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
-                ChatLayout.feedChoice(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
+                ChatLayout.feedChoice(ConversationPage.of(ChatChannel.CONSOLE)));
         // A choice with no name, a line without its tab and an old mute
         // line leave their conversations as they ship.
         assertEquals(ChatLineChoice.ONLY_MENTIONS,
@@ -633,7 +633,7 @@ public final class WindowLayoutStoreTest {
         assertTrue(second.isPanelOut());
         assertEquals(0.0D, ChatLayout.getMembersWidth(ConversationPage.from(second)),
                 1.0E-9D);
-        first.resetView();
+        first.resetPanels();
         assertTrue(first.isMemberListOut());
         assertTrue(first.isPanelOut());
     }

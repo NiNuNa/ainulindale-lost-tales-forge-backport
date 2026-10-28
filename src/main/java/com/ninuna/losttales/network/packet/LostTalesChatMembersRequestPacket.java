@@ -1,6 +1,7 @@
 package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.chat.server.ChatMemberDirectory;
 import com.ninuna.losttales.chat.server.ChatMemberWatches;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
@@ -30,6 +31,9 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * fellowship — is the server's to say from the identity the player speaks as;
  * whether they may read the channel at all is asked again, and a named
  * fellowship is looked up in the server's own records, never taken on trust.
+ * A conversation heard nearby also names the range its copy speaks at, and
+ * its list is who that range reaches (CHAT-37, CHAT-51), measured by the
+ * server.
  * The answer is {@link LostTalesChatMembersPacket}: empty for a channel
  * the player may not read, and only a word that nothing changed where the
  * fingerprint still matches.</p>
@@ -41,7 +45,8 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
     private static final int MAX_IDENTITY_BYTES = 128;
     private static final int MAX_PACKET_BYTES = 5 + MAX_CHANNEL_ID_BYTES
             + 5 + LostTalesChatMembersPacket.MAX_CONVERSATION_KEY_BYTES
-            + 5 + MAX_PARTNER_BYTES + 5 + MAX_IDENTITY_BYTES + 17 + 17 + 8;
+            + 5 + MAX_PARTNER_BYTES + 5 + MAX_IDENTITY_BYTES + 17 + 17 + 8
+            + 1;
 
     private String channelId = "";
     private String conversationKey = "";
@@ -50,6 +55,8 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
     private UUID partnerCharacterId;
     private UUID heldCharacterId;
     private long heldFingerprint;
+    /** The range a copy heard nearby speaks at; talk for every other conversation. */
+    private ChatSpeechRange range = ChatSpeechRange.TALK;
     private boolean malformed;
 
     public LostTalesChatMembersRequestPacket() {}
@@ -98,6 +105,7 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
             this.partnerCharacterId = LostTalesPacketCodec.readNullableUuid(buffer);
             this.heldCharacterId = LostTalesPacketCodec.readNullableUuid(buffer);
             this.heldFingerprint = buffer.readLong();
+            this.range = ChatSpeechRange.fromCode(buffer.readUnsignedByte());
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
@@ -109,6 +117,7 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
             this.partnerCharacterId = null;
             this.heldCharacterId = null;
             this.heldFingerprint = 0L;
+            this.range = ChatSpeechRange.TALK;
             LostTalesPacketCodec.discardRemaining(buffer);
         }
     }
@@ -127,6 +136,7 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
         LostTalesPacketCodec.writeNullableUuid(buffer, this.partnerCharacterId);
         LostTalesPacketCodec.writeNullableUuid(buffer, this.heldCharacterId);
         buffer.writeLong(this.heldFingerprint);
+        buffer.writeByte(this.range.code());
     }
 
     /**
@@ -141,6 +151,9 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
                         MAX_PARTNER_BYTES)
                 || !LostTalesPacketCodec.isUtf8WithinLimit(this.partnerIdentity,
                         MAX_IDENTITY_BYTES)
+                || this.range == null
+                || (this.range != ChatSpeechRange.TALK
+                        && !ChatSpeechRange.appliesTo(getChannel()))
                 || (getChannel() != ChatChannel.WHISPER
                         && (this.partnerAccount.length() > 0
                                 || this.partnerIdentity.length() > 0
@@ -169,6 +182,16 @@ public final class LostTalesChatMembersRequestPacket implements IMessage {
 
     /** The fingerprint of the answer the client holds; zero for none. */
     public long getHeldFingerprint() { return this.heldFingerprint; }
+
+    /** The same ask for a copy heard nearby speaking at {@code range}: talk for none. */
+    public LostTalesChatMembersRequestPacket range(ChatSpeechRange range) {
+        this.range = range == null ? ChatSpeechRange.TALK : range;
+        validate();
+        return this;
+    }
+
+    /** The range the asking copy speaks at; talk for a conversation not heard nearby. */
+    public ChatSpeechRange getRange() { return this.range; }
 
     public boolean isMalformed() { return this.malformed; }
 

@@ -59,7 +59,7 @@ public final class LotrSharedWaypoints {
     }
 
     /** One copy: whose waypoint, and its number. */
-    private static final class Key {
+    static final class Key {
         final UUID ownerId;
         final int id;
 
@@ -81,7 +81,7 @@ public final class LotrSharedWaypoints {
     }
 
     /** What was handed out for one of LOTR's fellowships, and to whom. */
-    private static final class Handed {
+    static final class Handed {
         final Set<UUID> recipients;
         final Set<Key> copies;
 
@@ -178,14 +178,14 @@ public final class LotrSharedWaypoints {
             if (before != null) {
                 for (Key key : before.copies) {
                     if (!wanted.containsKey(key) && !sharedLive(key, mirrorId)) {
-                        takeBack(before.recipients, key);
-                        takeBack(recipients, key);
+                        takeBack(before.recipients, key, mirrorId);
+                        takeBack(recipients, key, mirrorId);
                     }
                 }
                 Set<UUID> gone = new HashSet<UUID>(before.recipients);
                 gone.removeAll(recipients);
                 for (Key key : before.copies) {
-                    takeBack(gone, key);
+                    takeBack(gone, key, mirrorId);
                 }
             }
             HANDED.put(mirrorId, new Handed(recipients, new HashSet<Key>(wanted.keySet())));
@@ -207,7 +207,7 @@ public final class LotrSharedWaypoints {
         try {
             for (Key key : handed.copies) {
                 if (!sharedLive(key, mirrorId)) {
-                    takeBack(handed.recipients, key);
+                    takeBack(handed.recipients, key, mirrorId);
                 }
             }
         } catch (RuntimeException failure) {
@@ -268,6 +268,22 @@ public final class LotrSharedWaypoints {
         data.addOrUpdateSharedCustomWaypoint(copy);
     }
 
+    /**
+     * Whether a fellowship other than {@code mirrorId} handed
+     * {@code account} this copy too, as {@code handed} records it.
+     */
+    static boolean handedElsewhere(Map<UUID, Handed> handed, UUID account,
+                                   Key key, UUID mirrorId) {
+        for (Map.Entry<UUID, Handed> entry : handed.entrySet()) {
+            if (!entry.getKey().equals(mirrorId)
+                    && entry.getValue().recipients.contains(account)
+                    && entry.getValue().copies.contains(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether the owner's own waypoint of that number is shared with this fellowship now, LOTR's to look after. */
     private static boolean sharedLive(Key key, UUID mirrorId) {
         LOTRCustomWaypoint live = LOTRLevelData.getData(key.ownerId).getCustomWaypointByID(key.id);
@@ -277,11 +293,25 @@ public final class LotrSharedWaypoints {
     /**
      * Takes one copy back from each of these accounts, online or not: one
      * handed a copy and since logged out may still hold it, and LOTR would
-     * send it again as they come back.
+     * send it again as they come back. An account another fellowship still
+     * gives the copy to keeps it: one more fellowship that handed it out
+     * here, or one its owner's own waypoint is shared with live.
      */
-    private static void takeBack(Set<UUID> accounts, Key key) {
+    private static void takeBack(Set<UUID> accounts, Key key, UUID mirrorId) {
+        LOTRCustomWaypoint live = null;
+        boolean liveRead = false;
         for (UUID account : accounts) {
-            if (account.equals(key.ownerId)) {
+            if (account.equals(key.ownerId)
+                    || handedElsewhere(HANDED, account, key, mirrorId)) {
+                continue;
+            }
+            if (!liveRead) {
+                live = LOTRLevelData.getData(key.ownerId)
+                        .getCustomWaypointByID(key.id);
+                liveRead = true;
+            }
+            if (live != null
+                    && live.getPlayersInAllSharedFellowships().contains(account)) {
                 continue;
             }
             LOTRPlayerData data = LOTRLevelData.getData(account);

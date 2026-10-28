@@ -21,8 +21,8 @@ import net.minecraft.util.StatCollector;
 /**
  * The Server's quiet line in a fellowship's conversation when its leader or
  * a guide places, moves or removes a mark: <i>Aldric marked Weathertop.</i>,
- * in each member's own language. The mark's name opens the map there. The line names nobody, so it pings
- * nobody; it only waits unread.
+ * in each member's own language. The mark's name opens the map there. The
+ * line names nobody, so it pings nobody; it only waits unread.
  */
 public final class FellowshipMarkNotice {
 

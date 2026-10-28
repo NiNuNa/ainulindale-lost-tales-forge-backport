@@ -231,7 +231,7 @@ public final class LostTalesMapMarkerWaypointRegistry {
         if (REGIONS_BY_MARKER_ID.containsKey(markerId)) {
             return PRIVATE_REGION_MARKER_IDS.contains(markerId);
         }
-        // Synthetic/dynamic markers are not present in the bundled registry.
+        // Markers made in the game are not present in the bundled registry.
         // Preserve their private-region policy without touching ordinary
         // native LOTR waypoints, which returned above.
         return marker.isDiscoverable()

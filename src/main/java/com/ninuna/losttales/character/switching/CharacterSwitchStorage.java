@@ -5,7 +5,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 
-/** Resolves and synchronously flushes the dedicated switch-state store. */
+/** Finds the switch store in dimension 0's storage, and writes it to disk. */
 public final class CharacterSwitchStorage {
 
     private CharacterSwitchStorage() {}
@@ -25,8 +25,8 @@ public final class CharacterSwitchStorage {
     }
 
     /**
-     * Switches are rare and security-sensitive, so phase boundaries force all
-     * dirty overworld map data to disk instead of waiting for the next autosave.
+     * Writes every changed store of dimension 0 to disk at once, rather
+     * than at the next autosave: a switch writes after each of its steps.
      */
     public static void flush(World world) {
         LostTalesDimensionHelper.flushOverworldStorage(world);

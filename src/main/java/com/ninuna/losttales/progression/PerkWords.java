@@ -70,7 +70,7 @@ public final class PerkWords {
         if ("seconds".equals(param) || "cooldown".equals(param)) {
             return PerkEffect.Unit.SECONDS;
         }
-        if ("health".equals(param) || "poison".equals(param) || "volume".equals(param)) {
+        if ("health".equals(param) || "poison".equals(param)) {
             return PerkEffect.Unit.PERCENT;
         }
         if ("radius".equals(param)) {

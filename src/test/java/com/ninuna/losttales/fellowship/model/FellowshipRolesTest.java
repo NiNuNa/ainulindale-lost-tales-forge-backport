@@ -6,14 +6,15 @@ import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
  * A fellowship has a leader and guides: the leader is never a guide, a
- * guide who leaves or leads is a guide no more, and a leader who leaves is
- * followed by the member who joined first. A new fellowship has every
- * switch on and no icon.
+ * guide who leaves or leads is a guide no more, and the leader stays a
+ * member until the lead is handed on. A new fellowship has every switch on
+ * and no icon.
  */
 public final class FellowshipRolesTest {
 
@@ -54,11 +55,17 @@ public final class FellowshipRolesTest {
     }
 
     @Test
-    public void aLeaderWhoLeavesIsFollowedByTheFirstToHaveJoined() {
+    public void theLeaderStaysUntilTheLeadIsHandedOn() {
         Fellowship fellowship = FellowshipMemberLimitTest.fellowshipOf(3);
+        UUID leader = fellowship.getLeaderIdentityId();
         UUID second = fellowship.getMembers().get(1).getIdentityId();
         fellowship.setGuide(second, true);
-        fellowship.removeMember(fellowship.getLeaderIdentityId());
+        assertNull(fellowship.removeMember(leader));
+        assertEquals(leader, fellowship.getLeaderIdentityId());
+        assertEquals(3, fellowship.getMemberCount());
+
+        assertTrue(fellowship.transferLeadership(second));
+        assertNotNull(fellowship.removeMember(leader));
         assertEquals(second, fellowship.getLeaderIdentityId());
         assertFalse("the new leader is no guide", fellowship.isGuide(second));
     }

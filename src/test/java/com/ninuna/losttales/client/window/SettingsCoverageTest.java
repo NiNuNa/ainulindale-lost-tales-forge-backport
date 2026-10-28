@@ -43,8 +43,8 @@ public final class SettingsCoverageTest {
                     "showCompassHud",
                     "showFellowshipHud",
                     "showQuickLootHud",
-                    "showQuestHud",
-                    "hudPlacementPreset",
+                    "showQuestTracker",
+                    "hudPanelLayout",
                     // The map's waypoint editor writes a custom
                     // waypoint's colour and its note.
                     "customWaypointColors",

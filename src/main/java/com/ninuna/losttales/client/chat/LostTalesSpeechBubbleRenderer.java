@@ -1,11 +1,11 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.core.LostTalesClassTransformer;
-import com.ninuna.losttales.character.sync.CharacterAppearance;
-import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
+import com.ninuna.losttales.gui.style.LostTalesUiFading;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.Collections;
@@ -31,7 +31,10 @@ import org.lwjgl.opengl.GL11;
  * words under it in the chat's ivory on the chat's black, and the same
  * emoji the chat draws rather than the {@code :shortcode:} standing for
  * them. The size and the wrapping width are LOTR's own, so the speech
- * reads where theirs did.</p>
+ * reads where theirs did. A whisper's words stand in italics and a
+ * shout's in bold, as in the chat (CHAT-37). A line too long for the rows
+ * one line may take ends on a row that fades out at its end, as a cut
+ * name does (CHAT-86, LOOK-37).</p>
  *
  * <p>Drawn from the entity's own render pass, which is where vanilla
  * hangs a nameplate: the position comes in with the event rather than
@@ -49,12 +52,14 @@ public final class LostTalesSpeechBubbleRenderer {
     /** Where the lowest row sits above the speaker's head. */
     private static final double BUBBLE_Y_OFFSET = 0.5D;
     /**
-     * How far speech bubbles reach before the server states its Proximity
-     * radius, and what a server that never states it leaves in force.
+     * How far speech bubbles reach before the server states its speech
+     * ranges, and what a server that never states them leaves in force.
      */
     private static final double UNSTATED_RANGE = 48.0D;
-    /** Rows of speech drawn over one head at most, newest kept. */
+    /** Rows of speech drawn over one head at most, newest kept; also the most one line takes. */
     private static final int MAX_ROWS = 4;
+    /** The code a shout's words are drawn behind: in bold, as the chat sets them. */
+    private static final String BOLD = "\u00a7l";
     private static final int ROW_STRIDE = 10;
     /** Clear air between the name and the words under it. */
     private static final int NAME_GAP = 4;
@@ -118,11 +123,11 @@ public final class LostTalesSpeechBubbleRenderer {
     }
 
     /**
-     * How far a bubble is drawn: the server's Proximity radius, the range
-     * speech carries; the unstated range until the server says.
+     * How far a bubble of a line said at {@code range} is drawn: as far as
+     * the server says that range carries; the unstated range until it says.
      */
-    private static double bubbleRange() {
-        int radius = ClientChatChannelState.getProximityRadius();
+    private static double bubbleRange(ChatSpeechRange range) {
+        int radius = ClientChatChannelState.rangeBlocks(range);
         return radius > 0 ? radius : UNSTATED_RANGE;
     }
 
@@ -141,9 +146,10 @@ public final class LostTalesSpeechBubbleRenderer {
                 || (ChatSpeechBubbles.isEmpty() && !typingShown())) {
             return;
         }
-        // Speech carries as far as the server's Proximity radius, measured
-        // between the speaker and the player as the server measures it.
-        double range = bubbleRange();
+        // Speech carries as far as its range, measured between the speaker
+        // and the player as the server measures it: a shout's at most, and
+        // each line its own below.
+        double range = bubbleRange(ChatSpeechRange.SHOUT);
         double distanceSquared = minecraft.thePlayer != null
                 ? speaker.getDistanceSqToEntity(minecraft.thePlayer)
                 : x * x + y * y + z * z;
@@ -163,7 +169,7 @@ public final class LostTalesSpeechBubbleRenderer {
         ChatSpeechBubbles.Speech speech =
                 ChatSpeechBubbles.speechOf(speaker.getUniqueID(), now);
         List<Row> rows = speech == null ? new ArrayList<Row>(1)
-                : layOut(minecraft.fontRenderer, speech, now);
+                : layOut(minecraft.fontRenderer, speech, now, distanceSquared);
         if (typingShown() && isTyping(speaker, now)) {
             // The dots stand nearest the head, under whatever was said:
             // they are what comes next.
@@ -207,29 +213,28 @@ public final class LostTalesSpeechBubbleRenderer {
      */
     private static List<Row> layOut(FontRenderer font,
                                     ChatSpeechBubbles.Speech speech,
-                                    long nowNanos) {
+                                    long nowNanos, double distanceSquared) {
         List<ChatSpeechBubbles.Line> lines = speech.lines;
         List<Row> rows = new ArrayList<Row>(MAX_ROWS + 1);
         float newest = 0.0F;
         for (int index = 0; index < lines.size(); index++) {
             ChatSpeechBubbles.Line line = lines.get(index);
             float opacity = line.opacity(nowNanos);
-            if (opacity <= 0.0F) {
+            double reach = bubbleRange(line.range);
+            if (opacity <= 0.0F || distanceSquared > reach * reach) {
                 continue;
             }
+            boolean bold = line.range == ChatSpeechRange.SHOUT;
             if (line.action) {
                 // An action is the sentence the chat shows: the name in
                 // its colour opening the words, all in italics.
-                addActionRows(font, rows, speech, line.text, opacity);
+                addActionRows(font, rows, speech, line, opacity, bold);
                 continue;
             }
             newest = Math.max(newest, opacity);
-            List<?> wrapped = font.listFormattedStringToWidth(line.text,
-                    MAX_WIDTH);
-            for (int part = 0; part < wrapped.size(); part++) {
-                rows.add(Row.of(font, String.valueOf(wrapped.get(part)),
-                        opacity, LostTalesUiInk.IVORY, 0));
-            }
+            boolean italic = line.range == ChatSpeechRange.WHISPER;
+            addWordRows(font, rows, wrap(font, format(italic, bold) + line.text),
+                    line.cut, opacity, italic, bold);
         }
         while (rows.size() > MAX_ROWS) {
             rows.remove(0);
@@ -252,21 +257,77 @@ public final class LostTalesSpeechBubbleRenderer {
      */
     private static void addActionRows(FontRenderer font, List<Row> rows,
                                       ChatSpeechBubbles.Speech speech,
-                                      String words, float opacity) {
+                                      ChatSpeechBubbles.Line line,
+                                      float opacity, boolean bold) {
         String lead = ITALIC + speech.name;
-        List<?> wrapped = font.listFormattedStringToWidth(
-                lead + " " + words, MAX_WIDTH);
-        for (int part = 0; part < wrapped.size(); part++) {
-            String piece = String.valueOf(wrapped.get(part));
-            if (part == 0 && speech.name.length() > 0
-                    && piece.startsWith(lead)) {
-                rows.add(Row.led(font, lead, speech.nameColor,
-                        piece.substring(lead.length()), opacity,
-                        LostTalesUiInk.IVORY));
-            } else {
-                rows.add(Row.of(font, piece, opacity, LostTalesUiInk.IVORY,
-                        0, true));
+        String format = format(true, bold);
+        List<?> raw = font.listFormattedStringToWidth(
+                lead + " " + format + line.text, MAX_WIDTH);
+        List<String> wrapped = new ArrayList<String>(raw.size());
+        for (Object row : raw) {
+            wrapped.add(LostTalesChatVisualStyle.removeColorCodes(
+                    String.valueOf(row)));
+        }
+        if (wrapped.isEmpty()) {
+            return;
+        }
+        String first = String.valueOf(raw.get(0));
+        if (speech.name.length() > 0 && first.startsWith(lead)) {
+            // The name's row opens the sentence; the words go on below it.
+            List<String> rest = new ArrayList<String>(wrapped);
+            rest.set(0, LostTalesChatVisualStyle.removeColorCodes(
+                    first.substring(lead.length())));
+            boolean fades = line.cut && rest.size() == 1;
+            rows.add(Row.led(font, lead, speech.nameColor, rest.get(0),
+                    opacity, LostTalesUiInk.IVORY, bold, fades));
+            rest.remove(0);
+            addWordRows(font, rows, rest, line.cut, opacity, true, bold);
+            return;
+        }
+        addWordRows(font, rows, wrapped, line.cut, opacity, true, bold);
+    }
+
+    /** The formatting codes words drawn in italics, in bold or both open with. */
+    private static String format(boolean italic, boolean bold) {
+        return (italic ? ITALIC : "") + (bold ? BOLD : "");
+    }
+
+    /** The words wrapped at the speech's width, formatting codes taken off each row. */
+    private static List<String> wrap(FontRenderer font, String text) {
+        List<?> wrapped = font.listFormattedStringToWidth(text, MAX_WIDTH);
+        List<String> rows = new ArrayList<String>(wrapped.size());
+        for (Object row : wrapped) {
+            rows.add(LostTalesChatVisualStyle.removeColorCodes(
+                    String.valueOf(row)));
+        }
+        return rows;
+    }
+
+    /**
+     * A line's word rows: at most {@link #MAX_ROWS}. A line that needs
+     * more, or one cut at its length ({@code cut}), ends on a row holding
+     * the rest of its words, cut at the speech's width and fading out at
+     * its end as a cut name does (LOOK-37), with no dots.
+     */
+    private static void addWordRows(FontRenderer font, List<Row> rows,
+                                    List<String> wrapped, boolean cut,
+                                    float opacity, boolean italic,
+                                    boolean bold) {
+        int kept = Math.min(wrapped.size(), MAX_ROWS);
+        for (int part = 0; part < kept; part++) {
+            boolean last = part == kept - 1;
+            String text = wrapped.get(part);
+            boolean fades = last && (cut || wrapped.size() > MAX_ROWS);
+            if (last && wrapped.size() > MAX_ROWS) {
+                // The rest of the words on one row, which the fade cuts.
+                StringBuilder rest = new StringBuilder(text);
+                for (int more = part + 1; more < wrapped.size(); more++) {
+                    rest.append(' ').append(wrapped.get(more));
+                }
+                text = rest.toString();
             }
+            rows.add(Row.of(font, text, opacity, LostTalesUiInk.IVORY, 0,
+                    italic, bold, fades));
         }
     }
 
@@ -291,6 +352,8 @@ public final class LostTalesSpeechBubbleRenderer {
                         row.opacity);
                 if (row.dots) {
                     drawDots(-half, y, alpha, nowNanos);
+                } else if (row.fades) {
+                    drawFadingRow(minecraft, font, row, -half, y, alpha);
                 } else {
                     drawRow(minecraft, font, row, -half, y, alpha);
                 }
@@ -318,6 +381,62 @@ public final class LostTalesSpeechBubbleRenderer {
         }
     }
 
+    /**
+     * A row cut at its room and fading out into its end, as a cut name
+     * does (LOOK-37): glyph by glyph, each at the share of its strength
+     * its middle stands at within the fade's depth, and none past the
+     * room. The bubble stands in the world, where no screen cut reaches,
+     * so the fade is laid on the glyphs themselves.
+     */
+    private static void drawFadingRow(Minecraft minecraft, FontRenderer font,
+                                      Row row, int left, int y, int alpha) {
+        float room = row.width;
+        float depth = LostTalesUiFading.sideFadeDepth(room);
+        int x = left;
+        int end = left + row.width;
+        if (row.lead.length() > 0) {
+            x += drawRun(font, row.lead, x, y, row.leadRgb, alpha);
+        }
+        for (int index = 0; index < row.parts.size(); index++) {
+            ChatEmojiParser.Segment part = row.parts.get(index);
+            if (part.isEmoji()) {
+                if (x + EMOJI_ADVANCE > end) {
+                    return;
+                }
+                int share = Math.round(alpha * fadeShare(end - x
+                        - EMOJI_ADVANCE / 2.0F, depth));
+                if (share >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+                    ChatInlineIcons.drawEmoji(minecraft, part.getEmoji(), x,
+                            y - 1.0F, EMOJI_SIZE, share);
+                }
+                x += EMOJI_ADVANCE;
+                continue;
+            }
+            String text = part.getText();
+            for (int at = 0; at < text.length(); at++) {
+                String glyph = row.format + text.charAt(at);
+                int advance = font.getStringWidth(glyph);
+                if (x + advance > end) {
+                    return;
+                }
+                int share = Math.round(alpha * fadeShare(end - x
+                        - advance / 2.0F, depth));
+                if (share >= LostTalesUiInk.MIN_VISIBLE_ALPHA) {
+                    drawRun(font, glyph, x, y, row.rgb, share);
+                }
+                x += advance;
+            }
+        }
+    }
+
+    /** The share of a glyph's strength {@code fromEnd} short of its room's end: none there, whole a fade's depth in. */
+    static float fadeShare(float fromEnd, float depth) {
+        if (!(depth > 0.0F)) {
+            return 1.0F;
+        }
+        return Math.max(0.0F, Math.min(1.0F, fromEnd / depth));
+    }
+
     /** One run of text over its shadow; answers its width. */
     private static int drawRun(FontRenderer font, String text, int x, int y,
                                int rgb, int alpha) {
@@ -334,32 +453,25 @@ public final class LostTalesSpeechBubbleRenderer {
 
     /**
      * Whether typing bubbles are drawn at all right now: the client
-     * shows typing, and somebody is typing into a roleplaying
-     * conversation. Both the speech and the typing switches gate them,
+     * shows typing, and somebody is typing where words are said aloud
+     * (CHAT-58). Both the speech and the typing switches gate them,
      * since the dots stand where the speech will.
      */
     private static boolean typingShown() {
         return LostTalesConfig.showChatTypingIndicators
-                && ClientChatTypingState.anyTypingInCharacter(System.nanoTime());
+                && ClientChatTypingState.anyTypingNearby(System.nanoTime());
     }
 
     /**
-     * Whether this speaker is typing into a roleplaying conversation
-     * this client reads: a player, by the name their lines would show —
-     * the character they play, or their account.
+     * Whether this speaker is typing into a conversation heard nearby
+     * this client reads: a player, by their account, as the server named
+     * the typist, so a namesake never shows dots and an ignored typist's
+     * notice never arrived.
      */
     private static boolean isTyping(EntityLivingBase speaker, long nowNanos) {
-        if (!(speaker instanceof EntityPlayer)) {
-            return false;
-        }
-        String account = speaker.getCommandSenderName();
-        CharacterAppearance appearance = ClientCharacterAppearanceCache.get(
-                speaker.getUniqueID());
-        String character = appearance == null || !appearance.hasCharacter() ? null
-                : appearance.getCharacterName();
-        return (character != null
-                && ClientChatTypingState.isTypingInCharacter(character, nowNanos))
-                || ClientChatTypingState.isTypingInCharacter(account, nowNanos);
+        return speaker instanceof EntityPlayer
+                && ClientChatTypingState.isTypingNearby(speaker.getUniqueID(),
+                        nowNanos);
     }
 
     /** Where the dots' two rows stand in a row of capitals: on its middle, half a pixel up. */
@@ -426,71 +538,85 @@ public final class LostTalesSpeechBubbleRenderer {
         private final int gapBelow;
         /** Whether the row is the typing marks rather than words. */
         private final boolean dots;
-        /** Whether every run of the row is in italics: an action's. */
-        private final boolean italic;
+        /** The codes every run of the row is drawn behind: italics, bold, both or none. */
+        private final String format;
         /** Text before the parts in a colour of its own: an action's name; empty for none. */
         private final String lead;
         private final int leadRgb;
+        /** Whether the row is cut at {@link #MAX_WIDTH} and fades out at its end. */
+        private final boolean fades;
 
         private Row(List<ChatEmojiParser.Segment> parts, int width,
                     float opacity, int rgb, int gapBelow, boolean dots,
-                    boolean italic, String lead, int leadRgb) {
+                    String format, String lead, int leadRgb, boolean fades) {
             this.parts = parts;
             this.width = width;
             this.opacity = opacity;
             this.rgb = rgb;
             this.gapBelow = gapBelow;
             this.dots = dots;
-            this.italic = italic;
+            this.format = format;
             this.lead = lead;
             this.leadRgb = leadRgb;
+            this.fades = fades;
         }
 
         /** The typing marks as a row of their own width. */
         static Row dots() {
             return new Row(Collections.<ChatEmojiParser.Segment>emptyList(),
                     ChatTypingDots.WIDTH, 1.0F, LostTalesUiInk.IVORY, 0,
-                    true, false, "", 0);
+                    true, "", "", 0, false);
         }
 
         static Row of(FontRenderer font, String text, float opacity,
                       int rgb, int gapBelow) {
-            return of(font, text, opacity, rgb, gapBelow, false);
+            return build(font, "", 0, text, opacity, rgb, gapBelow, "", false);
         }
 
-        /** As above, every run in italics when {@code italic} says so. */
+        /**
+         * As above, every run in italics and in bold as {@code italic} and
+         * {@code bold} say, cut and fading at its end when {@code fades}.
+         */
         static Row of(FontRenderer font, String text, float opacity,
-                      int rgb, int gapBelow, boolean italic) {
-            return build(font, "", 0, text, opacity, rgb, gapBelow, italic);
+                      int rgb, int gapBelow, boolean italic, boolean bold,
+                      boolean fades) {
+            return build(font, "", 0, text, opacity, rgb, gapBelow,
+                    format(italic, bold), fades);
         }
 
         /**
          * An action's first row: {@code lead}, the name, in
-         * {@code leadRgb}, then the rest of the row in italics.
+         * {@code leadRgb}, then the rest of the row in italics, in bold too
+         * for a shout.
          */
         static Row led(FontRenderer font, String lead, int leadRgb,
-                       String rest, float opacity, int rgb) {
-            return build(font, lead, leadRgb, rest, opacity, rgb, 0, true);
+                       String rest, float opacity, int rgb, boolean bold,
+                       boolean fades) {
+            return build(font, lead, leadRgb, rest, opacity, rgb, 0,
+                    format(true, bold), fades);
         }
 
         private static Row build(FontRenderer font, String lead, int leadRgb,
                                  String text, float opacity, int rgb,
-                                 int gapBelow, boolean italic) {
+                                 int gapBelow, String format, boolean fades) {
             List<ChatEmojiParser.Segment> parts = ChatEmojiParser.split(text);
             int width = font.getStringWidth(lead);
             for (int index = 0; index < parts.size(); index++) {
                 ChatEmojiParser.Segment part = parts.get(index);
                 width += part.isEmoji() ? EMOJI_ADVANCE
-                        : font.getStringWidth(italic ? ITALIC + part.getText()
-                                : part.getText());
+                        : font.getStringWidth(format + part.getText());
+            }
+            // A row that fades is cut at the speech's width.
+            if (fades) {
+                width = Math.min(width, MAX_WIDTH);
             }
             return new Row(parts, width, opacity, rgb, gapBelow, false,
-                    italic, lead, leadRgb);
+                    format, lead, leadRgb, fades);
         }
 
-        /** A run's text as it is drawn: in italics on an action's row. */
+        /** A run's text as it is drawn: behind the row's codes. */
         String textOf(ChatEmojiParser.Segment part) {
-            return this.italic ? ITALIC + part.getText() : part.getText();
+            return this.format + part.getText();
         }
     }
 }

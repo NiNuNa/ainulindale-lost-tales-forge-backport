@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Persistent snapshot manifest for every character of one account, and for
- * the ghost while its first switch is under way.
+ * One account's saved lives, a record per character, and the ghost's while
+ * its first switch is under way.
  */
 public final class CharacterPlayerStateAccount {
 

@@ -36,7 +36,7 @@ import org.lwjgl.input.Mouse;
  * Search Global}, {@code Search active quests} — with its magnifier at
  * the well's right end; the member list's button, two people, which a
  * page has none of; the borderless button, which lets the tab in front
- * fill its window ({@link ContentView}); the split view button, which
+ * fill its window ({@link Borderless}); the split view button, which
  * opens the pages that can stand beside it, or the split's own rows; the
  * cog, which opens the settings of the page's kind (Chat Settings for
  * every conversation); a hairline; and the page's options, each a button
@@ -81,7 +81,7 @@ public final class ToolStrip {
         /** The duplicate button: another copy of the page in front, right after it. */
         DUPLICATE,
         /** The borderless button: the tab in front filling its window. */
-        VIEW,
+        BORDERLESS,
         MEMBERS_TOGGLE,
         /** The question mark at the strip's right end: the page's help. */
         HELP,
@@ -233,7 +233,7 @@ public final class ToolStrip {
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion duplicateMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
-        final LostTalesUiButtonMotion viewMotion =
+        final LostTalesUiButtonMotion borderlessMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
         final LostTalesUiButtonMotion overflowMotion =
                 new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
@@ -575,7 +575,7 @@ public final class ToolStrip {
         drawButton(state.duplicateMotion, front.opensMoreThanOnce(), false,
                 under, Part.DUPLICATE, DUPLICATE_GLYPH, DUPLICATE_LIT,
                 laid.duplicateX, glyphTop(laid, DUPLICATE_HEIGHT), now, ink);
-        drawButton(state.viewMotion, true, false, under, Part.VIEW,
+        drawButton(state.borderlessMotion, true, false, under, Part.BORDERLESS,
                 LostTalesUiSheet.FULLSCREEN, LostTalesUiSheet.FULLSCREEN_HOVER,
                 laid.viewX, glyphTop(laid, VIEW_HEIGHT), now, ink);
         if (laid.hasMembers) {
@@ -877,7 +877,7 @@ public final class ToolStrip {
             return Part.DUPLICATE;
         }
         if (glyphBox(laid, laid.viewX, VIEW_WIDTH, VIEW_HEIGHT).contains(x, y)) {
-            return Part.VIEW;
+            return Part.BORDERLESS;
         }
         if (laid.hasMembers && glyphBox(laid, laid.membersX, MEMBERS_WIDTH,
                 MEMBERS_HEIGHT).contains(x, y)) {
@@ -993,9 +993,9 @@ public final class ToolStrip {
                         front.isMemberListOut()
                                 ? "gui.losttales.window.members.hide"
                                 : "gui.losttales.window.members.show");
-            case VIEW:
+            case BORDERLESS:
                 return StatCollector.translateToLocal(
-                        "gui.losttales.window.view.enter");
+                        "gui.losttales.window.borderless.enter");
             case ICON:
                 return WindowSearch.wordsIn(window.getId()).length() > 0
                         ? StatCollector.translateToLocal(

@@ -13,25 +13,43 @@ import net.minecraft.util.EnumChatFormatting;
  * (besides it the mod registers LOTR's {@code /strscan}; see
  * {@link ELostTalesCommand}). The root is open to operators of level two and to anyone who
  * may use at least one sub-command through a capability their roles
- * grant; each sub-command is asked for itself before it runs, so the
- * root opening never opens more than the sub-commands do.
+ * grant; each sub-command is asked for itself before it runs or
+ * completes, so the root opening never opens more than the sub-commands
+ * do.
+ *
+ * <p>Every sub-command runs on the server's own thread, beside the game
+ * state it changes. A command run on any other thread, as RCON runs its
+ * commands, is refused whole with one line (DATA-13); the server console
+ * and the game run on that thread.</p>
  */
 public class LostTalesCommandRoot extends LostTalesCommandBase {
 
     /** What the lang key of each of the root's answers begins with. */
     static final String SAY = "chat.losttales.command.root.";
+    /**
+     * The name vanilla gives the thread its server runs on
+     * ({@code MinecraftServer.startServerThread}), dedicated and
+     * integrated alike; FML's effective side reads the same name.
+     */
+    static final String SERVER_THREAD = "Server thread";
 
     public LostTalesCommandRoot() {
         super(LostTalesMetaData.MOD_ID);
     }
 
+    /**
+     * The usage vanilla's {@code /help} shows: only the sub-commands the
+     * sender may run, as the root's own help lists them.
+     */
     @Override
     public String getCommandUsage(ICommandSender sender) {
         StringBuilder names = new StringBuilder();
-        for (String name : ELostTalesSubCommand.primaryNames()) {
+        for (String name : sender == null ? ELostTalesSubCommand.primaryNames()
+                : ELostTalesSubCommand.primaryNamesFor(sender)) {
             names.append(names.length() == 0 ? "" : "|").append(name);
         }
-        return "/" + getCommandName() + " <" + names + "> ...";
+        return names.length() == 0 ? "/" + getCommandName()
+                : "/" + getCommandName() + " <" + names + "> ...";
     }
 
     @Override
@@ -57,6 +75,10 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
 
     @Override
     public void processCommand(ICommandSender sender, String[] args) {
+        if (!onServerThread(Thread.currentThread())) {
+            say(sender, EnumChatFormatting.RED, SAY + "server_thread");
+            return;
+        }
         if (args.length == 0 || "help".equalsIgnoreCase(args[0])) {
             sendUsage(sender);
             return;
@@ -78,6 +100,15 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
         }
 
         command.processCommand(sender, shift(args));
+    }
+
+    /**
+     * Whether {@code thread} is the server's own: the one every
+     * sub-command may run on. RCON's threads, and any other a mod runs
+     * commands from, are not.
+     */
+    static boolean onServerThread(Thread thread) {
+        return thread != null && SERVER_THREAD.equals(thread.getName());
     }
 
     private String[] shift(String[] args) {
@@ -104,8 +135,12 @@ public class LostTalesCommandRoot extends LostTalesCommandBase {
                     ELostTalesSubCommand.primaryNamesFor(sender));
         }
 
+        // The command handler completes past the first word without asking
+        // whether the sender may run the command, so the sub-command is
+        // asked here: nobody is offered the names, quests or markers of a
+        // command they may not run.
         ELostTalesSubCommand subCommand = ELostTalesSubCommand.byName(args[0]);
-        if (subCommand == null) {
+        if (subCommand == null || !subCommand.getCommand().canCommandSenderUseCommand(sender)) {
             return null;
         }
         return subCommand.getCommand().addTabCompletionOptions(sender, shift(args));

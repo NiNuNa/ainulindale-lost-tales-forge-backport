@@ -19,7 +19,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.util.StatCollector;
 
-/** Converts LOTR miniquests into the shared Lost Tales presentation. */
+/** LOTR's mini-quests as journal entries. */
 @SideOnly(Side.CLIENT)
 public final class LotrClientQuestAdapter {
     private LotrClientQuestAdapter() {}
@@ -62,7 +62,7 @@ public final class LotrClientQuestAdapter {
                 : ClientQuestEntry.Status.ACTIVE;
         boolean nativeTracked = data.getTrackingMiniQuest() == quest;
         boolean tracked = LostTalesClientQuestProgressStore
-                .isQuestReferencePinned(reference) || nativeTracked;
+                .isQuestReferenceTracked(reference) || nativeTracked;
 
         String objective = safe(quest.getQuestObjective(),
                 StatCollector.translateToLocal("gui.losttales.quest.lotr.untitled"));

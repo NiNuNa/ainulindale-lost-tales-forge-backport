@@ -10,7 +10,7 @@ import net.minecraft.nbt.NBTTagList;
 import net.minecraft.network.play.server.S09PacketHeldItemChange;
 import net.minecraftforge.common.util.Constants;
 
-/** Main inventory, hotbar, armor, and selected hotbar slot only. */
+/** The main inventory, the hotbar, the armour and the selected hotbar slot. */
 public final class VanillaInventoryStateComponent implements CharacterStateComponent {
 
     public static final String ID = "vanilla_inventory";

@@ -68,6 +68,27 @@ public final class LostTalesCustomWaypointStyleTest {
                 LostTalesCustomWaypointStyle.normalizeKey(" North Camp "));
     }
 
+    /**
+     * Forge reads a list line beginning with {@code >} as the list's end and
+     * one ending with {@code <} as a broken list: a name begins the line, so
+     * it may not begin with {@code >}; a note ends it, so a closing
+     * {@code <} is taken off.
+     */
+    @Test
+    public void nothingStoredEndsTheConfigsList() {
+        assertEquals("", LostTalesCustomWaypointStyle.normalizeKey(">camp"));
+        assertEquals("", LostTalesCustomWaypointStyle.normalizeKey("  > camp"));
+        assertEquals("camp<", LostTalesCustomWaypointStyle.normalizeKey("Camp<"));
+        assertEquals("see you", LostTalesCustomWaypointStyle.normalizeNote("see you <"));
+        assertEquals("see you", LostTalesCustomWaypointStyle.normalizeNote("see you< <<"));
+        assertEquals("", LostTalesCustomWaypointStyle.normalizeNote("<<"));
+        assertEquals("> quote", LostTalesCustomWaypointStyle.normalizeNote("> quote"));
+        assertEquals("a < b", LostTalesCustomWaypointStyle.normalizeNote("a < b"));
+        assertTrue(com.ninuna.losttales.config.server.ServerConfigChangeValidator.staysInList(
+                LostTalesCustomWaypointStyle.normalizeKey("Camp<") + "="
+                        + LostTalesCustomWaypointStyle.normalizeNote("note <")));
+    }
+
     @Test
     public void onlyPaletteColoursAreAccepted() {
         for (String color : LostTalesCustomWaypointStyle.PALETTE) {

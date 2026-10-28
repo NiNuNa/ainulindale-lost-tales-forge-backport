@@ -144,19 +144,15 @@ public final class LostTalesQuestRules {
         return rewards;
     }
 
-    /** One reply a stage's choice offers: what the player says, and the stage it leads to. */
+    /**
+     * One reply a stage's choice offers: the stage it leads to. Its words
+     * are read through {@link LostTalesQuestWords#choiceWords}.
+     */
     public static final class Choice {
-        private final String say;
         private final String next;
 
-        Choice(String say, String next) {
-            this.say = say;
+        Choice(String next) {
             this.next = next;
-        }
-
-        /** The words as written; read through {@link LostTalesQuestWords#choiceWords}. */
-        public String getSay() {
-            return this.say;
         }
 
         /** The stage it leads to, or {@link #END}. */
@@ -177,8 +173,7 @@ public final class LostTalesQuestRules {
             if (next.length() == 0) {
                 break;
             }
-            choices.add(new Choice(LostTalesQuestParams.value(stage.getRules(),
-                    CHOICE_PREFIX + index + ".say"), next));
+            choices.add(new Choice(next));
         }
         return choices;
     }
@@ -195,11 +190,18 @@ public final class LostTalesQuestRules {
         return next.length() == 0 ? stageIndex + 1 : stageIndexOf(quest, next);
     }
 
-    /** The index of the stage {@code next} names; the number of stages for {@link #END} or a stage it lacks. */
-    public static int stageIndexOf(LostTalesQuestDefinition quest, String next) {
+    /**
+     * The index of the stage of id {@code stageId}; the number of stages
+     * for {@link #END}, an empty id or a stage the quest lacks. Every
+     * lookup of a stage by its id asks this.
+     */
+    public static int stageIndexOf(LostTalesQuestDefinition quest, String stageId) {
         java.util.List<LostTalesQuestStageDefinition> stages = quest.getStages();
+        if (stageId == null || stageId.length() == 0) {
+            return stages.size();
+        }
         for (int index = 0; index < stages.size(); index++) {
-            if (stages.get(index).getId().equals(next)) {
+            if (stageId.equals(stages.get(index).getId())) {
                 return index;
             }
         }
@@ -217,5 +219,21 @@ public final class LostTalesQuestRules {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a fellowship member's kills and arrivals may count for this
+     * objective (FEL-28, QUEST-25): one in no missive whose
+     * {@code fellowshipShared} does not say false. The server's
+     * {@code enableSharedQuestProgress} is asked apart.
+     */
+    public static boolean sharesWithFellowship(LostTalesQuestDefinition quest,
+                                               LostTalesQuestObjectiveDefinition objective) {
+        if (quest == null || objective == null
+                || com.ninuna.losttales.quest.missive.MissiveWords.isMissive(quest.getWords())) {
+            return false;
+        }
+        String value = LostTalesQuestParams.value(objective.getParams(), "fellowshipShared");
+        return value.length() == 0 || Boolean.parseBoolean(value);
     }
 }

@@ -148,7 +148,7 @@ public final class OtherPage extends WindowPage {
     }
 
     @Override
-    public void resetView() {
+    public void resetPanels() {
         content().resetPanel();
     }
 

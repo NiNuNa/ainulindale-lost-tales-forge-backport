@@ -21,11 +21,11 @@ import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
- * Constructs and sends private authoritative character snapshots. Every
- * roster answer brings the creation catalog and the lore list along, each
- * only where it changed since that client was last sent it: what was sent
- * is kept by account, as a digest, until its player leaves. Static state,
- * cleared with the server's other stores.
+ * Sends a player their own roster and the answers to their character
+ * requests. Every roster answer brings the creation catalogue and the lore
+ * list along, each only where it changed since that client was last sent
+ * it: what was sent is kept by account, as a digest, until its player
+ * leaves. Static state, cleared with the server's other stores.
  */
 public final class CharacterSyncManager {
 
@@ -74,10 +74,12 @@ public final class CharacterSyncManager {
                     LostTalesMetaData.MOD_ID, roster.getOwnerId(), player.getUniqueID());
             return false;
         }
-        // The deleted characters the owner may still restore go with it.
+        // The deleted characters the owner may still restore go with it,
+        // and whether the player is held for their last switch (CHAR-45).
         CharacterRosterSnapshot snapshot = CharacterRosterSnapshot.fromRoster(
                 roster, CharacterDeletionService.getInstance().deletedOf(
-                        player.worldObj, roster.getOwnerId()));
+                        player.worldObj, roster.getOwnerId()))
+                .withJournalHeld(CharacterJoin.isHeldForJournal(player));
         LostTalesNetworkHandler.CHANNEL.sendTo(
                 new CharacterRosterSyncPacket(requestId, snapshot), player);
         sendCreationCatalog(player);

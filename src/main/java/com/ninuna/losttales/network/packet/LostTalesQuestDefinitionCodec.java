@@ -66,7 +66,7 @@ public final class LostTalesQuestDefinitionCodec {
         writeStringMap(buf, quest.getInteraction(), "interaction");
         writeStringMap(buf, quest.getMarkers(), "quest marker");
         writeStringMap(buf, quest.getJournalLog(), "journal log");
-        writeStringMap(buf, quest.getDialogue(), "dialogue");
+        writeStringMap(buf, quest.getConversation(), "conversation");
         writeStringMap(buf, quest.getWorld(), "world");
         if (!MissiveWords.isWellFormed(quest.getWords())) {
             throw new IllegalStateException("invalid quest words");
@@ -122,7 +122,7 @@ public final class LostTalesQuestDefinitionCodec {
         Map<String, String> interaction = readStringMap(buf, "interaction");
         Map<String, String> markers = readStringMap(buf, "quest marker");
         Map<String, String> journalLog = readStringMap(buf, "journal log");
-        Map<String, String> dialogue = readStringMap(buf, "dialogue");
+        Map<String, String> conversation = readStringMap(buf, "conversation");
         Map<String, String> world = readStringMap(buf, "world");
         Map<String, String> words = readStringMap(buf, "words");
         if (!MissiveWords.isWellFormed(words)) {
@@ -173,7 +173,7 @@ public final class LostTalesQuestDefinitionCodec {
         }
         return new LostTalesQuestDefinition(id, title, description,
                 repeatable, restartable, startMode, prerequisites, rewards,
-                interaction, markers, journalLog, dialogue, world, stages,
+                interaction, markers, journalLog, conversation, world, stages,
                 false, words, rules);
     }
 

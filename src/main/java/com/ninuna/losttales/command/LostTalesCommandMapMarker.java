@@ -36,9 +36,11 @@ import com.ninuna.losttales.world.waystone.LostTalesWaystonePlacementService;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import cpw.mods.fml.common.FMLLog;
 /**
- * Operator tools for player discovery state, bundled marker inspection, and
- * retrying failed waystone generation. Markers are named by their ids and
- * the names their JSON gives them; a placement's reason is its code.
+ * The map markers for whoever holds {@code mapmarker.manage}: what a
+ * player has discovered and tracks, the markers the files define, and
+ * waystones built again where their generation failed. Markers are named
+ * by their ids and the names their JSON gives them; a placement's reason
+ * is its code.
  */
 public class LostTalesCommandMapMarker extends LostTalesCommandBase {
 
@@ -54,7 +56,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return commandPrefix() + " <list|dynamic|known|discover|forget|track|untrack|retry|reseed> [markerId|all] [player]";
+        return commandPrefix() + " <list|givers|known|discover|forget|track|untrack|retry|reseed> [markerId|all] [player]";
     }
 
     @Override
@@ -84,11 +86,11 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
             return;
         }
 
-        if ("dynamic".equalsIgnoreCase(action) || "dynamics".equalsIgnoreCase(action) || "runtime".equalsIgnoreCase(action)) {
+        if ("givers".equalsIgnoreCase(action)) {
             EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
             if (player != null) {
                 String filter = args.length > 2 ? args[2] : "";
-                listDynamicMarkers(sender, player, filter);
+                listGiverMarkers(sender, player, filter);
             }
             return;
         }
@@ -202,25 +204,25 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
 
     private void listMarkers(ICommandSender sender, EntityPlayerMP player) {
         Set<String> markers = LostTalesQuestManager.getDiscoveredMarkerIds(player);
-        String pinned = LostTalesQuestManager.getPinnedMapMarkerId(player);
-        Map<String, LostTalesMapMarkerDefinition> dynamicMarkers = collectDynamicMarkerMap(player);
+        String tracked = LostTalesQuestManager.getTrackedMapMarkerId(player);
+        Map<String, LostTalesMapMarkerDefinition> giverMarkers = collectGiverMarkerMap(player);
 
         say(sender, EnumChatFormatting.GOLD, SAY + "list.header", player.getCommandSenderName());
-        say(sender, EnumChatFormatting.GRAY, SAY + "list.tracked", pinned.length() == 0
-                ? words(SAY + "none") : formatMarkerId(pinned, dynamicMarkers));
+        say(sender, EnumChatFormatting.GRAY, SAY + "list.tracked", tracked.length() == 0
+                ? words(SAY + "none") : formatMarkerId(tracked, giverMarkers));
         say(sender, EnumChatFormatting.GRAY, SAY + "list.discovered", markers.isEmpty()
-                ? words(SAY + "none") : joinFormatted(markers, dynamicMarkers));
-        if (!dynamicMarkers.isEmpty()) {
-            say(sender, EnumChatFormatting.GRAY, SAY + "list.dynamic",
-                    Integer.valueOf(dynamicMarkers.size()), commandPrefix(),
+                ? words(SAY + "none") : joinFormatted(markers, giverMarkers));
+        if (!giverMarkers.isEmpty()) {
+            say(sender, EnumChatFormatting.GRAY, SAY + "list.givers",
+                    Integer.valueOf(giverMarkers.size()), commandPrefix(),
                     player.getCommandSenderName());
         }
     }
 
-    private void listDynamicMarkers(ICommandSender sender, EntityPlayerMP player, String filter) {
+    private void listGiverMarkers(ICommandSender sender, EntityPlayerMP player, String filter) {
         String normalizedFilter = filter == null ? "" : filter.trim().toLowerCase(Locale.ROOT);
         List<LostTalesMapMarkerDefinition> visible = new ArrayList<LostTalesMapMarkerDefinition>();
-        for (LostTalesMapMarkerDefinition marker : LostTalesQuestManager.getDynamicMapMarkers(player)) {
+        for (LostTalesMapMarkerDefinition marker : LostTalesQuestManager.getGiverMarkers(player)) {
             if (marker == null) {
                 continue;
             }
@@ -235,16 +237,16 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
 
         if (visible.isEmpty()) {
             if (normalizedFilter.length() > 0) {
-                say(sender, EnumChatFormatting.YELLOW, SAY + "dynamic.none.filter",
+                say(sender, EnumChatFormatting.YELLOW, SAY + "givers.none.filter",
                         player.getCommandSenderName(), filter);
             } else {
-                say(sender, EnumChatFormatting.YELLOW, SAY + "dynamic.none",
+                say(sender, EnumChatFormatting.YELLOW, SAY + "givers.none",
                         player.getCommandSenderName());
             }
             return;
         }
 
-        say(sender, EnumChatFormatting.GOLD, SAY + "dynamic.header",
+        say(sender, EnumChatFormatting.GOLD, SAY + "givers.header",
                 player.getCommandSenderName(), Integer.valueOf(visible.size()));
         int shown = 0;
         for (LostTalesMapMarkerDefinition marker : visible) {
@@ -254,7 +256,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
                 break;
             }
             say(sender, EnumChatFormatting.GRAY, SAY + "entry.marked", describe(marker),
-                    line(EnumChatFormatting.DARK_GRAY, SAY + "dynamic"));
+                    line(EnumChatFormatting.DARK_GRAY, SAY + "giver"));
             shown++;
         }
     }
@@ -282,7 +284,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
 
     private void trackMarker(ICommandSender sender, EntityPlayerMP player, String markerId) {
         warnIfUnknownMarker(sender, player, markerId);
-        if (LostTalesQuestManager.pinMapMarker(player, markerId)) {
+        if (LostTalesQuestManager.trackMapMarker(player, markerId)) {
             say(sender, EnumChatFormatting.GREEN, SAY + "track.done",
                     formatMarkerId(markerId), player.getCommandSenderName());
         } else {
@@ -292,7 +294,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     }
 
     private void untrackMarker(ICommandSender sender, EntityPlayerMP player) {
-        if (LostTalesQuestManager.unpinMapMarker(player)) {
+        if (LostTalesQuestManager.untrackMapMarker(player)) {
             say(sender, EnumChatFormatting.GREEN, SAY + "untrack.done",
                     player.getCommandSenderName());
         } else {
@@ -506,16 +508,16 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         if (markerId == null || markerId.length() == 0 || LostTalesMapMarkerCatalog.containsMarker(markerId)) {
             return;
         }
-        LostTalesMapMarkerDefinition dynamic = null;
+        LostTalesMapMarkerDefinition giver = null;
         if (player != null) {
-            for (LostTalesMapMarkerDefinition marker : LostTalesQuestManager.getDynamicMapMarkers(player)) {
+            for (LostTalesMapMarkerDefinition marker : LostTalesQuestManager.getGiverMarkers(player)) {
                 if (marker != null && markerId.equals(marker.getId())) {
-                    dynamic = marker;
+                    giver = marker;
                     break;
                 }
             }
         }
-        if (dynamic != null) {
+        if (giver != null) {
             return;
         }
         say(sender, EnumChatFormatting.YELLOW, SAY + "unknown_warning", markerId,
@@ -526,12 +528,12 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         return formatMarkerId(markerId, null);
     }
 
-    /** A marker by its id and name; a dynamic one with where it stands. */
-    private Object formatMarkerId(String markerId, Map<String, LostTalesMapMarkerDefinition> dynamicMarkers) {
-        if (dynamicMarkers != null) {
-            LostTalesMapMarkerDefinition marker = dynamicMarkers.get(markerId);
+    /** A marker by its id and name; a giver's with where it stands. */
+    private Object formatMarkerId(String markerId, Map<String, LostTalesMapMarkerDefinition> giverMarkers) {
+        if (giverMarkers != null) {
+            LostTalesMapMarkerDefinition marker = giverMarkers.get(markerId);
             if (marker != null) {
-                return words(SAY + "marker.dynamic", marker.getId(),
+                return words(SAY + "marker.giver", marker.getId(),
                         LostTalesMapMarkerNames.component(marker.getId(), marker.getName(),
                         marker.getNamedAfter()),
                         Long.valueOf(Math.round(marker.getX())),
@@ -547,7 +549,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
         say(sender, EnumChatFormatting.GRAY, SAY + "examples");
         usage(sender, commandPrefix() + " known");
         usage(sender, commandPrefix() + " list <player>");
-        usage(sender, commandPrefix() + " dynamic <player> [filter]");
+        usage(sender, commandPrefix() + " givers <player> [filter]");
         usage(sender, commandPrefix() + " discover losttales:quest_giver_nia <player>");
         usage(sender, commandPrefix() + " track losttales:quest_giver_nia <player>");
         usage(sender, commandPrefix() + " forget losttales:quest_giver_nia <player>");
@@ -560,22 +562,22 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     }
 
     /** The markers, comma-separated, each as {@link #formatMarkerId} names it. */
-    private IChatComponent joinFormatted(Collection<String> values, Map<String, LostTalesMapMarkerDefinition> dynamicMarkers) {
+    private IChatComponent joinFormatted(Collection<String> values, Map<String, LostTalesMapMarkerDefinition> giverMarkers) {
         IChatComponent joined = new ChatComponentText("");
         for (String value : values) {
             if (!joined.getSiblings().isEmpty()) {
                 joined.appendSibling(new ChatComponentText(", "));
             }
-            Object marker = formatMarkerId(value, dynamicMarkers);
+            Object marker = formatMarkerId(value, giverMarkers);
             joined.appendSibling(marker instanceof IChatComponent ? (IChatComponent)marker
                     : new ChatComponentText(String.valueOf(marker)));
         }
         return joined;
     }
 
-    private Map<String, LostTalesMapMarkerDefinition> collectDynamicMarkerMap(EntityPlayerMP player) {
+    private Map<String, LostTalesMapMarkerDefinition> collectGiverMarkerMap(EntityPlayerMP player) {
         Map<String, LostTalesMapMarkerDefinition> byId = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
-        for (LostTalesMapMarkerDefinition marker : LostTalesQuestManager.getDynamicMapMarkers(player)) {
+        for (LostTalesMapMarkerDefinition marker : LostTalesQuestManager.getGiverMarkers(player)) {
             if (marker != null && marker.getId() != null) {
                 byId.put(marker.getId(), marker);
             }
@@ -586,7 +588,7 @@ public class LostTalesCommandMapMarker extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "list", "dynamic", "known", "catalog", "discover", "reveal", "forget", "hide", "track", "untrack", "retry", "reseed", "regenerate");
+            return getListOfStringsMatchingLastWord(args, "list", "givers", "known", "catalog", "discover", "reveal", "forget", "hide", "track", "untrack", "retry", "reseed", "regenerate");
         }
         if (args.length == 2 && ("discover".equalsIgnoreCase(args[0]) || "reveal".equalsIgnoreCase(args[0]) || "forget".equalsIgnoreCase(args[0]) || "hide".equalsIgnoreCase(args[0]) || "track".equalsIgnoreCase(args[0]) || "retry".equalsIgnoreCase(args[0]) || "reseed".equalsIgnoreCase(args[0]) || "regenerate".equalsIgnoreCase(args[0]))) {
             List<String> ids = collectKnownMarkerIds();

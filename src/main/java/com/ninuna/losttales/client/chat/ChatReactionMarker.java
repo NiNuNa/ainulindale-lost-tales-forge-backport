@@ -79,7 +79,7 @@ final class ChatReactionMarker {
     /** Between two of the reader's identities in the marker. */
     private static final String MINE_SEPARATOR = ",";
 
-    /** The copy whose lines are being drawn; null for the closed feed. */
+    /** The copy whose lines are being drawn; null for the feed. */
     private static ConversationPage reader;
 
     private ChatReactionMarker() {}
@@ -89,7 +89,7 @@ final class ChatReactionMarker {
         reader = copy;
     }
 
-    /** The copy whose lines are being drawn; null for the closed feed. */
+    /** The copy whose lines are being drawn; null for the feed. */
     static ConversationPage reader() {
         return reader;
     }

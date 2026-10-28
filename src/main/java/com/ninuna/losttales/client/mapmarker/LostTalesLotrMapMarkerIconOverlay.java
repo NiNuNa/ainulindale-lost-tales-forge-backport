@@ -94,7 +94,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     /** Localized "+X more" summary for members the fan cannot show. */
     private static final String GROUP_MORE_LANG_KEY =
             "map.losttales.marker.group_more";
-    /** The name over a rumour's pin: the quest the rumour leads to (QUEST-20). */
+    /** The name over a rumour's marker: the quest the rumour leads to (QUEST-20). */
     private static final String RUMOUR_LANG_KEY = "gui.losttales.map.rumour";
     /**
      * Marker IDs for the client-only view of a LOTR custom waypoint. LOTR
@@ -243,7 +243,7 @@ public final class LostTalesLotrMapMarkerIconOverlay {
      * re-derives all of it for the request itself.</p>
      *
      * @param excludedMarkerId a marker whose click means something else — the
-     *                         player's own "go here" pin — or null
+     *                         player's own go-here mark — or null
      */
     public static List<FastTravelCandidate> collectFastTravelCandidates(
             List<LOTRAbstractWaypoint> waypoints, boolean includeHidden,
@@ -2240,10 +2240,10 @@ public final class LostTalesLotrMapMarkerIconOverlay {
     }
 
     /**
-     * Pins the places the rumours heard point to (QUEST-20): the quest mark
+     * Marks the places the rumours heard point to (QUEST-20): the quest mark
      * in the dim tone the journal marks a rumour with, the quest it leads to
      * named over it, taking no pointer. Drawn under every marker, so a
-     * place shown as its own question mark covers the pin while the name
+     * place shown as its own question mark covers the rumour's while the name
      * stands over it. The map's Quests switch hides them with the quest
      * markers; the names show where the markers' do.
      */
@@ -2257,8 +2257,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                 || !LostTalesMapZoomFade.isDrawable(context.alpha)) {
             return;
         }
-        List<ClientQuestCatalog.RumourPin> pins = ClientQuestCatalog.rumourPins();
-        if (pins.isEmpty()) {
+        List<ClientQuestCatalog.RumourMarker> rumours = ClientQuestCatalog.rumourMarkers();
+        if (rumours.isEmpty()) {
             return;
         }
 
@@ -2270,8 +2270,8 @@ public final class LostTalesLotrMapMarkerIconOverlay {
         float labelLift = artAbove(LostTalesCompassMarkerIcon.QUEST,
                 ICON_DRAW_SIZE) + LostTalesMapMarkerRenderedGeometry.LABEL_GAP;
         try {
-            for (ClientQuestCatalog.RumourPin pin : pins) {
-                QuestRumourPlace place = pin.getPlace();
+            for (ClientQuestCatalog.RumourMarker rumour : rumours) {
+                QuestRumourPlace place = rumour.getPlace();
                 if (place.getDimensionId() != LOTRDimension.MIDDLE_EARTH.dimensionID) {
                     continue;
                 }
@@ -2297,12 +2297,12 @@ public final class LostTalesLotrMapMarkerIconOverlay {
                                 + LostTalesMapMarkerRenderedGeometry.LABEL_GAP
                         : labelLift;
                 drawNameLabel(context, StatCollector.translateToLocalFormatted(
-                                RUMOUR_LANG_KEY, pin.getTitle()),
+                                RUMOUR_LANG_KEY, rumour.getTitle()),
                         position.x, position.y - lift,
                         context.labelAlpha);
             }
         } catch (Throwable ignored) {
-            // A rumour's pin is visual-only; never break the LOTR map.
+            // A rumour's marker is visual-only; never break the LOTR map.
         } finally {
             endIconRender();
         }

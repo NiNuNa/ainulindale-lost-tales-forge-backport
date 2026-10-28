@@ -1,24 +1,22 @@
 package com.ninuna.losttales.character.registry;
 
 /**
- * Resolves stable starting-faction identifiers without exposing third-party
- * mod classes to the character service or persistence model.
+ * The starting factions and waypoints by id, so the character code needs
+ * no LOTR class.
  */
 public interface CharacterFactionResolver {
 
-    /** True when the backing integration can safely validate new records. */
+    /** Whether LOTR can be asked, so a new character can be checked. */
     boolean isAvailable();
 
-    /**
-     * Returns a canonical definition, or null when the identifier is unknown.
-     */
+    /** The faction of that id; null when there is none. */
     CharacterFactionDefinition resolve(String factionId);
 
     /**
-     * Returns the canonical waypoint ID when it belongs to the faction, or
-     * null when it is invalid. A blank request may select a safe server
-     * default. With {@code allowAnyRegion}, which the player turns on with
-     * the unconventional settings, any public waypoint may be chosen.
+     * The waypoint's id when a character of that faction may start there,
+     * else null. An empty request takes the faction's first. With
+     * {@code allowAnyRegion} (the Unconventional settings) any public
+     * waypoint may be chosen.
      */
     String resolveStartingWaypointId(String factionId, String waypointId,
                                      boolean allowAnyRegion);

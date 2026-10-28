@@ -31,7 +31,7 @@ import java.util.Set;
  * from a file, changes nothing.
  */
 public final class CharacterRaceCatalogPacket implements IMessage {
-    /** Under the 1 MiB a custom payload may carry in 1.7.10. */
+    /** Well under the 2,097,050 bytes Forge 1.7.10 lets a server's custom payload carry. */
     static final int MAX_PACKET_BYTES = 1000 * 1024;
     static final int MAX_RACES = CharacterRaceRegistry.MAX_RACES + CharacterRaceRegistry.MAX_STAND_INS;
     private static final int MAX_ID_BYTES = 128;

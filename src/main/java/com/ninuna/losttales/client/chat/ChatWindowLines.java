@@ -23,7 +23,7 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * The lines one view shows, laid out for that view alone: every open
- * window at its own width, and the closed-chat feed.
+ * window at its own width, and the feed.
  *
  * <p>Minecraft wraps a message once, at one width, and keeps the result
  * in the list every chat draw reads — so views of different widths
@@ -51,7 +51,7 @@ import net.minecraft.util.IChatComponent;
  * of the blank row between the runs either side of it.</p>
  *
  * <p>The feed shows the channel prefix on every line; the open screen
- * hides it — the tabs already name the channel — so a window gives that
+ * hides it — the pages already name the channel — so a window gives that
  * width back to the message body instead of leaving it blank at the end
  * of each line. A view whose history cannot be read falls back to the
  * shared list, where every message keeps its header.</p>
@@ -498,7 +498,7 @@ public final class ChatWindowLines {
     }
 
     /**
-     * The closed-chat feed's lines, laid out at the game's own chat
+     * The feed's lines, laid out at the game's own chat
      * width — exactly the width vanilla wraps the shared list to, since
      * the feed shows the same channel prefixes on the same messages and
      * only their grouping is its own.
@@ -870,7 +870,7 @@ public final class ChatWindowLines {
                 // A line addressed to the player passes where only such
                 // lines of its conversation do.
                 if (message != null && filter.accepts(
-                        ClientChatChannelViews.tabOf(
+                        ClientChatChannelViews.pageOf(
                                 message.getChatLineID()),
                         LostTalesChatPresentation.isPingedLine(
                                 message.getChatLineID()))) {

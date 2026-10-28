@@ -85,7 +85,7 @@ public final class LostTalesQuestRewardsTest {
     public void theCheckerHoldsEveryNewReward() {
         String head = "{\"id\":\"losttales:test/q\",\"startMode\":\"locked\","
                 + "\"interaction\":{\"entity\":\"losttales.Nia\"},\"returnTo\":\"giver\","
-                + "\"dialogue\":{\"handIn\":\"Thank you.\"},"
+                + "\"conversation\":{\"handIn\":\"Thank you.\"},"
                 + "\"stages\":[{\"id\":\"10\",\"objectives\":[{\"id\":\"a\","
                 + "\"type\":\"gather\",\"params\":{\"item\":\"minecraft:log\"}}]}],";
         assertEquals(Collections.<String>emptyList(), warnings(head

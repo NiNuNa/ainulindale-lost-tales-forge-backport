@@ -11,7 +11,7 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Server-validated release request for one owned, inactive lore character. */
+/** Asks to give back a lore character the player holds and does not play; the server checks both. */
 public final class LoreCharacterReleaseRequestPacket implements IMessage {
     private int requestId;
     private long expectedRosterRevision;

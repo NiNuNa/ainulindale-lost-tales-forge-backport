@@ -27,11 +27,11 @@ public final class ChargeTierCalculatorTest {
 
     @Test
     public void policyIncludesBowsButNotOrdinaryPotions() {
-        assertTrue(ThirdPersonChargeItemPolicy.supportsChargeTiers(
+        assertTrue(ChargeItemPolicy.supportsChargeTiers(
                 new ItemStack(new ItemBow())));
-        assertEquals(20, ThirdPersonChargeItemPolicy.getFullDrawTicks(
+        assertEquals(20, ChargeItemPolicy.getFullDrawTicks(
                 new ItemStack(new ItemBow())));
-        assertFalse(ThirdPersonChargeItemPolicy.supportsChargeTiers(
+        assertFalse(ChargeItemPolicy.supportsChargeTiers(
                 new ItemStack(new ItemPotion(), 1, 16384)));
     }
 }

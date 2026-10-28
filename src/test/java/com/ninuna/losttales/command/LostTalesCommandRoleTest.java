@@ -3,9 +3,34 @@ package com.ninuna.losttales.command;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
-/** An edit names options one at a time and keeps the rest of the entry. */
+/**
+ * An edit names options one at a time and keeps the rest of the entry;
+ * who stands where among the roles (DATA-14).
+ */
 public final class LostTalesCommandRoleTest {
+
+    /**
+     * An operator holding {@code roles.manage} by level stands above every
+     * role, as a Discord server's owner; a sender that holds it neither by
+     * level nor through a role a player's account holds stands below them all.
+     */
+    @Test
+    public void anAdministratorStandsAboveEveryRole() {
+        LostTalesCommandRole.Standing administrator = LostTalesCommandRole.standingOf(
+                FakeCommandSender.administrator("Admin"));
+        assertTrue(administrator.manages(1));
+        assertTrue(administrator.manages(1000));
+        assertNull(administrator.highest);
+        LostTalesCommandRole.Standing operator = LostTalesCommandRole.standingOf(
+                FakeCommandSender.operator("Ops"));
+        assertFalse(operator.manages(1000));
+        assertNull(operator.highest);
+        assertFalse(LostTalesCommandRole.standingOf(null).manages(1000));
+    }
 
     @Test
     public void anOptionIsReplacedInPlaceOrAppended() {

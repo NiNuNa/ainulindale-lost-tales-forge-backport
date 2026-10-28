@@ -1,7 +1,6 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
-import java.util.Arrays;
 import java.util.UUID;
 import org.junit.Test;
 
@@ -12,19 +11,10 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Every chat line passes one ordered path whatever its source (CHAT-82),
- * each rule kept once: the order, the words rule, who calls roles and who
- * is held to a budget here.
+ * each rule kept once: the words rule, who calls roles and who is held to
+ * a budget here.
  */
 public final class ChatLinePipelineTest {
-
-    @Test
-    public void theStagesStandInTheirOrder() {
-        assertEquals(Arrays.asList(ChatLinePipeline.Stage.GATE,
-                ChatLinePipeline.Stage.MUTE, ChatLinePipeline.Stage.RATE_LIMIT,
-                ChatLinePipeline.Stage.WORDS, ChatLinePipeline.Stage.MENTIONS,
-                ChatLinePipeline.Stage.SHARES, ChatLinePipeline.Stage.READERS),
-                ChatLinePipeline.ORDER);
-    }
 
     @Test
     public void theWordsRuleIsOneForEverySource() {

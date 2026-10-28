@@ -19,7 +19,7 @@ public final class FirstTips {
         /** The {@code +} at the end of the tab row. */
         PLUS("plus"),
         /** The identity button on the input bar. */
-        HEAD("head"),
+        IDENTITY("identity"),
         /** Ctrl+K, the quick switcher, in the middle of the window. */
         SWITCHER("switcher");
 

@@ -1,6 +1,9 @@
 package com.ninuna.losttales.character.validation;
 
-/** Stable, non-localized identifiers returned by authoritative operations. */
+/**
+ * Why the server refused a character request. The id goes on the wire,
+ * and the client words it from its lang file.
+ */
 public enum CharacterErrorId {
     NONE("none"),
     INVALID_PLAYER("invalid_player"),
@@ -115,6 +118,7 @@ public enum CharacterErrorId {
         return this.id;
     }
 
+    /** The error an id names exactly; null for one that names none, which a decoder refuses. */
     public static CharacterErrorId fromId(String id) {
         if (id != null) {
             for (CharacterErrorId value : values()) {
@@ -123,6 +127,6 @@ public enum CharacterErrorId {
                 }
             }
         }
-        return INTERNAL_ERROR;
+        return null;
     }
 }

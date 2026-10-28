@@ -1,6 +1,10 @@
 package com.ninuna.losttales.character.state;
 
-/** Ordering boundary around race and other maximum-health attributes. */
+/**
+ * When a part is put on the player: before the race's attributes, after
+ * them (health needs its maximum first), or by the switch itself (the
+ * location).
+ */
 public enum CharacterStateApplyPhase {
     BEFORE_ATTRIBUTES,
     AFTER_ATTRIBUTES,

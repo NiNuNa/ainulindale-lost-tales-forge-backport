@@ -12,10 +12,11 @@ import java.util.Locale;
  * what must not be repeated left out. The Server Log writes its
  * entries with it, and the chat shows a typed command's echo with it, so
  * a reply quoting the echo carries no secret either. A private message
- * keeps only whom it went to; a config change ({@code /losttales config set} or its
- * alias {@code cfg}) keeps the category and key but not the value, since a
- * value may be a secret; a Discord unlink keeps its game channel but never
- * a Discord channel id. Another mod's login, password or private message
+ * keeps only whom it went to; any {@code /losttales config} action (or its
+ * alias {@code cfg}), typed right or not, keeps at most the action, category
+ * and key, never a value, since a value may be a secret; any
+ * {@code /losttales discord} action keeps at most the action and the game
+ * channel, never a Discord channel id. Another mod's login, password or private message
  * keeps only its name ({@link #SECRET_NAMES}), and so does every command the
  * server lists as private in its config ({@link #parseNames}). Everything is
  * cut to a line.
@@ -44,6 +45,18 @@ public final class ChatCommandText {
                     "passwd", "pass", "auth", "2fa", "totp", "r", "reply",
                     "pm", "m", "message", "whisper", "mail"));
     /**
+     * The login and password commands among {@link #SECRET_NAMES}: what a
+     * muted player still types to get into the server, so the list of
+     * commands a mute holds never takes one.
+     */
+    public static final List<String> LOGIN_NAMES =
+            Collections.unmodifiableList(Arrays.asList(
+                    "login", "l", "log", "register", "reg", "unregister",
+                    "unreg", "changepassword", "changepw", "cp", "password",
+                    "passwd", "pass", "auth", "2fa", "totp"));
+    /** The most names the list of commands a mute holds takes. */
+    public static final int MAX_MUTED_NAMES = 64;
+    /**
      * The names of the game's private message: {@code /tell}, and its
      * aliases {@code /w} and {@code /msg}. A command known by any of them
      * keeps whom it went to and leaves out what it said.
@@ -57,8 +70,88 @@ public final class ChatCommandText {
 
     /** The server's own list of private commands, from its config; empty until read. */
     private static volatile List<String> serverNames = Collections.emptyList();
+    /** The commands a mute holds besides the game's own, from the server's config; empty until read. */
+    private static volatile List<String> mutedNames = Collections.emptyList();
 
     private ChatCommandText() {}
+
+    /** The server's list of commands a mute holds, written by its config. */
+    public static void installMutedNames(List<String> names) {
+        mutedNames = names == null ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(names));
+    }
+
+    /** The commands a mute holds besides the game's own. */
+    public static List<String> mutedNames() {
+        return mutedNames;
+    }
+
+    /**
+     * The config's lines as the commands a mute holds: trimmed, a leading
+     * slash taken off, in lower case. A line that is no name, or a login
+     * or password command ({@link #LOGIN_NAMES}), is reported and skipped,
+     * so a muted player can always get into the server; a repeat is
+     * skipped quietly; past {@link #MAX_MUTED_NAMES} the rest are reported.
+     */
+    public static List<String> parseMutedNames(String[] lines,
+                                               List<String> warnings) {
+        List<String> names = new ArrayList<String>();
+        if (lines == null) {
+            return names;
+        }
+        for (String line : lines) {
+            String name = line == null ? "" : line.trim();
+            if (name.startsWith("/")) {
+                name = name.substring(1).trim();
+            }
+            name = name.toLowerCase(Locale.ROOT);
+            if (name.isEmpty()) {
+                continue;
+            }
+            if (!isValidName(name)) {
+                warn(warnings, "Muted command '" + line + "' is not a command's name "
+                        + "(no spaces or formatting, up to " + MAX_NAME_LENGTH
+                        + " letters); skipped");
+            } else if (LOGIN_NAMES.contains(name)) {
+                warn(warnings, "Muted command '" + line + "' is a login or password "
+                        + "command, which a mute never holds; skipped");
+            } else if (names.size() >= MAX_MUTED_NAMES) {
+                warn(warnings, "Muted command '" + line + "' is past the "
+                        + MAX_MUTED_NAMES + " the list holds; skipped");
+            } else if (!names.contains(name)) {
+                names.add(name);
+            }
+        }
+        return names;
+    }
+
+    /**
+     * Whether a command known by {@code name} or any of {@code aliases}
+     * stands on {@code muted}, the commands a mute holds; a login or a
+     * password command never does, whatever the list says.
+     */
+    public static boolean isMutedCommand(String name, List<String> aliases,
+                                         Collection<String> muted) {
+        if (muted == null || muted.isEmpty()) {
+            return false;
+        }
+        String own = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
+        if (isKnownBy(LOGIN_NAMES, own, aliases)) {
+            return false;
+        }
+        if (muted.contains(own)) {
+            return true;
+        }
+        if (aliases != null) {
+            for (String alias : aliases) {
+                if (alias != null && muted.contains(
+                        alias.trim().toLowerCase(Locale.ROOT))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     /** The server's list of private commands, written by its config. */
     public static void installServerNames(List<String> names) {
@@ -71,8 +164,10 @@ public final class ChatCommandText {
         return serverNames;
     }
 
+    /** Forgets the server's lists, the private commands and the commands a mute holds. */
     public static void resetServerNames() {
         serverNames = Collections.emptyList();
+        mutedNames = Collections.emptyList();
     }
 
     /**
@@ -171,22 +266,14 @@ public final class ChatCommandText {
             if (arguments.length > 1) {
                 kept.add(ELIDED);
             }
-        } else if (name.equals("losttales") && arguments.length > 1
-                && CONFIG_NAMES.contains(arguments[0].toLowerCase(Locale.ROOT))
-                && arguments[1].equalsIgnoreCase("set")) {
-            for (int index = 0; index < arguments.length && index < 4; index++) {
-                kept.add(arguments[index]);
-            }
-            if (arguments.length > 4) {
-                kept.add(ELIDED);
-            }
-        } else if (name.equals("losttales") && arguments.length > 3
-                && arguments[0].equalsIgnoreCase("discord")
-                && arguments[1].equalsIgnoreCase("unlink")) {
-            for (int index = 0; index < 3; index++) {
-                kept.add(arguments[index]);
-            }
-            kept.add(ELIDED);
+        } else if (name.equals("losttales") && arguments.length > 0
+                && CONFIG_NAMES.contains(arguments[0].toLowerCase(Locale.ROOT))) {
+            // config, action, category, key: never a value, whatever the action.
+            keepFirst(kept, arguments, 4);
+        } else if (name.equals("losttales") && arguments.length > 0
+                && arguments[0].equalsIgnoreCase("discord")) {
+            // discord, action, game channel: never a Discord channel id or a token.
+            keepFirst(kept, arguments, 3);
         } else {
             Collections.addAll(kept, arguments);
         }
@@ -199,6 +286,16 @@ public final class ChatCommandText {
             line.append(ELIDED);
         }
         return line.toString();
+    }
+
+    /** Keeps the first {@code count} arguments, and marks that more were left out. */
+    private static void keepFirst(List<String> kept, String[] arguments, int count) {
+        for (int index = 0; index < arguments.length && index < count; index++) {
+            kept.add(arguments[index]);
+        }
+        if (arguments.length > count) {
+            kept.add(ELIDED);
+        }
     }
 
     /** Whether a command known by {@code name} or any of {@code aliases} keeps its words to itself. */

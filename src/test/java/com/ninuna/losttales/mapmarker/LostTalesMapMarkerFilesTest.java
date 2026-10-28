@@ -75,7 +75,7 @@ public final class LostTalesMapMarkerFilesTest {
                 "losttales:quest/runtime", "Quest Target",
                 "quest", "white", 0, 1.0D, 64.0D, 2.0D, true);
 
-        assertEquals(LostTalesMapMarkerSource.QUEST_DYNAMIC, marker.getSource());
+        assertEquals(LostTalesMapMarkerSource.QUEST_GIVER, marker.getSource());
         assertFalse(marker.hasWaystone());
         assertEquals("", marker.getWaystoneStructureType());
     }
@@ -128,6 +128,10 @@ public final class LostTalesMapMarkerFilesTest {
         assertWarns(named("losttales:player/abc"), "players place");
         assertWarns(named("lotr:waypoint:nowhere"), "no bundled marker");
         assertWarns(with(named("myserver:a"), "name", ""), "empty name");
+        assertWarns(with(named("myserver:a"), "name", "§cMill"), "formatting code");
+        assertWarns(with(named("myserver:a"), "description", "Old\nmill"),
+                "formatting code");
+        assertWarns(with(named("myserver:a"), "category", "Mill\u202e"), "formatting code");
     }
 
     /** A marker naming a house no file brought is a warning, and the file is left out. */

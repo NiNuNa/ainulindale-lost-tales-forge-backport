@@ -26,6 +26,7 @@ import com.ninuna.losttales.client.window.WindowLists;
 import com.ninuna.losttales.client.window.WindowStyle;
 import com.ninuna.losttales.client.window.WindowScreen;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
@@ -39,6 +40,7 @@ import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveSelection;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveTextHelper;
+import com.ninuna.losttales.quest.LostTalesQuestRules;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import com.ninuna.losttales.quest.progress.LostTalesQuestHistoryEntry;
 import com.ninuna.losttales.quest.progress.LostTalesQuestProgress;
@@ -54,7 +56,6 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
@@ -559,12 +560,14 @@ public final class QuestJournalPage extends PageContent {
             y += row.height;
         }
 
-        enableScissor((int)list.left, bandTop, (int)list.width,
+        // Nothing of the band shows when the cut is empty, so the rows
+        // are drawn only inside one.
+        boolean cut = beginCut((int)list.left, bandTop, (int)list.width,
                 bandBottom - bandTop);
         try {
             y = listTop(list);
             for (QuestListRow row : rows) {
-                if (y + row.height > bandTop && y < bandBottom) {
+                if (cut && y + row.height > bandTop && y < bandBottom) {
                     if (row.category) {
                         drawCategoryRow(row.label, layout, y, alpha);
                     } else if (row.quest != null) {
@@ -574,7 +577,7 @@ public final class QuestJournalPage extends PageContent {
                 y += row.height;
             }
         } finally {
-            disableScissor();
+            endCut(cut);
         }
         WindowLists.drawScroll(list.left, 0.0D, list.right(), this.height,
                 list.top, list.bottom(), this.listShown, maxScroll, alpha);
@@ -667,10 +670,9 @@ public final class QuestJournalPage extends PageContent {
         if (bottom <= top) {
             return;
         }
-        boolean cut = row.height < rowHeight();
-        if (cut) {
-            enableScissor((int)list.left, top, (int)list.width, bottom - top);
-        }
+        boolean cut = row.height < rowHeight()
+                && beginCut((int)list.left, top, (int)list.width,
+                        bottom - top);
         try {
             ClientQuestEntry quest = row.quest;
             FontRenderer font = this.fontRendererObj;
@@ -702,9 +704,7 @@ public final class QuestJournalPage extends PageContent {
                     this.hovered == Hovered.QUEST
                             && this.hoveredIndex == row.questIndex);
         } finally {
-            if (cut) {
-                disableScissor();
-            }
+            endCut(cut);
         }
     }
 
@@ -767,7 +767,7 @@ public final class QuestJournalPage extends PageContent {
     /**
      * What the chosen quest says: its lines laid out in the detail
      * column, clipped to it, with the lists' scroll edge where there is
-     * more than fits. A separator is one rule, as everywhere else.
+     * more than fits.
      */
     private void drawQuestDetails(List<ClientQuestEntry> quests,
                                   QuestJournalLayout layout, int alpha) {
@@ -793,25 +793,31 @@ public final class QuestJournalPage extends PageContent {
         int maxScroll = Math.max(0, detailHeight(lines) - (int)area.height);
         this.detailScroll = clamp(this.detailScroll, 0, maxScroll);
 
-        enableScissor((int)area.left, (int)area.top, (int)area.width,
-                (int)area.height);
-        LostTalesUiInk.beginContent();
-        double y = area.top - this.detailShown;
-        for (DetailLine line : lines) {
-            if (y + line.height() >= area.top && y <= area.bottom()) {
-                drawDetailLine(line, rows, (int)Math.round(y), alpha);
+        boolean cut = beginCut((int)area.left, (int)area.top,
+                (int)area.width, (int)area.height);
+        try {
+            if (cut) {
+                LostTalesUiInk.beginContent();
+                double y = area.top - this.detailShown;
+                for (DetailLine line : lines) {
+                    if (y + line.height() >= area.top
+                            && y <= area.bottom()) {
+                        drawDetailLine(line, rows, (int)Math.round(y),
+                                alpha);
+                    }
+                    y += line.height();
+                }
             }
-            y += line.height();
+        } finally {
+            endCut(cut);
         }
-        disableScissor();
         WindowLists.drawScroll(area.left, 0.0D, area.right(), this.height,
                 area.top, area.bottom(), this.detailShown, maxScroll, alpha);
     }
 
     /**
      * One line of the quest's words, as a menu's are drawn: a heading as
-     * every list's, a separator as a menu's, the words with the one
-     * shadow, centred in their line.
+     * every list's, the words with the one shadow, centred in their line.
      */
     private void drawDetailLine(DetailLine line, LostTalesUiHitBox rows, int y,
                                 int alpha) {
@@ -820,10 +826,6 @@ public final class QuestJournalPage extends PageContent {
         if (line.heading) {
             WindowLists.drawHeading(this.fontRendererObj, line.text, left, left,
                     right, y, line.height(), line.title, alpha);
-            return;
-        }
-        if (line.separator) {
-            WindowLists.drawSeparator(left + line.indent, right, y, alpha);
             return;
         }
         int textTop = y + LostTalesUiInk.centredStart(DETAIL_LINE_HEIGHT,
@@ -844,12 +846,8 @@ public final class QuestJournalPage extends PageContent {
                     left + line.indent + 10, textTop, line.color, alpha);
             return;
         }
-        int x = line.centered
-                ? (int)Math.round(rows.left + (rows.width
-                        - this.fontRendererObj.getStringWidth(line.text)) / 2.0D)
-                : left + line.indent;
-        LostTalesUiInk.drawText(this.fontRendererObj, line.text, x, textTop,
-                line.color, alpha);
+        LostTalesUiInk.drawText(this.fontRendererObj, line.text,
+                left + line.indent, textTop, line.color, alpha);
     }
 
     /** How tall the quest's words stand, every line its own height. */
@@ -1029,11 +1027,11 @@ public final class QuestJournalPage extends PageContent {
         boolean completed = entry.isCompleted();
         boolean failed = entry.isFailed();
         boolean abandoned = entry.isAbandoned();
-        boolean pinned = entry.isTracked();
+        boolean tracked = entry.isTracked();
 
         addTitleHeader(lines, LostTalesQuestWords.title(quest), width);
         addQuestStatusLines(lines, quest, progress, completed, failed,
-                abandoned, pinned, width);
+                abandoned, tracked, width);
         addHistoryLines(lines, quest, entry.getHistoryEntry(), progress != null,
                 width);
         addBlankLine(lines);
@@ -1048,7 +1046,7 @@ public final class QuestJournalPage extends PageContent {
 
         addStageSummary(lines, quest, progress, completed,
                 entry.getHistoryEntry(), width);
-        addRewardSummary(lines, quest, width, completed || failed);
+        addRewardSummary(lines, quest, width);
         addWaitingRewards(lines, entry.getReference(), width);
 
         return lines;
@@ -1107,9 +1105,7 @@ public final class QuestJournalPage extends PageContent {
         if (!quest.getRewards().isEmpty()) {
             addSectionTitle(lines, translate("gui.losttales.quest.section.rewards"));
             for (String reward : quest.getRewards()) {
-                addWrappedLines(lines, reward,
-                        quest.isCompleted() ? WindowStyle.asideRgb()
-                                : WindowStyle.asideRgb(),
+                addWrappedLines(lines, reward, WindowStyle.asideRgb(),
                         16, width - 16);
             }
             addBlankLine(lines);
@@ -1120,7 +1116,7 @@ public final class QuestJournalPage extends PageContent {
 
     /** The quest's name at the top, a heading in ivory over its hairline. */
     private void addTitleHeader(List<DetailLine> lines, String title, int width) {
-        DetailLine line = new DetailLine(title, LostTalesUiInk.IVORY, 0, false);
+        DetailLine line = new DetailLine(title, LostTalesUiInk.IVORY, 0);
         line.heading = true;
         line.title = true;
         lines.add(line);
@@ -1200,11 +1196,13 @@ public final class QuestJournalPage extends PageContent {
                         objectiveActive && !objectiveComplete);
                 if (current) {
                     // The fellowships' members at this stage or past it
-                    // (QUEST-25): Tobin 2/3 · Dior done, those not
-                    // travelling with the player dimmed.
+                    // (QUEST-25): Tobin 2/3 · Dior done, those whose
+                    // count does not help the player dimmed.
                     addFellowLines(lines, ClientQuestFellows.partsFor(
                             quest.getId(), objective.getId(),
-                            getObjectiveTargetCount(objective)), 20, width - 16);
+                            getObjectiveTargetCount(objective),
+                            LostTalesQuestRules.sharesWithFellowship(quest, objective)),
+                            20, width - 16);
                 }
                 addedAny = true;
             }
@@ -1219,8 +1217,8 @@ public final class QuestJournalPage extends PageContent {
                     LostTalesUiInk.IVORY, 12, width - 16, false, true);
             addedAny = true;
         }
-        if (!addedAny) {
-            addWrappedLines(lines, completed ? translate("gui.losttales.quest.status.completed") : translate("gui.losttales.quest.objective.none"), completed ? WindowStyle.asideRgb() : WindowStyle.asideRgb(), 16, width - 16);
+        if (!addedAny && !completed) {
+            addWrappedLines(lines, translate("gui.losttales.quest.objective.none"), WindowStyle.asideRgb(), 16, width - 16);
         }
         if (completed) {
             addWrappedLines(lines, translate("gui.losttales.quest.status.completed"), WindowStyle.asideRgb(), 16, width - 16);
@@ -1250,23 +1248,23 @@ public final class QuestJournalPage extends PageContent {
         addBlankLine(lines);
     }
 
-    private void addRewardSummary(List<DetailLine> lines, LostTalesQuestDefinition quest, int width, boolean completed) {
+    private void addRewardSummary(List<DetailLine> lines, LostTalesQuestDefinition quest, int width) {
         if (LostTalesQuestRewards.withOptionals(quest).isEmpty()) {
             return;
         }
         addSectionTitle(lines, translate("gui.losttales.quest.section.rewards"));
         for (String rewardLine : buildRewardLines(quest)) {
-            addWrappedLines(lines, rewardLine, completed ? WindowStyle.asideRgb() : WindowStyle.asideRgb(), 16, width - 16);
+            addWrappedLines(lines, rewardLine, WindowStyle.asideRgb(), 16, width - 16);
         }
         addBlankLine(lines);
     }
 
-    private void addQuestStatusLines(List<DetailLine> lines, LostTalesQuestDefinition quest, LostTalesQuestProgress progress, boolean completed, boolean failed, boolean abandoned, boolean pinned, int width) {
+    private void addQuestStatusLines(List<DetailLine> lines, LostTalesQuestDefinition quest, LostTalesQuestProgress progress, boolean completed, boolean failed, boolean abandoned, boolean tracked, int width) {
         String status = translate(failed ? "gui.losttales.quest.status.failed"
                 : abandoned ? "gui.losttales.quest.status.abandoned"
                 : completed ? "gui.losttales.quest.status.completed"
                 : "gui.losttales.quest.status.active");
-        String tracking = translate(pinned
+        String tracking = translate(tracked
                 ? "gui.losttales.quest.status.tracked"
                 : "gui.losttales.quest.status.untracked");
         // A stage gone from the quest's file stands nowhere, and has no number.
@@ -1391,17 +1389,17 @@ public final class QuestJournalPage extends PageContent {
     /** A section's name as every list's heading: sand words over a full hairline. */
     private void addSectionTitle(List<DetailLine> lines, String title) {
         addBlankLine(lines);
-        DetailLine line = new DetailLine(title, LostTalesUiInk.IVORY, 0, false);
+        DetailLine line = new DetailLine(title, LostTalesUiInk.IVORY, 0);
         line.heading = true;
         lines.add(line);
     }
 
     private void addBlankLine(List<DetailLine> lines) {
-        lines.add(new DetailLine("", LostTalesUiInk.IVORY, 0, false));
+        lines.add(new DetailLine("", LostTalesUiInk.IVORY, 0));
     }
 
     private void addObjectiveLine(List<DetailLine> lines, String text, int color, int indent, boolean complete, boolean active) {
-        DetailLine line = new DetailLine(text, color, indent, false);
+        DetailLine line = new DetailLine(text, color, indent);
         line.objective = true;
         line.complete = complete;
         line.active = active;
@@ -1422,7 +1420,7 @@ public final class QuestJournalPage extends PageContent {
             if (i == 0) {
                 addObjectiveLine(lines, wrapped.get(i), color, indent, complete, active);
             } else {
-                lines.add(new DetailLine(wrapped.get(i), color, indent + 22, false));
+                lines.add(new DetailLine(wrapped.get(i), color, indent + 22));
             }
         }
     }
@@ -1455,8 +1453,8 @@ public final class QuestJournalPage extends PageContent {
     }
 
     /**
-     * One row of members: each in the aside tone where they travel with
-     * the player, dimmed where they do not, the dots between in the aside
+     * One row of members: each in the aside tone where their count helps
+     * the player, dimmed where it does not, the dots between in the aside
      * tone.
      */
     private void drawFellowLine(DetailLine line, int left, int textTop,
@@ -1471,7 +1469,7 @@ public final class QuestJournalPage extends PageContent {
             }
             ClientQuestFellows.Part part = line.fellows.get(index);
             LostTalesUiInk.drawText(this.fontRendererObj, part.getText(), x,
-                    textTop, part.isTravelling() ? WindowStyle.asideRgb()
+                    textTop, part.isCounted() ? WindowStyle.asideRgb()
                             : LostTalesColors.rgb(LostTalesColors.TEXT_DIM),
                     alpha);
             x += this.fontRendererObj.getStringWidth(part.getText());
@@ -1518,15 +1516,15 @@ public final class QuestJournalPage extends PageContent {
         return null;
     }
 
-    /** A member not travelling with the player says so under the pointer (QUEST-25). */
+    /** A member whose count does not help the player says why under the pointer (QUEST-25). */
     @Override
     public String tipAt(LostTalesUiHitBox box, double x, double y) {
         if (this.fontRendererObj == null) {
             return "";
         }
         ClientQuestFellows.Part part = fellowAt(pageX(box, x), pageY(box, y));
-        return part == null || part.isTravelling() ? ""
-                : translate("gui.losttales.quest.fellow.away");
+        return part == null || part.isCounted() ? ""
+                : translate(part.getTipKey());
     }
 
     private void addWrappedLines(List<DetailLine> lines, String text, int color, int indent, int width) {
@@ -1536,7 +1534,7 @@ public final class QuestJournalPage extends PageContent {
         int wrapWidth = Math.max(20, width - Math.max(0, indent));
         List<String> wrapped = this.fontRendererObj.listFormattedStringToWidth(text, wrapWidth);
         for (String line : wrapped) {
-            lines.add(new DetailLine(line, color, indent, false));
+            lines.add(new DetailLine(line, color, indent));
         }
     }
 
@@ -1860,12 +1858,12 @@ public final class QuestJournalPage extends PageContent {
         if (quest.isTracked()) {
             LostTalesNetworkHandler.CHANNEL.sendToServer(
                     new LostTalesQuestActionPacket(
-                            LostTalesQuestActionPacket.ACTION_UNPIN,
+                            LostTalesQuestActionPacket.ACTION_UNTRACK,
                             quest.getReference()));
         } else {
             LostTalesNetworkHandler.CHANNEL.sendToServer(
                     new LostTalesQuestActionPacket(
-                            LostTalesQuestActionPacket.ACTION_PIN,
+                            LostTalesQuestActionPacket.ACTION_TRACK,
                             quest.getReference()));
         }
     }
@@ -1952,21 +1950,18 @@ public final class QuestJournalPage extends PageContent {
 
     /**
      * Cuts what is drawn next to a box of the page, where the page really
-     * stands on the screen, until {@link #disableScissor} puts back the
-     * cut that stood before.
+     * stands on the screen, inside the cut of a window the page fills.
+     * Ended with {@link #endCut}, which puts back the cut that stood
+     * before.
      */
-    private void enableScissor(int x, int y, int width, int height) {
-        ScaledResolution scaled = new ScaledResolution(this.mc, this.mc.displayWidth, this.mc.displayHeight);
-        int scale = scaled.getScaleFactor();
-        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
-        GL11.glEnable(GL11.GL_SCISSOR_TEST);
-        GL11.glScissor((int)Math.round((this.clipX + x) * scale),
-                this.mc.displayHeight - (int)Math.round((this.clipY + y + height) * scale),
-                Math.max(0, width * scale), Math.max(0, height * scale));
+    private boolean beginCut(int x, int y, int width, int height) {
+        return LostTalesUiClip.begin(this.mc, this.clipX + x,
+                this.clipX + x + width, this.clipY + y,
+                this.clipY + y + height, true);
     }
 
-    private void disableScissor() {
-        GL11.glPopAttrib();
+    private static void endCut(boolean cut) {
+        LostTalesUiClip.end(cut);
     }
 
     private enum QuestFilter {
@@ -2044,37 +2039,32 @@ public final class QuestJournalPage extends PageContent {
         private final String text;
         private final int color;
         private final int indent;
-        private final boolean centered;
         /** A section's heading, a menu row high; the quest's name, {@link #title}, in ivory. */
         private boolean heading;
         private boolean title;
-        private boolean separator;
         private boolean objective;
         private boolean complete;
         private boolean active;
         /** A row of members under an objective (QUEST-25); null for any other line. */
         private List<ClientQuestFellows.Part> fellows;
 
-        private DetailLine(String text, int color, int indent, boolean centered) {
+        private DetailLine(String text, int color, int indent) {
             this.text = text == null ? "" : text;
             this.color = color;
             this.indent = Math.max(0, indent);
-            this.centered = centered;
         }
 
         private static DetailLine fellows(List<ClientQuestFellows.Part> parts,
                                           int indent) {
-            DetailLine line = new DetailLine("", WindowStyle.asideRgb(), indent, false);
+            DetailLine line = new DetailLine("", WindowStyle.asideRgb(), indent);
             line.fellows = Collections.unmodifiableList(
                     new ArrayList<ClientQuestFellows.Part>(parts));
             return line;
         }
 
-        /** A heading a menu row, a separator its hairline's room, words a note's line. */
+        /** A heading a menu row, words a note's line. */
         private int height() {
-            return this.heading ? MenuWindow.rowHeight()
-                    : this.separator ? WindowLists.SEPARATOR_HEIGHT
-                    : DETAIL_LINE_HEIGHT;
+            return this.heading ? MenuWindow.rowHeight() : DETAIL_LINE_HEIGHT;
         }
     }
 }

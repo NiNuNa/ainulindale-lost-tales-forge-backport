@@ -18,7 +18,7 @@ public final class ChatConsoleFixtures {
                 actor, text, "", null, null);
     }
 
-    /** A command {@code actor} ran from the tab {@code context}. */
+    /** A command {@code actor} ran from the page {@code context}. */
     public static ChatConsoleEvent command(long id, long timestampMillis,
                                            String actor, String text,
                                            String context) {

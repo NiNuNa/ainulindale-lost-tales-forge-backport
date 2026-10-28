@@ -3,19 +3,17 @@ package com.ninuna.losttales.character.physics;
 import net.minecraft.entity.player.EntityPlayer;
 
 /**
- * Common-side world-space spawn origins for entities created by a player.
- *
- * Minecraft 1.7.10 anchors EntityPlayer#posY above the bottom of the player
- * bounding box. Vanilla projectile and item-drop constructors then combine
- * that anchor with the small Forge player eye-height field. The race profile,
- * by contrast, stores an absolute eye height above the feet. These helpers
- * preserve the vanilla default-size origin while applying the same relationship
- * to shorter and taller races.
+ * Where a projectile or a dropped item starts, for a player of any race.
+ * The game starts them from the player's {@code posY}, which stands above
+ * the feet, plus Forge's small eye-height field; a race keeps its eye
+ * height above the feet. These give a player of the default size the
+ * game's own start, and shorter and taller races the same start for their
+ * eyes.
  */
 public final class CharacterSpawnOriginHelper {
 
-    /** Forge 1.7.10's default EntityPlayer eyeHeight field value. */
-    private static final double LEGACY_PLAYER_EYE_FIELD = 0.12D;
+    /** Forge's {@code EntityPlayer.eyeHeight} field at its default. */
+    private static final double PLAYER_EYE_FIELD = 0.12D;
 
     /** Downward offset used by vanilla arrows and LOTR projectile constructors. */
     private static final double PROJECTILE_DOWN_OFFSET = 0.10D;
@@ -32,7 +30,7 @@ public final class CharacterSpawnOriginHelper {
         }
         return getFeetY(player)
                 + dimensions.getProjectileEyeReferenceHeight(player.isSneaking())
-                + LEGACY_PLAYER_EYE_FIELD
+                + PLAYER_EYE_FIELD
                 - PROJECTILE_DOWN_OFFSET;
     }
 
@@ -43,13 +41,13 @@ public final class CharacterSpawnOriginHelper {
         }
         return getFeetY(player)
                 + dimensions.getItemDropEyeReferenceHeight(player.isSneaking())
-                + LEGACY_PLAYER_EYE_FIELD
+                + PLAYER_EYE_FIELD
                 - ITEM_DROP_DOWN_OFFSET;
     }
 
     /**
-     * Uses the actual collision-box floor so riding, ySize interpolation, and
-     * the legacy player yOffset convention do not leak into race calculations.
+     * The bottom of the player's hitbox, so riding, {@code ySize} and the
+     * player's {@code yOffset} never move a race's numbers.
      */
     public static double getFeetY(EntityPlayer player) {
         if (player == null) {

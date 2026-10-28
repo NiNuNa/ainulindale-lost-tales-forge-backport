@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.state;
 
 import java.util.UUID;
 
-/** Current and previous immutable generations for one role-playing character. */
+/** One character's saved life: its current generation and the one before it. */
 public final class CharacterPlayerStateRecord {
 
     public static final int CURRENT_DATA_VERSION = 1;
@@ -62,7 +62,7 @@ public final class CharacterPlayerStateRecord {
                 components);
     }
 
-    /** Commits only a previously validated next generation. */
+    /** Makes {@code snapshot}, the next generation, the current one; the caller has checked it. */
     public void commit(CharacterPlayerStateSnapshot snapshot) {
         validateCharacter(this.characterId, snapshot);
         if (snapshot == null

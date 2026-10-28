@@ -26,7 +26,7 @@ public final class ServerQuestVisibilityTest {
                         Collections.<String>emptySet(),
                         Arrays.asList("losttales:tutorial/meet_nia",
                                 "server:bree/rats",
-                                "losttales:missive/generated/dim0_1_2_3/100_0"),
+                                "losttales:missive/dim0_1_2_3/100_0"),
                         SERVER));
     }
 

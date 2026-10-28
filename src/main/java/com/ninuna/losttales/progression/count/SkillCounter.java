@@ -2,6 +2,7 @@ package com.ninuna.losttales.progression.count;
 
 import com.ninuna.losttales.armour.ArmourWeight;
 import com.ninuna.losttales.compat.lotr.LotrWeaponKinds;
+import com.ninuna.losttales.progression.GrantSource;
 import com.ninuna.losttales.progression.ProgressionCatalog;
 import com.ninuna.losttales.progression.ProgressionService;
 import com.ninuna.losttales.progression.skill.SkillAct;
@@ -16,7 +17,8 @@ import net.minecraft.item.ItemStack;
 /**
  * Hands an act to every skill whose file counts it (PROG-01), at what
  * that file makes it worth (PROG-02). Each skill grows apart; nothing is
- * shared (PROG-09).
+ * shared (PROG-09). A finished quest and a first find go to the skill as
+ * what they are, which the hourly cap may let past (PROG-08).
  */
 public final class SkillCounter {
     private SkillCounter() {}
@@ -52,7 +54,8 @@ public final class SkillCounter {
                 }
                 double worth = CountWorth.of(count, thing, measure);
                 if (worth > 0.0D) {
-                    ProgressionService.count(player, skill.getId(), key, repeats, worth);
+                    ProgressionService.count(player, skill.getId(), key, repeats, worth,
+                            GrantSource.of(act));
                 }
             }
         }

@@ -7,7 +7,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The closed feed stands its lines against the left edge, the right one
+ * The feed stands its lines against the left edge, the right one
  * or the middle: a row keeps its shape and only moves, by its ink, and
  * its band thins out away from where the lines stand.
  */

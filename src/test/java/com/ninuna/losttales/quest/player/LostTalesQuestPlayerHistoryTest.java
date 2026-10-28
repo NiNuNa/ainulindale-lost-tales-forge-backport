@@ -8,6 +8,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class LostTalesQuestPlayerHistoryTest {
@@ -129,6 +130,46 @@ public final class LostTalesQuestPlayerHistoryTest {
         // A character's copy of the log reads back exactly as written.
         LostTalesQuestPlayerData.validateCharacterState(
                 reloaded.writeCharacterState());
+    }
+
+    /**
+     * Every History line is written with its outcome, its count and its
+     * path, and every running quest with its path: a log missing one, or
+     * naming an outcome in other letters, is no log this build wrote, and
+     * is kept read-only (MOD-10).
+     */
+    @Test
+    public void aLogIsReadOnlyAsThisBuildWritesIt() {
+        LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
+        data.startQuest("losttales:tale", "start", 10L, 0L);
+        assertTrue(data.completeQuest("losttales:tale", 20L,
+                Collections.<String>emptySet()));
+        data.startQuest("losttales:running", "start", 30L, 0L);
+        NBTTagCompound state = data.writeCharacterState();
+        assertTrue(LostTalesQuestPlayerData.isStructurallyReasonable(state));
+
+        assertFalse(LostTalesQuestPlayerData.isStructurallyReasonable(
+                without(state, "QuestHistory", "Completions")));
+        assertFalse(LostTalesQuestPlayerData.isStructurallyReasonable(
+                without(state, "QuestHistory", "StagePath")));
+        assertFalse(LostTalesQuestPlayerData.isStructurallyReasonable(
+                without(state, "ActiveQuests", "StagePath")));
+        NBTTagCompound otherLetters = (NBTTagCompound) state.copy();
+        otherLetters.getTagList("QuestHistory", 10).getCompoundTagAt(0)
+                .setString("Outcome", "completed");
+        assertFalse(LostTalesQuestPlayerData.isStructurallyReasonable(
+                otherLetters));
+        assertEquals(LostTalesQuestHistoryEntry.Outcome.COMPLETED,
+                LostTalesQuestHistoryEntry.Outcome.fromName("COMPLETED"));
+        assertNull(LostTalesQuestHistoryEntry.Outcome.fromName("Completed"));
+    }
+
+    /** A copy of the log with {@code tag} taken from the first entry of {@code list}. */
+    private static NBTTagCompound without(NBTTagCompound state, String list,
+                                          String tag) {
+        NBTTagCompound copy = (NBTTagCompound) state.copy();
+        copy.getTagList(list, 10).getCompoundTagAt(0).removeTag(tag);
+        return copy;
     }
 
     /**

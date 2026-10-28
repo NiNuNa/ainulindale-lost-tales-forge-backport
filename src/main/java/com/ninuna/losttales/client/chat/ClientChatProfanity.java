@@ -8,13 +8,9 @@ import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
+import com.ninuna.losttales.util.LostTalesTextFiles;
 import cpw.mods.fml.common.FMLLog;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +28,6 @@ import java.util.List;
  */
 public final class ClientChatProfanity {
     static final String FILE_PATH = LostTalesConfigFiles.CHAT_PROFANITY;
-    private static final Charset UTF_8 = Charset.forName("UTF-8");
 
     private static ChatProfanityWords local = ChatProfanityWords.NONE;
     /** The catalogue's list the merged one was built over. */
@@ -87,30 +82,20 @@ public final class ClientChatProfanity {
         return merged;
     }
 
+    /**
+     * The file's lines, room left for comments and blank lines beside the
+     * words; none without a file.
+     */
     private static String[] readLines(File file) {
         if (file == null || !file.isFile()) {
             return new String[0];
         }
-        List<String> lines = new ArrayList<String>();
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(file), UTF_8));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                lines.add(line);
-            }
-        } catch (IOException exception) {
-            FMLLog.warning("[%s] %s could not be read: %s",
-                    LostTalesMetaData.MOD_ID, FILE_PATH, exception.getMessage());
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException ignored) {
-                    // Nothing left to do with a reader that would not close.
-                }
-            }
+        List<String> lines = LostTalesTextFiles.readLines(file,
+                4 * ChatProfanityWords.MAX_WORDS);
+        if (lines == null) {
+            FMLLog.warning("[%s] %s could not be read",
+                    LostTalesMetaData.MOD_ID, FILE_PATH);
+            return new String[0];
         }
         return lines.toArray(new String[lines.size()]);
     }

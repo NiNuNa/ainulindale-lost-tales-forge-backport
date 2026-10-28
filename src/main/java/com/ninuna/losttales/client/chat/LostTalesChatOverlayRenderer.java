@@ -1,7 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.chat.ChatFeedPlacement;
-import com.ninuna.losttales.client.window.ContentView;
+import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.client.window.Borderless;
 import com.ninuna.losttales.client.window.OtherPage;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowDrawing;
@@ -40,10 +40,13 @@ import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
+import cpw.mods.fml.common.FMLLog;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ChatLine;
 import net.minecraft.client.gui.FontRenderer;
@@ -60,26 +63,23 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import net.minecraft.client.renderer.OpenGlHelper;
 import org.lwjgl.opengl.GL14;
+import org.apache.logging.log4j.Level;
 
 /**
- * Vanilla-compatible chat draw pass with heads and optional time-based entry
- * easing, run once per chat window. Lines are read from vanilla's single
- * history; each window shows the subset its {@link ChatLineFilter} selects
- * — with the chat screen open, its front tab's channel with that channel's
- * own scroll offset from {@link ClientChatChannelViews} and without the
- * channel prefix. With the chat closed the windows are not drawn at all;
- * one feed shows every unmuted channel's messages, fading as
- * vanilla's do, at its own position. While the Lost Tales chat screen is
- * open the screen draws the windows itself, one complete window after
- * another, so the open chat lies above every HUD element and a front
- * window covers the whole of one behind it; the HUD pass then only
- * cancels vanilla's. Every window is drawn inside the box
- * {@link WindowPlacement} gives it, with the opening motion every
- * other Lost Tales screen uses, and records the screen band of every
- * line it draws in its
- * {@link WindowFrame}; all mouse-to-line mapping (person card,
- * clipboard, component hits, the vanilla hit-test hook) resolves against
- * those recorded bands, so it always matches what is on screen.
+ * The chat's draw pass: each conversation window, and the feed. Lines are
+ * read from vanilla's one history; a window shows those its
+ * {@link ChatLineFilter} picks, the conversation in front, at that
+ * conversation's own scroll ({@link ClientChatChannelViews}). With the
+ * chat closed no window is drawn, and the feed shows, fading, what each
+ * conversation's Chat Feed Settings let through, at its own place. While
+ * the window screen is open the screen draws the windows itself, one
+ * whole window after another, so the open chat lies over the HUD and a
+ * front window covers the one behind it; the HUD pass then only cancels
+ * vanilla's chat. Every window is drawn in the box {@link WindowPlacement}
+ * gives it, with the opening motion every screen uses, and records where
+ * each line it draws stands in its {@link ChatFrame}. Every pointer test
+ * on a line (cards, the clipboard, components, vanilla's hit test) reads
+ * those records, so it matches what is drawn.
  */
 public final class LostTalesChatOverlayRenderer {
     /** Width of the bar a mention wears on the window's left edge. */
@@ -188,7 +188,10 @@ public final class LostTalesChatOverlayRenderer {
      * nothing at the region's top and bottom edges.
      */
     private static final int EMPTY_HATCH_ALPHA = Math.round(255.0F / 3.0F);
+    /** Vanilla's wrapped, drawn lines; the same name in a workspace and a release jar. */
     private static final Field DRAWN_LINES = findField("field_146253_i");
+    /** Whether a failed draw has been logged; the first one is enough. */
+    private static boolean drawFailureLogged;
 
     private LostTalesChatOverlayRenderer() {}
 
@@ -257,12 +260,30 @@ public final class LostTalesChatOverlayRenderer {
             return true;
         } catch (IllegalAccessException ignored) {
             return false;
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException failure) {
+            logDrawFailureOnce(failure);
             return false;
         } finally {
             if (depthTest) {
                 GL11.glEnable(GL11.GL_DEPTH_TEST);
             }
+        }
+    }
+
+    /** Names the first failed draw in the log, with its stack. */
+    private static void logDrawFailureOnce(RuntimeException failure) {
+        if (drawFailureLogged) {
+            return;
+        }
+        drawFailureLogged = true;
+        try {
+            FMLLog.log(Level.WARN, failure, "[%s] The chat could not draw its"
+                    + " windows or its feed. Later failures are not logged.",
+                    LostTalesMetaData.MOD_ID);
+        } catch (RuntimeException unavailable) {
+            // FML's logger is not set up outside a running game.
+        } catch (LinkageError unavailable) {
+            // Nor are FML's classes there outside one.
         }
     }
 
@@ -285,14 +306,15 @@ public final class LostTalesChatOverlayRenderer {
                     screenWidth, screenHeight, opening);
         } catch (IllegalAccessException ignored) {
             ChatFrame.of(window).drawn = false;
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException failure) {
+            logDrawFailureOnce(failure);
             ChatFrame.of(window).drawn = false;
         }
     }
 
     /**
      * Opening the screen brings the history in with the same sampler as
-     * every other Lost Tales screen; the tabs follow because they stand
+     * every other Lost Tales screen; the pages follow because they stand
      * on the bands.
      */
     private static void drawOpenWindow(Minecraft minecraft, GuiNewChat chat,
@@ -325,14 +347,14 @@ public final class LostTalesChatOverlayRenderer {
         ConversationPage view = ConversationPage.from(front);
         ChatLineFilter filter = ChatLineFilter.of(view);
         // An open window lays its own lines out: at its own width when
-        // it has one, with the grouping its own tab's sequence gives,
+        // it has one, with the grouping its own page's sequence gives,
         // and always without the channel prefix the shared history
         // reserves room for, which the open screen does not draw. Only
         // a window whose history cannot be read falls back to that
         // shared list.
         // A window filling a part of the screen, or gliding to or from
         // it, is laid out at the width it is drawn at this instant.
-        frame.advanceFill(ContentView.fillOf(window));
+        frame.advanceFill(Borderless.fillOf(window));
         int chatWidth = WindowPlacement.drawnChatWidth(window, minecraft,
                 screenWidth);
         if (besideOther && !stacked) {
@@ -349,12 +371,12 @@ public final class LostTalesChatOverlayRenderer {
         // with the window down to its heads rather than leaving. A window
         // with nothing on screen leaves both as they stand.
         float windowChatWidth = chatWidth / chat.func_146244_h() + 6.0F;
-        ConversationPage frontTab = ConversationPage.from(front);
+        ConversationPage frontPage = ConversationPage.from(front);
         ChatMemberList.measure(frame.members,
-                ChatLayout.getMembersWidth(frontTab), windowChatWidth,
+                ChatLayout.getMembersWidth(frontPage), windowChatWidth,
                 ChatTimestampColumn.of(frame, minecraft.fontRenderer)
                         .messageX());
-        frame.advancePanels(frontTab);
+        frame.advancePanels(frontPage);
         // The unread divider opens a run of its own under it while it
         // stands, so the window lays its lines out knowing where it is.
         Integer unread = view == null ? null
@@ -462,7 +484,7 @@ public final class LostTalesChatOverlayRenderer {
         // others lie over fades as one picture.
         WindowDrawing.beginStackFade(minecraft, frame, shownBox);
         // The newest line sits on the baseline; the whole window rides
-        // the opening motion, tabs and bar included. The origin is the
+        // the opening motion, pages and bar included. The origin is the
         // frame's, not the placement box's: the box is where the window
         // was dragged to, in fractions of a pixel, and the frame is
         // where it is drawn, on whole display pixels. Measuring the
@@ -507,7 +529,7 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * A conversation on the other side of a split window from the tab in
+     * A conversation on the other side of a split window from the page in
      * front: its history in its own side, beside it or over or under it,
      * read only. Nothing on it answers the pointer until a press brings it
      * in front.
@@ -568,8 +590,8 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The closed-chat feed: the lines each conversation's feed choice
-     * choice lets through, its tab open or closed, as one fading stack
+     * The feed: the lines each conversation's feed choice
+     * choice lets through, its page open or closed, as one fading stack
      * at the feed's own position, with the
      * channel prefixes that tell the channels apart. The feed lays its
      * own lines out, at the game's chat width, because a run here is
@@ -585,12 +607,12 @@ public final class LostTalesChatOverlayRenderer {
         // Every line of a conversation shown in the feed with
         // Everything, and a line addressed to the player of one shown
         // with Only Mentions; typing shows for the first alone.
-        List<ConversationPage> feedTabs = ChatLayout.feedTabs();
+        List<ConversationPage> feedPages = ChatLayout.feedPages();
         ChatLineFilter filter = ChatLayout.feedFilter();
         // Someone typing into a conversation the feed carries raises
         // the lines a row, and the typing row comes up under them.
         float typingShare = ChatFeedTyping.advance(
-                ChatFeedTyping.segments(feedTabs), System.nanoTime());
+                ChatFeedTyping.segments(feedPages), System.nanoTime());
         List<ChatLine> own = ChatWindowLines.forFeed(minecraft, chat, filter);
         List<ChatLine> lines = own != null ? own
                 : ClientChatChannelViews.visibleLines(drawn, filter);
@@ -639,7 +661,7 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * The closed feed's typing row, under its newest line: each
+     * The feed's typing row, under its newest line: each
      * conversation someone is typing into, named as the feed names a
      * line's channel, then the speech bubble where a line's head would
      * stand and the typing line's words and dots. A conversation that
@@ -673,9 +695,9 @@ public final class LostTalesChatOverlayRenderer {
         List<String> words = new ArrayList<String>();
         int used = 0;
         for (ChatFeedTyping.Segment segment : segments) {
-            String prefix = (segment.tab.isWhisper()
+            String prefix = (segment.page.isWhisper()
                     ? ChatNames.channel(LostTalesWords.LANG, ChatChannel.WHISPER)
-                    : ClientChatChannelState.displayName(segment.tab)) + ": ";
+                    : ClientChatChannelState.displayName(segment.page)) + ": ";
             String said = ChatTypingLine.words(segment.names);
             int width = font.getStringWidth(prefix) + bubble.getWidth()
                     + FEED_TYPING_BUBBLE_GAP + ChatTypingLine.width(font, said);
@@ -714,10 +736,10 @@ public final class LostTalesChatOverlayRenderer {
                 if (index > 0) {
                     x += FEED_TYPING_SEGMENT_GAP;
                 }
-                ConversationPage tab = segments.get(index).tab;
+                ConversationPage page = segments.get(index).page;
                 LostTalesUiInk.drawText(font,
                         prefixes.get(index), x, y,
-                        ClientChatChannelState.displayColor(tab), alpha);
+                        ClientChatChannelState.displayColor(page), alpha);
                 x += font.getStringWidth(prefixes.get(index));
                 bubble.drawWithShadow(x, y + WindowStyle.centredBoxTop(bubble.getHeight()),
                         alpha);
@@ -1052,11 +1074,11 @@ public final class LostTalesChatOverlayRenderer {
 
         int unscaledWidth = MathHelper.ceiling_float_int(chatWidth / scale);
         FontRenderer font = minecraft.fontRenderer;
-        // The closed feed stands its lines against the edge the client
+        // The feed stands its lines against the edge the client
         // chose; an open window's always start at its left.
         ChatFeedAlignment alignment = open ? ChatFeedAlignment.LEFT
                 : ChatFeedAlignment.current();
-        // Switching tabs is a hard cut for the lines: only the tabs
+        // Switching pages is a hard cut for the lines: only the pages
         // themselves ease. The stack rises with a new message only while
         // the history is shorter than the room; full, it would only look
         // like it is trying to.
@@ -1182,13 +1204,13 @@ public final class LostTalesChatOverlayRenderer {
         // line owns the head-room under the row.
         boolean reachesTop = totalHeight >= roomUnscaled - 0.01F;
         // An open window keeps its row on its own top edge whatever the
-        // tab in front holds. Its box is its own height, the game's chat
+        // page in front holds. Its box is its own height, the game's chat
         // height, or the part of the screen it fills, and never what its
-        // tabs hold, so switching tabs neither resizes the window nor
+        // pages hold, so switching pages neither resizes the window nor
         // moves its row: the rows a shorter history does not reach stay
         // as hatched panel under the row. Nor does the row move as the
         // stack scrolls under it, the trailing scroll room included. Only
-        // the closed feed, which has no row, ends on the lines it has.
+        // the feed, which has no row, ends on the lines it has.
         boolean full = open || totalRowCount <= 0 || reachesTop;
         // Laid on a whole display pixel, like every edge the window is
         // drawn from: the tab row hangs from it, and a row standing
@@ -1271,7 +1293,7 @@ public final class LostTalesChatOverlayRenderer {
                 if (columns.shows()) {
                     // The timestamp area's own surface: the chat's inset
                     // surface, the primary at two thirds, the typing
-                    // well's and a resting tab's, so the avatars and the
+                    // well's and a resting page's, so the avatars and the
                     // times read as a margin rather than as part of the
                     // messages.
                     // The panel stops at the separator, so the two lie
@@ -1406,6 +1428,10 @@ public final class LostTalesChatOverlayRenderer {
                     int alpha = Math.round(lineAlpha(
                             open ? 255 : (int)(255.0D * fade), line, opacity,
                             opening) * glide.shown(lineIndex));
+                    // Words said far off read fainter under Sizes and
+                    // Fainter (CHAT-37).
+                    alpha = LostTalesChatVisualStyle.distanceAlpha(alpha,
+                            line.func_151461_a());
                     eligibleHeight += rowHeight;
                     // The row's bottom edge, measured up the stack from
                     // the row the scroll rests on.
@@ -1429,7 +1455,7 @@ public final class LostTalesChatOverlayRenderer {
                     if (open) {
                         // Recorded exactly as drawn: the same translate, slide
                         // and scale the quads below use. Recorded even while
-                        // the line is still too faint to paint, so the tabs
+                        // the line is still too faint to paint, so the pages
                         // standing on the bands exist from the first frame of
                         // the opening fade instead of popping in later.
                         float bandLeft = originX + entry * scale;
@@ -1599,7 +1625,7 @@ public final class LostTalesChatOverlayRenderer {
                             // at a glance from across the window. A pixel
                             // clear of the frame, strongest at the
                             // message's middle and fading to nothing at its
-                            // ends, as a tab's accent line does. It stands
+                            // ends, as a page's accent line does. It stands
                             // with the panel, still while the line's text
                             // slides in.
                             float barLeft = panelLeft + MENTION_BAR_INSET;
@@ -1611,7 +1637,7 @@ public final class LostTalesChatOverlayRenderer {
                                     alpha, mentionRgb);
                         }
                     }
-                    // The closed feed has no panel — each of its lines
+                    // The feed has no panel — each of its lines
                     // fades on its own — so there each brings its own
                     // band, sliding with its text so a new message
                     // enters as one piece.
@@ -1844,7 +1870,7 @@ public final class LostTalesChatOverlayRenderer {
                 GL11.glPopMatrix();
             }
             if (!full) {
-                // The closed feed's rows the draw passed over: its stack
+                // The feed's rows the draw passed over: its stack
                 // ends lower than the room allows, and the feed ends on
                 // it. A history short enough to leave room is drawn
                 // whole, so the divider's row is among them.
@@ -2018,7 +2044,7 @@ public final class LostTalesChatOverlayRenderer {
     /**
      * Whether the line above a blank row — the older neighbour, one
      * further along the newest-first list — is on screen: still inside
-     * the window's rows, and in the closed feed not yet faded. A blank
+     * the window's rows, and in the feed not yet faded. A blank
      * row stands for the gap between two runs, so with nothing above it
      * there is nothing to mark.
      */
@@ -2091,7 +2117,7 @@ public final class LostTalesChatOverlayRenderer {
     }
 
     /**
-     * How far the closed feed moves a row sideways for its alignment, in
+     * How far the feed moves a row sideways for its alignment, in
      * the stack's units and on the display's own grid, so that the row's
      * ink, not its advance, meets the edge it stands against. A row drawn
      * at another size than the words grows or shrinks from where its
@@ -2119,7 +2145,7 @@ public final class LostTalesChatOverlayRenderer {
     /**
      * The shade along one edge of the backdrop: the backdrop's plum
      * black at half opacity on the edge, fading to nothing
-     * {@code height} pixels inward — downward from the top edge the tab
+     * {@code height} pixels inward — downward from the top edge the page
      * row stands on, upward from the bottom edge the bottom rule stands
      * on — and never past {@code limit}, the opposite
      * edge. That vertical fade is then masked by a second, horizontal
@@ -2512,7 +2538,7 @@ public final class LostTalesChatOverlayRenderer {
 
     /**
      * The jump-to-present button of a scrolled-back view: a framed button
-     * centred across the panel, the sheet's down chevron — the tab
+     * centred across the panel, the sheet's down chevron — the page
      * search's, at rest — and its label in ivory after it, lit under the
      * pointer, standing in the hole the history left for it. Drawn in
      * the window's local space; the screen rectangle it lands on is
@@ -2843,7 +2869,7 @@ public final class LostTalesChatOverlayRenderer {
 
     /**
      * A line's opacity from {@code base} — full in an open window, its
-     * age's fade in the closed feed: a message still on its way is faint
+     * age's fade in the feed: a message still on its way is faint
      * until the server's own copy of it arrives to take its place, and
      * every line carries the chat opacity, its own entrance and the
      * opening fade.
@@ -3447,7 +3473,7 @@ public final class LostTalesChatOverlayRenderer {
      * message in the open window: the row naming a speaker, a reply's
      * quote, a message's own words and the chat's small text, each read
      * once for the whole stack rather than per row. The window and the
-     * closed feed are asked separately, so the feed can show the voices
+     * feed are asked separately, so the feed can show the voices
      * plain and shrink what they say while the window does the opposite.
      * A size the display cannot draw apart from the words is the words'.
      */
@@ -3455,14 +3481,19 @@ public final class LostTalesChatOverlayRenderer {
         final float speaker;
         final float quote;
         final float message;
+        /** A line heard nearby's words read a size larger and a size smaller (CHAT-37). */
+        final float near;
+        final float far;
         /** The chat's small text: the chips and the times. */
         final float small;
 
         private RowSizes(float speaker, float quote, float message,
-                         float small) {
+                         float near, float far, float small) {
             this.speaker = speaker;
             this.quote = quote;
             this.message = message;
+            this.near = near;
+            this.far = far;
             this.small = small;
         }
 
@@ -3471,6 +3502,8 @@ public final class LostTalesChatOverlayRenderer {
                     LostTalesChatVisualStyle.speakerRowScale(chatOpen),
                     LostTalesChatVisualStyle.quoteRowScale(chatOpen),
                     LostTalesChatVisualStyle.messageRowScale(chatOpen),
+                    LostTalesChatVisualStyle.messageRowScale(chatOpen, 1),
+                    LostTalesChatVisualStyle.messageRowScale(chatOpen, -1),
                     LostTalesChatVisualStyle.stackSmallScale());
         }
 
@@ -3488,7 +3521,11 @@ public final class LostTalesChatOverlayRenderer {
             if (ChatReplyMarker.isQuoteRow(row)) {
                 return this.quote;
             }
-            return ChatLayoutMarker.isBodyRow(row) ? this.message : 1.0F;
+            if (!ChatLayoutMarker.isBodyRow(row)) {
+                return 1.0F;
+            }
+            int step = ChatLayoutMarker.bodyRowStep(row);
+            return step > 0 ? this.near : step < 0 ? this.far : this.message;
         }
     }
 
@@ -3869,7 +3906,7 @@ public final class LostTalesChatOverlayRenderer {
 
     /**
      * Palette backdrop band with the band's own opacity profile, sampled
-     * evenly from its left edge to its right: the closed feed's lines
+     * evenly from its left edge to its right: the feed's lines
      * thin out away from whichever edge they stand against
      * ({@link ChatFeedAlignment}). Edges are fractional: a band has to
      * meet its neighbour and the window's rules exactly, and a stack
@@ -4153,6 +4190,17 @@ public final class LostTalesChatOverlayRenderer {
     private static void drawHeadShadow(
             Minecraft minecraft, ChatHeadMarker.Data marker,
             float x, float y, float size, float opacity) {
+        drawHeadShadow(minecraft, marker.npcIdentity, marker.accountIdentity,
+                marker.senderId, marker.skinId, x, y, size, opacity);
+    }
+
+    /**
+     * The one head shadow every chat head casts: an NPC's by its skin, an
+     * account's by its id, a character's by its id and skin.
+     */
+    static void drawHeadShadow(Minecraft minecraft, boolean npc,
+                               boolean account, UUID id, String skinId,
+                               float x, float y, float size, float opacity) {
         if (opacity * 255.0F < LostTalesUiInk.MIN_VISIBLE_ALPHA) {
             return;
         }
@@ -4160,18 +4208,17 @@ public final class LostTalesChatOverlayRenderer {
         float shadowY = y + LostTalesUiInk.SHADOW_OFFSET;
         LostTalesSilhouetteRenderState.begin(LostTalesUiInk.SHADOW);
         try {
-            if (marker.npcIdentity) {
+            if (npc) {
                 LostTalesCharacterHeadIconRenderer.drawTintedNpcHeadBase(
-                        minecraft, marker.skinId, shadowX, shadowY, size,
+                        minecraft, skinId, shadowX, shadowY, size,
                         1.0F, 1.0F, 1.0F, opacity);
-            } else if (marker.accountIdentity) {
+            } else if (account) {
                 LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
-                        minecraft, marker.senderId, shadowX, shadowY, size,
+                        minecraft, id, shadowX, shadowY, size,
                         1.0F, 1.0F, 1.0F, opacity);
             } else {
                 LostTalesCharacterHeadIconRenderer.drawTintedSnapshotHeadBase(
-                        minecraft, marker.senderId, marker.skinId,
-                        shadowX, shadowY, size,
+                        minecraft, id, skinId, shadowX, shadowY, size,
                         1.0F, 1.0F, 1.0F, opacity);
             }
         } finally {
@@ -4288,8 +4335,8 @@ public final class LostTalesChatOverlayRenderer {
         if (started <= 0L) {
             return 0.0F;
         }
-        ConversationPage lastTab = LostTalesChatPresentation.getLastMessageTab();
-        if (filter != null && !filter.accepts(lastTab)) {
+        ConversationPage lastPage = LostTalesChatPresentation.getLastMessagePage();
+        if (filter != null && !filter.accepts(lastPage)) {
             return 0.0F;
         }
         float progress = Math.min(1.0F,
@@ -4333,9 +4380,14 @@ public final class LostTalesChatOverlayRenderer {
                 (System.nanoTime() - started) / (float)duration).opacity;
     }
 
+    /** A list field of the chat's by name, only when it has that shape; null otherwise. */
     private static Field findField(String name) {
         try {
             Field field = GuiNewChat.class.getDeclaredField(name);
+            if (Modifier.isStatic(field.getModifiers())
+                    || !List.class.isAssignableFrom(field.getType())) {
+                return null;
+            }
             field.setAccessible(true);
             return field;
         } catch (ReflectiveOperationException ignored) {

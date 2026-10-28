@@ -12,7 +12,7 @@ import net.minecraft.util.IChatComponent;
  * run of {@code ||spoiler||} text carries which message it belongs to
  * and which of that message's spoilers it is, and a reveal is recorded
  * against that pair rather than against any one built component — the
- * open window's line, the closed feed's copy and a grouped rebuild all
+ * open window's line, the feed's copy and a grouped rebuild all
  * name the same spoiler, so revealing it anywhere reveals it
  * everywhere. The renderer keeps drawing the run obfuscated until the
  * pair is in the revealed set, and a reveal changes nothing the wrapper

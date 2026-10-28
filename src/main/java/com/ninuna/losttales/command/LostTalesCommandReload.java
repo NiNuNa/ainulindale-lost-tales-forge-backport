@@ -39,8 +39,8 @@ import net.minecraft.world.WorldServer;
  * goes to every player online again: the quests their logs name, the
  * skills, the markers, the races and capes, each player's lore list. After
  * the races every player online is sized again to the race they play, on
- * the server thread the command runs on; a player whose race no file has
- * any more plays as the body it stood on.
+ * the server thread the command runs on; a player whose race no file
+ * holds plays as the body it stood on.
  */
 public final class LostTalesCommandReload extends LostTalesCommandBase {
 

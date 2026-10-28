@@ -17,8 +17,8 @@ public final class ServerSettingNamesTest {
     @Test
     public void smallWordsStayLowerAfterTheFirst() {
         assertEquals("History per Channel", ServerSettingNames.name("historyPerChannel"));
-        assertEquals("Auto Pin Quest on Start",
-                ServerSettingNames.name("autoPinQuestOnStart"));
+        assertEquals("Auto Track Quest on Start",
+                ServerSettingNames.name("autoTrackQuestOnStart"));
         assertEquals("To Channel", ServerSettingNames.name("toChannel"));
     }
 

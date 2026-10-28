@@ -7,7 +7,6 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.moderation.ChatMuteEntry;
 import com.ninuna.losttales.chat.moderation.ChatMuteStorage;
 import com.ninuna.losttales.network.server.LostTalesRequestRateLimiter;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -17,48 +16,40 @@ import net.minecraft.server.MinecraftServer;
 /**
  * The one ordered path every chat line passes, whatever its source
  * (CHAT-82): a player's line, the Narrator's, a Discord member's and the
- * Server's go through the same stages in the same order, each rule kept
- * here once, and a new source plugs in by naming itself. NPC lines are the
- * client's own and never reach the server; the client reads them with the
- * same words rule ({@link com.ninuna.losttales.chat.profanity.ChatProfanityFilter}).
+ * Server's pass the same checks in the same order, each rule kept here
+ * once. NPC lines are the client's own and never reach the server; the
+ * client reads them with the same words rule
+ * ({@link com.ninuna.losttales.chat.profanity.ChatProfanityFilter}).
  *
  * <ol>
- * <li>{@link Stage#GATE}: who may speak where. A player and the Narrator
- * by the channel's send gate, their identity and the whisper rule; a
- * Discord member by the bridge's inbound policy; the Server always.</li>
- * <li>{@link Stage#MUTE}: a mute stored against the sender's id, a
- * player's account or a Discord member's, refuses the line
- * ({@link #muteOf}); the Server is nobody to mute.</li>
- * <li>{@link Stage#RATE_LIMIT}: a player's and the Narrator's lines are
- * counted at the server's door, as every request is; a Discord member is
- * held to the same budget here ({@link #withinBudget}).</li>
- * <li>{@link Stage#WORDS}: the words a message may carry, an action ended
- * as the sentence it reads as ({@link #words}). Swearing is each reader's
- * to filter as they read (CHAT-60).</li>
- * <li>{@link Stage#MENTIONS}: whom the {@code @names} reach, found among
- * the conversation's members as its member list shows them, for every
- * source alike ({@link ChatMentionTargets}); the roles only a player's own
- * line calls ({@link #callsRoles}).</li>
- * <li>{@link Stage#SHARES}: the things a player's line shares, read from
- * the server's own state; a forward carries its message's; a Discord or
- * Server line shares nothing it did not build itself.</li>
- * <li>{@link Stage#READERS}: each reader is sent their copy: the author
- * their own (the echo name and what they typed), everyone else the shared
- * one (the Narrator's anonymous for all but the narrator), the reactions as
- * each reader is shown them; then the history and the audit keep it, and
- * the bridge carries it on.</li>
+ * <li>Gate: who may speak where. A player and the Narrator by the
+ * channel's send gate, their identity and the whisper rule; a Discord
+ * member by the bridge's inbound policy; the Server always.</li>
+ * <li>Mute: a mute stored against the sender's id, a player's account or
+ * a Discord member's, refuses the line ({@link #muteOf}); the Server is
+ * nobody to mute.</li>
+ * <li>Rate limit: a player's and the Narrator's lines are counted at the
+ * server's door, as every request is; a Discord member is held to the
+ * same budget here ({@link #withinBudget}).</li>
+ * <li>Words: the words a message may carry, an action ended as the
+ * sentence it reads as ({@link #words}). Swearing is each reader's to
+ * filter as they read (CHAT-60).</li>
+ * <li>Mentions: whom the {@code @names} reach, found among the
+ * conversation's members as its member list shows them
+ * ({@link ChatMentionTargets}); the roles only a player's own line calls
+ * ({@link #callsRoles}).</li>
+ * <li>Shares: what a player's line shares, read from the server's own
+ * state; a forward carries its message's; a Discord or Server line shares
+ * nothing it did not build itself.</li>
+ * <li>Readers: each reader is sent their copy: the author their own (the
+ * echo name and what they typed), everyone else the shared one (the
+ * Narrator's anonymous for all but the narrator); then the history and
+ * the audit keep it, and the bridge carries it on.</li>
  * </ol>
  */
 public final class ChatLinePipeline {
     /** Where a line comes from. */
     public enum Source { PLAYER, NARRATOR, DISCORD, SERVER }
-
-    /** One stage of the path, in its order. */
-    public enum Stage { GATE, MUTE, RATE_LIMIT, WORDS, MENTIONS, SHARES, READERS }
-
-    /** The stages in the order every line passes them. */
-    public static final List<Stage> ORDER = Collections.unmodifiableList(
-            Arrays.asList(Stage.values()));
 
     private ChatLinePipeline() {}
 

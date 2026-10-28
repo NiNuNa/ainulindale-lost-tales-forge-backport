@@ -48,6 +48,9 @@ public final class DiscordLinkingJsonTest {
         assertEquals("", DiscordJson.parseCreatedWebhookUrl(
                 "{\"id\":\"123\",\"token\":\"a/b\"}"));
         assertEquals("", DiscordJson.parseCreatedWebhookUrl("not json"));
+        // An id longer than a link's entry reads back is no address.
+        assertEquals("", DiscordJson.parseCreatedWebhookUrl(
+                "{\"id\":\"123456789012345678901\",\"token\":\"abc\"}"));
     }
 
     @Test

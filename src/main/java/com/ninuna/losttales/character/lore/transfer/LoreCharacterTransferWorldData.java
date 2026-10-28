@@ -20,7 +20,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Fail-closed state vault and in-flight transfer journal for lore characters. */
+/**
+ * Each lore figure's record and saved life as last claimed or released
+ * (the vault), and the claims and releases under way. Data it cannot read
+ * makes the whole store read-only.
+ */
 public final class LoreCharacterTransferWorldData extends WorldSavedData {
 
     public static final String DATA_NAME = "losttales_lore_character_transfers";

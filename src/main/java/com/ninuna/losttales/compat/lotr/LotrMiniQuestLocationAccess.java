@@ -15,7 +15,7 @@ import org.apache.commons.lang3.tuple.Pair;
  * private {@code lastLocation} pair. The field is resolved once and its
  * shape verified — a {@link Pair} whose halves are coordinates and a
  * number — rather than trusting the name, and a quest whose location
- * cannot be read simply has none, so a LOTR version that moved the field
+ * cannot be read has none, so a LOTR version that moved the field
  * costs a marker and nothing else.</p>
  */
 public final class LotrMiniQuestLocationAccess {

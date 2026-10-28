@@ -17,10 +17,11 @@ import net.minecraftforge.event.terraingen.PopulateChunkEvent;
 import net.minecraftforge.event.world.ChunkEvent;
 
 /**
- * Lazy backfill for existing chunks plus post-population placement for new
- * ones. A marker {@code retry} marked waits as not attempted, saved with
- * its record, and is built here as its chunk loads, as one never tried is
- * (WAY-18).
+ * Builds the generated waystones: as a new chunk is populated, as a
+ * chunk near a marker loads, and in a sweep round each player every
+ * second. A marker {@code retry} marked waits as not attempted, saved
+ * with its record, and is built here as its chunk loads, as one never
+ * tried is (WAY-18).
  */
 public final class LostTalesWaystoneGenerationHandler
         implements IWorldGenerator {
@@ -49,10 +50,9 @@ public final class LostTalesWaystoneGenerationHandler
     }
 
     /**
-     * Forge calls registered world generators from the server chunk
-     * population pipeline even when a custom provider does not post the
-     * corresponding terrain event. This matches how LOTR fixed structures
-     * are selected during biome decoration.
+     * Forge calls this as a chunk is populated, even where the chunk
+     * provider posts no population event; LOTR places its fixed
+     * structures the same way.
      */
     @Override
     public void generate(
@@ -66,10 +66,9 @@ public final class LostTalesWaystoneGenerationHandler
     }
 
     /**
-     * LOTR's legacy chunk provider does not consistently emit Forge's
-     * post-population event for newly generated Middle-earth chunks. A
-     * bounded proximity pass makes lazy generation reliable after terrain
-     * has finished loading, without requesting or forcing any chunks.
+     * LOTR's chunk provider does not always post Forge's population event
+     * for a new Middle-earth chunk, so every second the chunks round each
+     * player are tried as well. It loads no chunk.
      */
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {

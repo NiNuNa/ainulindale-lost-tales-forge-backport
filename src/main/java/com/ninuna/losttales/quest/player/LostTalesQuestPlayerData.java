@@ -47,10 +47,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     public static final int CURRENT_DATA_VERSION = 3;
     static final int MAX_ACTIVE_QUESTS = 1024;
     static final int MAX_QUEST_ID_HISTORY = 8192;
-    static final int MAX_DYNAMIC_QUESTS = 512;
+    static final int MAX_MISSIVES = 512;
     /** The most ended missives kept, with their quests and History lines; the oldest goes first. */
     public static final int MAX_ENDED_MISSIVES = 32;
-    static final int MAX_DYNAMIC_MARKERS = 2048;
+    static final int MAX_GIVER_MARKERS = 2048;
     static final int MAX_IDENTIFIER_CHARACTERS = 256;
     static final int MAX_NAME_CHARACTERS = 1024;
     static final int MAX_HISTORY_DETAIL_CHARACTERS = 2048;
@@ -62,12 +62,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private final Set<String> discoveredMarkerIds = new LinkedHashSet<String>();
     private final Map<String, String> discoveredMarkerIdByCanonicalKey =
             new LinkedHashMap<String, String>();
-    private final Map<String, LostTalesMapMarkerDefinition> dynamicMapMarkers = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
-    private final Map<String, String> dynamicMarkerIdByCanonicalKey =
+    private final Map<String, LostTalesMapMarkerDefinition> giverMarkers = new LinkedHashMap<String, LostTalesMapMarkerDefinition>();
+    private final Map<String, String> giverMarkerIdByCanonicalKey =
             new LinkedHashMap<String, String>();
-    private final Map<String, LostTalesQuestDefinition> dynamicQuestDefinitions = new LinkedHashMap<String, LostTalesQuestDefinition>();
-    private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
-    private String pinnedMapMarkerId = "";
+    private final Map<String, LostTalesQuestDefinition> missiveDefinitions = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private final Set<String> trackedQuestIds = new LinkedHashSet<String>();
+    private String trackedMapMarkerId = "";
     /** Whether this character was given its starter items (QUEST-29). */
     private boolean startersGiven;
     /**
@@ -164,8 +164,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         data.setTag("QuestHistory", historyList);
 
-        NBTTagList pinnedQuestList = new NBTTagList();
-        for (String questId : this.pinnedQuestIds) {
+        NBTTagList trackedQuestList = new NBTTagList();
+        for (String questId : this.trackedQuestIds) {
             if (questId == null || questId.length() == 0
                     || (!this.activeQuests.containsKey(questId)
                         && !LotrQuestReference.isLotrQuest(questId))) {
@@ -173,9 +173,9 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
             NBTTagCompound questTag = new NBTTagCompound();
             questTag.setString("QuestId", questId);
-            pinnedQuestList.appendTag(questTag);
+            trackedQuestList.appendTag(questTag);
         }
-        data.setTag("PinnedQuestIds", pinnedQuestList);
+        data.setTag("TrackedQuestIds", trackedQuestList);
 
         NBTTagList markerList = new NBTTagList();
         for (String markerId : this.discoveredMarkerIds) {
@@ -185,17 +185,17 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         data.setTag("DiscoveredMarkers", markerList);
 
-        NBTTagList dynamicQuestList = new NBTTagList();
-        for (LostTalesQuestDefinition quest : this.dynamicQuestDefinitions.values()) {
+        NBTTagList missiveList = new NBTTagList();
+        for (LostTalesQuestDefinition quest : this.missiveDefinitions.values()) {
             if (quest == null || quest.getId() == null || quest.getId().length() == 0) {
                 continue;
             }
-            dynamicQuestList.appendTag(LostTalesQuestDefinitionNbt.write(quest));
+            missiveList.appendTag(LostTalesQuestDefinitionNbt.write(quest));
         }
-        data.setTag("DynamicQuestDefinitions", dynamicQuestList);
+        data.setTag("MissiveDefinitions", missiveList);
 
-        NBTTagList dynamicMarkerList = new NBTTagList();
-        for (LostTalesMapMarkerDefinition marker : this.dynamicMapMarkers.values()) {
+        NBTTagList giverMarkerList = new NBTTagList();
+        for (LostTalesMapMarkerDefinition marker : this.giverMarkers.values()) {
             if (marker == null || marker.getId() == null || marker.getId().length() == 0) {
                 continue;
             }
@@ -218,10 +218,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             markerTag.setBoolean("RequiresRegionUnlock",
                     marker.requiresRegionUnlock());
             markerTag.setInteger("Priority", marker.getPriority());
-            dynamicMarkerList.appendTag(markerTag);
+            giverMarkerList.appendTag(markerTag);
         }
-        data.setTag("DynamicMapMarkers", dynamicMarkerList);
-        data.setString("PinnedMapMarkerId", this.pinnedMapMarkerId == null ? "" : this.pinnedMapMarkerId);
+        data.setTag("GiverMarkers", giverMarkerList);
+        data.setString("TrackedMapMarkerId", this.trackedMapMarkerId == null ? "" : this.trackedMapMarkerId);
         data.setBoolean("StartersGiven", this.startersGiven);
         NBTTagList rumourList = new NBTTagList();
         for (Map.Entry<String, String> rumour : this.heardRumours.entrySet()) {
@@ -247,18 +247,18 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     private void loadNBTData(NBTTagCompound compound,
-                             boolean registerRuntimeDefinitions,
+                             boolean registerMissiveDefinitions,
                              boolean logWarnings) {
         this.markerChanges++;
         this.activeQuests.clear();
         this.questHistory.clear();
         this.discoveredMarkerIds.clear();
         this.discoveredMarkerIdByCanonicalKey.clear();
-        this.dynamicMapMarkers.clear();
-        this.dynamicMarkerIdByCanonicalKey.clear();
-        this.dynamicQuestDefinitions.clear();
-        this.pinnedQuestIds.clear();
-        this.pinnedMapMarkerId = "";
+        this.giverMarkers.clear();
+        this.giverMarkerIdByCanonicalKey.clear();
+        this.missiveDefinitions.clear();
+        this.trackedQuestIds.clear();
+        this.trackedMapMarkerId = "";
         this.startersGiven = false;
         this.heardRumours.clear();
         this.waitingRewards.clear();
@@ -318,13 +318,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
         }
 
-        NBTTagList pinnedQuestList = data.getTagList("PinnedQuestIds", Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < pinnedQuestList.tagCount(); i++) {
-            String questId = pinnedQuestList.getCompoundTagAt(i).getString("QuestId");
+        NBTTagList trackedQuestList = data.getTagList("TrackedQuestIds", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < trackedQuestList.tagCount(); i++) {
+            String questId = trackedQuestList.getCompoundTagAt(i).getString("QuestId");
             if (questId != null && questId.length() > 0
                     && (this.activeQuests.containsKey(questId)
                         || LotrQuestReference.isLotrQuest(questId))) {
-                this.pinnedQuestIds.add(questId);
+                this.trackedQuestIds.add(questId);
             }
         }
 
@@ -359,32 +359,35 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             String markerId = LostTalesQuestMarkerHelper.normalizeMarkerId(markerTag.getString("MarkerId"));
             addDiscoveredMarkerId(markerId);
         }
-        NBTTagList dynamicQuestList = data.getTagList("DynamicQuestDefinitions", Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < dynamicQuestList.tagCount(); i++) {
-            LostTalesQuestDefinition quest = LostTalesQuestDefinitionNbt.read(dynamicQuestList.getCompoundTagAt(i));
+        NBTTagList missiveList = data.getTagList("MissiveDefinitions", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < missiveList.tagCount(); i++) {
+            LostTalesQuestDefinition quest = LostTalesQuestDefinitionNbt.read(missiveList.getCompoundTagAt(i));
             if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
-                this.dynamicQuestDefinitions.put(quest.getId(), quest);
-                if (registerRuntimeDefinitions) {
-                    LostTalesQuestRegistry.registerRuntimeQuest(quest);
-                }
+                this.missiveDefinitions.put(quest.getId(), quest);
             }
         }
+        // The missives go to the registry together, so its list is sorted
+        // once per load rather than once per missive.
+        if (registerMissiveDefinitions && !this.missiveDefinitions.isEmpty()) {
+            LostTalesQuestRegistry.registerMissives(
+                    this.missiveDefinitions.values());
+        }
 
-        NBTTagList dynamicMarkerList = data.getTagList("DynamicMapMarkers", Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < dynamicMarkerList.tagCount(); i++) {
-            LostTalesMapMarkerDefinition marker = readDynamicMarker(dynamicMarkerList.getCompoundTagAt(i));
+        NBTTagList giverMarkerList = data.getTagList("GiverMarkers", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < giverMarkerList.tagCount(); i++) {
+            LostTalesMapMarkerDefinition marker = readGiverMarker(giverMarkerList.getCompoundTagAt(i));
             if (marker != null) {
-                addLoadedDynamicMarker(marker);
+                addLoadedGiverMarker(marker);
             }
         }
 
-        String requestedPinnedMarkerId =
+        String requestedTrackedMarkerId =
                 LostTalesQuestMarkerHelper.normalizeMarkerId(
-                        data.getString("PinnedMapMarkerId"));
-        String storedPinnedMarkerId =
-                findDiscoveredMarkerId(requestedPinnedMarkerId);
-        this.pinnedMapMarkerId = storedPinnedMarkerId == null
-                ? "" : storedPinnedMarkerId;
+                        data.getString("TrackedMapMarkerId"));
+        String storedTrackedMarkerId =
+                findDiscoveredMarkerId(requestedTrackedMarkerId);
+        this.trackedMapMarkerId = storedTrackedMarkerId == null
+                ? "" : storedTrackedMarkerId;
         this.startersGiven = data.getBoolean("StartersGiven");
         NBTTagList rumourList = data.getTagList("HeardRumours", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < rumourList.tagCount(); i++) {
@@ -409,11 +412,6 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     public Map<String, String> getRumourMarkers() {
         return Collections.unmodifiableMap(
                 new LinkedHashMap<String, String>(this.heardRumours));
-    }
-
-    /** Keeps that this character heard the quest's rumour, pointing nowhere. */
-    public boolean hearRumour(String questId) {
-        return hearRumour(questId, "");
     }
 
     /**
@@ -529,8 +527,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     /**
-     * Returns a detached, character-owned quest payload without the Forge
-     * extended-properties wrapper used in vanilla player.dat.
+     * The log as a character keeps it: a copy, without the wrapper the
+     * player's own save puts round it.
      */
     public NBTTagCompound writeCharacterState() {
         NBTTagCompound wrapper = new NBTTagCompound();
@@ -543,9 +541,8 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     /**
-     * Strictly validates a detached quest payload without registering its
-     * server-global runtime definitions. The returned compound is independent
-     * from the caller's NBT tree.
+     * Checks a character's log without registering its missives with the
+     * server; answers a copy.
      */
     public static NBTTagCompound validateCharacterState(
             NBTTagCompound characterState) {
@@ -593,13 +590,13 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     }
 
     private void loadCharacterState(NBTTagCompound characterState,
-                                    boolean registerRuntimeDefinitions,
+                                    boolean registerMissiveDefinitions,
                                     boolean logWarnings) {
         NBTTagCompound wrapper = new NBTTagCompound();
         if (characterState != null) {
             wrapper.setTag(PROPERTY_ID, characterState.copy());
         }
-        loadNBTData(wrapper, registerRuntimeDefinitions, logWarnings);
+        loadNBTData(wrapper, registerMissiveDefinitions, logWarnings);
     }
 
     public Collection<LostTalesQuestProgress> getActiveQuests() {
@@ -642,7 +639,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return !this.handOversDue.isEmpty();
     }
 
-    /** The quests whose hand-over is due, no longer marked once taken. */
+    /** Takes the quests whose hand-over is due, and clears the marks. */
     public Set<String> takeHandOversDue() {
         Set<String> due = new LinkedHashSet<String>(this.handOversDue);
         this.handOversDue.clear();
@@ -653,7 +650,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     public Set<String> getQuestIdsInLog() {
         Set<String> named = new LinkedHashSet<String>(this.activeQuests.keySet());
         named.addAll(this.questHistory.keySet());
-        named.addAll(this.pinnedQuestIds);
+        named.addAll(this.trackedQuestIds);
         named.addAll(this.heardRumours.keySet());
         named.addAll(this.waitingRewards.questIds());
         return named;
@@ -663,12 +660,12 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return Collections.unmodifiableSet(new LinkedHashSet<String>(this.discoveredMarkerIds));
     }
 
-    public Collection<LostTalesMapMarkerDefinition> getDynamicMapMarkers() {
-        return Collections.unmodifiableCollection(new ArrayList<LostTalesMapMarkerDefinition>(this.dynamicMapMarkers.values()));
+    public Collection<LostTalesMapMarkerDefinition> getGiverMarkers() {
+        return Collections.unmodifiableCollection(new ArrayList<LostTalesMapMarkerDefinition>(this.giverMarkers.values()));
     }
 
-    public Collection<LostTalesQuestDefinition> getDynamicQuestDefinitions() {
-        return Collections.unmodifiableCollection(new ArrayList<LostTalesQuestDefinition>(this.dynamicQuestDefinitions.values()));
+    public Collection<LostTalesQuestDefinition> getMissiveDefinitions() {
+        return Collections.unmodifiableCollection(new ArrayList<LostTalesQuestDefinition>(this.missiveDefinitions.values()));
     }
 
     /**
@@ -677,26 +674,26 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
      * whether it is kept: not while every missive the log can save and
      * send is still running.
      */
-    public boolean rememberDynamicQuestDefinition(LostTalesQuestDefinition quest) {
+    public boolean rememberMissiveDefinition(LostTalesQuestDefinition quest) {
         if (!isWritable() || quest == null
                 || !LostTalesQuestIds.fits(quest.getId())) {
             return false;
         }
         forgetEndedMissives();
-        if (!this.dynamicQuestDefinitions.containsKey(quest.getId())
-                && this.dynamicQuestDefinitions.size() >= MAX_DYNAMIC_QUESTS) {
+        if (!this.missiveDefinitions.containsKey(quest.getId())
+                && this.missiveDefinitions.size() >= MAX_MISSIVES) {
             forgetEndedMissivesPast(Math.max(0, countEndedMissives() - 1));
-            if (this.dynamicQuestDefinitions.size() >= MAX_DYNAMIC_QUESTS) {
+            if (this.missiveDefinitions.size() >= MAX_MISSIVES) {
                 return false;
             }
         }
-        this.dynamicQuestDefinitions.put(quest.getId(), quest);
-        LostTalesQuestRegistry.registerRuntimeQuest(quest);
+        this.missiveDefinitions.put(quest.getId(), quest);
+        LostTalesQuestRegistry.registerMissive(quest);
         return true;
     }
 
     /**
-     * Forgets the missives the log no longer keeps: one neither running
+     * Forgets the missives the log does not keep: one neither running
      * nor in the History, and the oldest ended ones past
      * {@link #MAX_ENDED_MISSIVES}, each with its History line. A missive
      * whose rewards wait for room stays until they are collected. Called
@@ -715,7 +712,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
     private java.util.List<String> endedMissives() {
         ArrayList<String> ended = new ArrayList<String>();
         for (String questId : this.questHistory.keySet()) {
-            if (this.dynamicQuestDefinitions.containsKey(questId)
+            if (this.missiveDefinitions.containsKey(questId)
                     && !this.activeQuests.containsKey(questId)
                     && !this.waitingRewards.has(questId)) {
                 ended.add(questId);
@@ -730,7 +727,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         }
         boolean changed = false;
         ArrayList<String> unheld = new ArrayList<String>();
-        for (String questId : this.dynamicQuestDefinitions.keySet()) {
+        for (String questId : this.missiveDefinitions.keySet()) {
             if (!this.activeQuests.containsKey(questId)
                     && !this.questHistory.containsKey(questId)
                     && !this.waitingRewards.has(questId)) {
@@ -738,24 +735,24 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
         }
         for (String questId : unheld) {
-            this.dynamicQuestDefinitions.remove(questId);
+            this.missiveDefinitions.remove(questId);
             changed = true;
         }
         java.util.List<String> ended = endedMissives();
         for (int index = 0; index < ended.size() - keep; index++) {
             String questId = ended.get(index);
             this.questHistory.remove(questId);
-            this.dynamicQuestDefinitions.remove(questId);
-            this.pinnedQuestIds.remove(questId);
+            this.missiveDefinitions.remove(questId);
+            this.trackedQuestIds.remove(questId);
             changed = true;
         }
         return changed;
     }
 
-    public LostTalesMapMarkerDefinition getDynamicMapMarker(String markerId) {
-        String storedId = findDynamicMarkerId(markerId);
+    public LostTalesMapMarkerDefinition getGiverMarker(String markerId) {
+        String storedId = findGiverMarkerId(markerId);
         return storedId == null ? null
-                : this.dynamicMapMarkers.get(storedId);
+                : this.giverMarkers.get(storedId);
     }
 
     public LostTalesQuestProgress getActiveQuest(String questId) {
@@ -787,22 +784,22 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         if (!LostTalesQuestIds.fits(questId) || this.activeQuests.containsKey(questId)) {
             return;
         }
-        // A rumour leads to the quest; taken, it is no lead any more.
+        // A quest taken is no rumour.
         this.heardRumours.remove(questId);
         this.activeQuests.put(questId, new LostTalesQuestProgress(questId, 0, firstStageId, null, acceptedWorldTime, deadlineWorldTime));
     }
 
-    public Set<String> getPinnedQuestIds() {
+    public Set<String> getTrackedQuestIds() {
         return Collections.unmodifiableSet(
-                new LinkedHashSet<String>(this.pinnedQuestIds));
+                new LinkedHashSet<String>(this.trackedQuestIds));
     }
 
-    public boolean isQuestPinned(String questId) {
-        return questId != null && this.pinnedQuestIds.contains(questId) && this.activeQuests.containsKey(questId);
+    public boolean isQuestTracked(String questId) {
+        return questId != null && this.trackedQuestIds.contains(questId) && this.activeQuests.containsKey(questId);
     }
 
-    public String getPinnedMapMarkerId() {
-        return this.pinnedMapMarkerId == null ? "" : this.pinnedMapMarkerId;
+    public String getTrackedMapMarkerId() {
+        return this.trackedMapMarkerId == null ? "" : this.trackedMapMarkerId;
     }
 
     public boolean discoverMarker(String markerId) {
@@ -812,32 +809,32 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return addDiscoveredMarkerId(markerId);
     }
 
-    public boolean discoverDynamicMarker(LostTalesMapMarkerDefinition marker) {
+    public boolean discoverGiverMarker(LostTalesMapMarkerDefinition marker) {
         if (!isWritable()) {
             return false;
         }
-        if (!isValidDynamicMarker(marker)) {
+        if (!isValidGiverMarker(marker)) {
             return false;
         }
         String requestedId =
                 LostTalesQuestMarkerHelper.normalizeMarkerId(
                         marker.getId());
         String key = markerCanonicalKey(requestedId);
-        String storedId = this.dynamicMarkerIdByCanonicalKey.get(key);
+        String storedId = this.giverMarkerIdByCanonicalKey.get(key);
         if (storedId == null) {
-            if (this.dynamicMapMarkers.size() >= MAX_DYNAMIC_MARKERS
+            if (this.giverMarkers.size() >= MAX_GIVER_MARKERS
                     || (findDiscoveredMarkerId(requestedId) == null
                         && this.discoveredMarkerIds.size()
                                 >= MAX_QUEST_ID_HISTORY)) {
                 return false;
             }
             storedId = requestedId;
-            this.dynamicMarkerIdByCanonicalKey.put(key, storedId);
+            this.giverMarkerIdByCanonicalKey.put(key, storedId);
         }
         LostTalesMapMarkerDefinition normalized =
-                normalizeDynamicMarker(marker, storedId);
+                normalizeGiverMarker(marker, storedId);
         LostTalesMapMarkerDefinition old =
-                this.dynamicMapMarkers.put(storedId, normalized);
+                this.giverMarkers.put(storedId, normalized);
         boolean discoveredChanged = addDiscoveredMarkerId(storedId);
         if (discoveredChanged || !sameMarker(old, normalized)) {
             this.markerChanges++;
@@ -862,63 +859,63 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 this.discoveredMarkerIdByCanonicalKey.remove(key);
         boolean changed = discoveredId != null
                 && this.discoveredMarkerIds.remove(discoveredId);
-        String dynamicId =
-                this.dynamicMarkerIdByCanonicalKey.remove(key);
-        if (dynamicId != null
-                && this.dynamicMapMarkers.remove(dynamicId) != null) {
+        String giverId =
+                this.giverMarkerIdByCanonicalKey.remove(key);
+        if (giverId != null
+                && this.giverMarkers.remove(giverId) != null) {
             changed = true;
         }
         if (changed) {
             this.markerChanges++;
         }
-        if (sameMarkerIdentity(markerId, this.pinnedMapMarkerId)) {
-            this.pinnedMapMarkerId = "";
+        if (sameMarkerIdentity(markerId, this.trackedMapMarkerId)) {
+            this.trackedMapMarkerId = "";
             changed = true;
         }
         return changed;
     }
 
-    public boolean setPinnedMapMarkerId(String markerId) {
+    public boolean setTrackedMapMarkerId(String markerId) {
         if (!isWritable()) {
             return false;
         }
         String normalized =
                 LostTalesQuestMarkerHelper.normalizeMarkerId(markerId);
         if (normalized.length() == 0) {
-            return clearPinnedMapMarkerId();
+            return clearTrackedMapMarkerId();
         }
         String discoveredId = findDiscoveredMarkerId(normalized);
         if (discoveredId == null) {
             return false;
         }
         if (sameMarkerIdentity(discoveredId,
-                this.pinnedMapMarkerId)) {
+                this.trackedMapMarkerId)) {
             return false;
         }
-        this.pinnedMapMarkerId = discoveredId;
+        this.trackedMapMarkerId = discoveredId;
         return true;
     }
 
-    public boolean clearPinnedMapMarkerId() {
+    public boolean clearTrackedMapMarkerId() {
         if (!isWritable()) {
             return false;
         }
-        boolean changed = this.pinnedMapMarkerId != null && this.pinnedMapMarkerId.length() > 0;
-        this.pinnedMapMarkerId = "";
+        boolean changed = this.trackedMapMarkerId != null && this.trackedMapMarkerId.length() > 0;
+        this.trackedMapMarkerId = "";
         return changed;
     }
 
-    public boolean pinQuestId(String questId) {
+    public boolean trackQuestId(String questId) {
         if (!isWritable()) {
             return false;
         }
         if (questId == null || questId.length() == 0 || !this.activeQuests.containsKey(questId)) {
             return false;
         }
-        return this.pinnedQuestIds.add(questId);
+        return this.trackedQuestIds.add(questId);
     }
 
-    public boolean pinQuestReference(String questReference) {
+    public boolean trackQuestReference(String questReference) {
         if (!isWritable() || questReference == null
                 || questReference.length() == 0) {
             return false;
@@ -927,25 +924,25 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 && !LotrQuestReference.isLotrQuest(questReference)) {
             return false;
         }
-        return this.pinnedQuestIds.add(questReference);
+        return this.trackedQuestIds.add(questReference);
     }
 
-    public boolean unpinQuestId(String questId) {
+    public boolean untrackQuestId(String questId) {
         if (!isWritable()) {
             return false;
         }
         if (questId == null || questId.length() == 0) {
             return false;
         }
-        return this.pinnedQuestIds.remove(questId);
+        return this.trackedQuestIds.remove(questId);
     }
 
-    public boolean clearPinnedQuestId() {
+    public boolean clearTrackedQuestId() {
         if (!isWritable()) {
             return false;
         }
-        boolean changed = !this.pinnedQuestIds.isEmpty();
-        this.pinnedQuestIds.clear();
+        boolean changed = !this.trackedQuestIds.isEmpty();
+        this.trackedQuestIds.clear();
         return changed;
     }
 
@@ -964,7 +961,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         LostTalesQuestProgress progress = this.activeQuests.remove(questId);
-        this.pinnedQuestIds.remove(questId);
+        this.trackedQuestIds.remove(questId);
         LostTalesQuestHistoryEntry before = this.questHistory.get(questId);
         LostTalesQuestHistoryEntry old = this.questHistory.put(questId,
                 new LostTalesQuestHistoryEntry(questId,
@@ -1000,7 +997,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         LostTalesQuestProgress progress = this.activeQuests.remove(questId);
-        this.pinnedQuestIds.remove(questId);
+        this.trackedQuestIds.remove(questId);
         LostTalesQuestHistoryEntry before = this.questHistory.get(questId);
         LostTalesQuestHistoryEntry old = this.questHistory.put(questId,
                 new LostTalesQuestHistoryEntry(questId,
@@ -1099,7 +1096,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         boolean removedActive = this.activeQuests.remove(questId) != null;
-        this.pinnedQuestIds.remove(questId);
+        this.trackedQuestIds.remove(questId);
         boolean removedHistory = this.questHistory.remove(questId) != null;
         forgetEndedMissives();
         return removedActive || removedHistory;
@@ -1114,7 +1111,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         LostTalesQuestProgress progress = this.activeQuests.remove(questId);
-        this.pinnedQuestIds.remove(questId);
+        this.trackedQuestIds.remove(questId);
         if (progress == null) {
             return false;
         }
@@ -1134,11 +1131,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.questHistory.clear();
         this.discoveredMarkerIds.clear();
         this.discoveredMarkerIdByCanonicalKey.clear();
-        this.dynamicMapMarkers.clear();
-        this.dynamicMarkerIdByCanonicalKey.clear();
-        this.dynamicQuestDefinitions.clear();
-        this.pinnedQuestIds.clear();
-        this.pinnedMapMarkerId = "";
+        this.giverMarkers.clear();
+        this.giverMarkerIdByCanonicalKey.clear();
+        this.missiveDefinitions.clear();
+        this.trackedQuestIds.clear();
+        this.trackedMapMarkerId = "";
         this.startersGiven = false;
         this.heardRumours.clear();
         this.waitingRewards.clear();
@@ -1164,15 +1161,15 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             addDiscoveredMarkerId(markerId);
         }
         for (LostTalesMapMarkerDefinition marker :
-                oldData.dynamicMapMarkers.values()) {
-            addLoadedDynamicMarker(marker);
+                oldData.giverMarkers.values()) {
+            addLoadedGiverMarker(marker);
         }
-        this.dynamicQuestDefinitions.putAll(oldData.dynamicQuestDefinitions);
-        LostTalesQuestRegistry.registerRuntimeQuests(this.dynamicQuestDefinitions.values());
-        for (String questId : oldData.pinnedQuestIds) {
+        this.missiveDefinitions.putAll(oldData.missiveDefinitions);
+        LostTalesQuestRegistry.registerMissives(this.missiveDefinitions.values());
+        for (String questId : oldData.trackedQuestIds) {
             if (questId != null && (this.activeQuests.containsKey(questId)
                     || LotrQuestReference.isLotrQuest(questId))) {
-                this.pinnedQuestIds.add(questId);
+                this.trackedQuestIds.add(questId);
             }
         }
         this.startersGiven = oldData.startersGiven;
@@ -1181,16 +1178,16 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         for (NBTTagCompound aside : oldData.waitingQuarantine) {
             this.waitingQuarantine.add((NBTTagCompound) aside.copy());
         }
-        String copiedPinnedMarkerId =
-                findDiscoveredMarkerId(oldData.pinnedMapMarkerId);
-        this.pinnedMapMarkerId = copiedPinnedMarkerId == null
-                ? "" : copiedPinnedMarkerId;
+        String copiedTrackedMarkerId =
+                findDiscoveredMarkerId(oldData.trackedMapMarkerId);
+        this.trackedMapMarkerId = copiedTrackedMarkerId == null
+                ? "" : copiedTrackedMarkerId;
         pruneInvalidReferences();
     }
 
     /**
-     * Removes the references that no longer point at anything: a tracked
-     * quest that is not running, a pinned marker that is not discovered.
+     * Removes the references that point at nothing: a tracked
+     * quest that is not running, a tracked marker that is not discovered.
      * Runs as the log is loaded or copied, and after login, respawn or a
      * change of world. A log held read-only (saved under any version but
      * {@link #CURRENT_DATA_VERSION}, or malformed) is left as it is.
@@ -1201,25 +1198,25 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             return false;
         }
         boolean changed = false;
-        ArrayList<String> invalidPinnedQuests = new ArrayList<String>();
-        for (String questId : this.pinnedQuestIds) {
+        ArrayList<String> invalidTrackedQuests = new ArrayList<String>();
+        for (String questId : this.trackedQuestIds) {
             if (questId == null || questId.length() == 0
                     || (!this.activeQuests.containsKey(questId)
                         && !LotrQuestReference.isLotrQuest(questId))) {
-                invalidPinnedQuests.add(questId);
+                invalidTrackedQuests.add(questId);
             }
         }
-        if (!invalidPinnedQuests.isEmpty()) {
-            this.pinnedQuestIds.removeAll(invalidPinnedQuests);
+        if (!invalidTrackedQuests.isEmpty()) {
+            this.trackedQuestIds.removeAll(invalidTrackedQuests);
             changed = true;
         }
-        if (this.pinnedMapMarkerId != null
-                && this.pinnedMapMarkerId.length() > 0
+        if (this.trackedMapMarkerId != null
+                && this.trackedMapMarkerId.length() > 0
                 && findDiscoveredMarkerId(
-                        this.pinnedMapMarkerId) == null
+                        this.trackedMapMarkerId) == null
                 && !LostTalesMapMarkerCatalog.isVisibleByDefault(
-                        this.pinnedMapMarkerId)) {
-            this.pinnedMapMarkerId = "";
+                        this.trackedMapMarkerId)) {
+            this.trackedMapMarkerId = "";
             changed = true;
         }
         return changed;
@@ -1256,26 +1253,26 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         this.waypointCheckSeen = seen;
     }
 
-    private boolean addLoadedDynamicMarker(
+    private boolean addLoadedGiverMarker(
             LostTalesMapMarkerDefinition marker) {
-        if (!isValidDynamicMarker(marker)) {
+        if (!isValidGiverMarker(marker)) {
             return false;
         }
         String markerId =
                 LostTalesQuestMarkerHelper.normalizeMarkerId(
                         marker.getId());
         String key = markerCanonicalKey(markerId);
-        if (this.dynamicMarkerIdByCanonicalKey.containsKey(key)
-                || this.dynamicMapMarkers.size() >= MAX_DYNAMIC_MARKERS
+        if (this.giverMarkerIdByCanonicalKey.containsKey(key)
+                || this.giverMarkers.size() >= MAX_GIVER_MARKERS
                 || (findDiscoveredMarkerId(markerId) == null
                     && this.discoveredMarkerIds.size()
                             >= MAX_QUEST_ID_HISTORY)) {
             return false;
         }
         LostTalesMapMarkerDefinition normalized =
-                normalizeDynamicMarker(marker, markerId);
-        this.dynamicMapMarkers.put(markerId, normalized);
-        this.dynamicMarkerIdByCanonicalKey.put(key, markerId);
+                normalizeGiverMarker(marker, markerId);
+        this.giverMarkers.put(markerId, normalized);
+        this.giverMarkerIdByCanonicalKey.put(key, markerId);
         addDiscoveredMarkerId(markerId);
         return true;
     }
@@ -1286,10 +1283,10 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 : this.discoveredMarkerIdByCanonicalKey.get(key);
     }
 
-    private String findDynamicMarkerId(String markerId) {
+    private String findGiverMarkerId(String markerId) {
         String key = markerCanonicalKey(markerId);
         return key.length() == 0 ? null
-                : this.dynamicMarkerIdByCanonicalKey.get(key);
+                : this.giverMarkerIdByCanonicalKey.get(key);
     }
 
     private static boolean sameMarkerIdentity(
@@ -1307,7 +1304,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 : LostTalesQuestMarkerHelper.markerCanonicalKey(normalized);
     }
 
-    private static LostTalesMapMarkerDefinition normalizeDynamicMarker(
+    private static LostTalesMapMarkerDefinition normalizeGiverMarker(
             LostTalesMapMarkerDefinition marker,
             String persistedMarkerId) {
         return new LostTalesMapMarkerDefinition(
@@ -1326,11 +1323,11 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 marker.isHiddenUntilDiscovered(),
                 marker.isDiscoverable(),
                 marker.requiresRegionUnlock(),
-                LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                LostTalesMapMarkerSource.QUEST_GIVER,
                 false, "", marker.getPriority(), marker.getNamedAfter());
     }
 
-    private static boolean isValidDynamicMarker(
+    private static boolean isValidGiverMarker(
             LostTalesMapMarkerDefinition marker) {
         return marker != null
                 && markerCanonicalKey(marker.getId()).length() > 0
@@ -1351,7 +1348,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 && marker.getDiscoveryRadius() >= 0.0D;
     }
 
-    private static LostTalesMapMarkerDefinition readDynamicMarker(NBTTagCompound markerTag) {
+    private static LostTalesMapMarkerDefinition readGiverMarker(NBTTagCompound markerTag) {
         if (markerTag == null) {
             return null;
         }
@@ -1378,7 +1375,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 markerTag.getBoolean("HiddenUntilDiscovered"),
                 markerTag.getBoolean("IsDiscoverable"),
                 markerTag.getBoolean("RequiresRegionUnlock"),
-                LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                LostTalesMapMarkerSource.QUEST_GIVER,
                 false, "", markerTag.getInteger("Priority"),
                 namedAfter
         );
@@ -1421,21 +1418,27 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 : detail.substring(0, MAX_HISTORY_DETAIL_CHARACTERS);
     }
 
-    private static boolean isStructurallyReasonable(NBTTagCompound data) {
+    /**
+     * Whether the log is shaped as this build writes it, within every
+     * bound: each History line with its outcome as written, its count and
+     * its path, each running quest with its path. Any other log is kept
+     * whole and read-only.
+     */
+    static boolean isStructurallyReasonable(NBTTagCompound data) {
         if (!NbtTags.hasCompoundListWithinLimit(
                 data, "ActiveQuests", MAX_ACTIVE_QUESTS)
                 || !NbtTags.hasCompoundListWithinLimit(
-                data, "PinnedQuestIds", MAX_ACTIVE_QUESTS)
+                data, "TrackedQuestIds", MAX_ACTIVE_QUESTS)
                 || !NbtTags.hasCompoundListWithinLimit(
                 data, "QuestHistory", MAX_QUEST_ID_HISTORY)
                 || !NbtTags.hasCompoundListWithinLimit(
                 data, "DiscoveredMarkers", MAX_QUEST_ID_HISTORY)
                 || !NbtTags.hasCompoundListWithinLimit(
-                data, "DynamicQuestDefinitions", MAX_DYNAMIC_QUESTS)
+                data, "MissiveDefinitions", MAX_MISSIVES)
                 || !NbtTags.hasCompoundListWithinLimit(
-                data, "DynamicMapMarkers", MAX_DYNAMIC_MARKERS)
+                data, "GiverMarkers", MAX_GIVER_MARKERS)
                 || !hasReasonableOptionalString(
-                data, "PinnedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)
+                data, "TrackedMapMarkerId", MAX_IDENTIFIER_CHARACTERS)
                 || !NbtTags.hasCompoundListWithinLimit(
                 data, "HeardRumours", MAX_RUMOURS)
                 || !hasQuestIdList(data, "HeardRumours")
@@ -1451,7 +1454,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                 return false;
             }
         }
-        if (!hasQuestIdList(data, "PinnedQuestIds")
+        if (!hasQuestIdList(data, "TrackedQuestIds")
                 || !hasReasonableIdList(
                 data, "DiscoveredMarkers", "MarkerId")) {
             return false;
@@ -1473,8 +1476,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
                     || !hasReasonableIdList(entry,
                     "CompletedOptionalObjectives", "ObjectiveId")
                     || entry.getLong("WorldTime") < 0L
-                    || entry.hasKey("Completions")
-                    && !entry.hasKey("Completions", Constants.NBT.TAG_INT)
+                    || !entry.hasKey("Completions", Constants.NBT.TAG_INT)
                     || entry.getInteger("Completions") < 0
                     || !LostTalesQuestProgress.isReasonableStagePath(entry,
                     "StagePath")) {
@@ -1482,20 +1484,20 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
             }
         }
 
-        NBTTagList dynamicQuests = data.getTagList(
-                "DynamicQuestDefinitions", Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < dynamicQuests.tagCount(); i++) {
+        NBTTagList missives = data.getTagList(
+                "MissiveDefinitions", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < missives.tagCount(); i++) {
             if (!LostTalesQuestDefinitionNbt.isStructurallyReasonable(
-                    dynamicQuests.getCompoundTagAt(i))) {
+                    missives.getCompoundTagAt(i))) {
                 return false;
             }
         }
 
-        NBTTagList dynamicMarkers = data.getTagList(
-                "DynamicMapMarkers", Constants.NBT.TAG_COMPOUND);
-        for (int i = 0; i < dynamicMarkers.tagCount(); i++) {
-            if (!isReasonableDynamicMarker(
-                    dynamicMarkers.getCompoundTagAt(i))) {
+        NBTTagList giverMarkers = data.getTagList(
+                "GiverMarkers", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < giverMarkers.tagCount(); i++) {
+            if (!isReasonableGiverMarker(
+                    giverMarkers.getCompoundTagAt(i))) {
                 return false;
             }
         }
@@ -1542,7 +1544,7 @@ public final class LostTalesQuestPlayerData implements IExtendedEntityProperties
         return true;
     }
 
-    private static boolean isReasonableDynamicMarker(NBTTagCompound marker) {
+    private static boolean isReasonableGiverMarker(NBTTagCompound marker) {
         if (!hasReasonableRequiredString(
                 marker, "MarkerId", MAX_IDENTIFIER_CHARACTERS)
                 || !hasReasonableOptionalString(

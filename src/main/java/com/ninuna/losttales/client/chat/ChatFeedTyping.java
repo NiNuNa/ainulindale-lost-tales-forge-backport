@@ -8,8 +8,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The closed feed's typing row: who is typing into the conversations
- * whose every line the feed carries ({@link ChatLayout#feedTabs}), each
+ * The feed's typing row: who is typing into the conversations
+ * whose every line the feed carries ({@link ChatLayout#feedPages}), each
  * conversation named as the feed names a line's
  * channel ("Global: Aldric is typing"), in the feed's own order. While
  * anyone types, the feed's lines rise a row and the typing row comes up
@@ -20,11 +20,11 @@ import java.util.List;
 final class ChatFeedTyping {
     /** One conversation and who is typing into it, oldest first. */
     static final class Segment {
-        final ConversationPage tab;
+        final ConversationPage page;
         final List<String> names;
 
-        Segment(ConversationPage tab, List<String> names) {
-            this.tab = tab;
+        Segment(ConversationPage page, List<String> names) {
+            this.page = page;
             this.names = Collections.unmodifiableList(
                     new ArrayList<String>(names));
         }
@@ -37,16 +37,16 @@ final class ChatFeedTyping {
 
     private ChatFeedTyping() {}
 
-    /** The conversations of {@code tabs} someone is typing into, in their order. */
-    static List<Segment> segments(List<ConversationPage> tabs) {
+    /** The conversations of {@code pages} someone is typing into, in their order. */
+    static List<Segment> segments(List<ConversationPage> pages) {
         List<Segment> segments = new ArrayList<Segment>();
         if (!LostTalesConfig.showChatTypingIndicators) {
             return segments;
         }
-        for (ConversationPage tab : tabs) {
-            List<String> names = ClientChatTypingState.namesTyping(tab);
+        for (ConversationPage page : pages) {
+            List<String> names = ClientChatTypingState.namesTyping(page);
             if (!names.isEmpty()) {
-                segments.add(new Segment(tab, names));
+                segments.add(new Segment(page, names));
             }
         }
         return segments;

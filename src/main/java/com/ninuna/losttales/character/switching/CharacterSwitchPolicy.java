@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.switching;
 
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Extensible centralized policy boundary for every character switch. */
+/** The checks a switch must pass before the player is touched. */
 public interface CharacterSwitchPolicy {
     CharacterSwitchPolicyResult evaluate(EntityPlayerMP player,
                                          CharacterSwitchAccountState accountState,

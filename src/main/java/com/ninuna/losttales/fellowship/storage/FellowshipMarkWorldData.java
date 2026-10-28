@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Persistent store of every mark, of both kinds, by mark id; a character's
+ * Every mark of both kinds, kept with the world, by mark id; a character's
  * go-here mark is found by its owner too, one an owner.
  */
 public final class FellowshipMarkWorldData extends WorldSavedData {

@@ -18,10 +18,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Public active-character appearance synchronization.
- *
- * A full packet replaces the client cache. Incremental packets update or remove
- * individual online players. No private roster data is included.
+ * What each online player looks like as the identity they play, sent to
+ * every client. A full packet replaces what the client knew; any other
+ * changes or removes single players. Nothing private of a roster is in it.
  */
 public final class CharacterAppearanceSyncPacket implements IMessage {
 

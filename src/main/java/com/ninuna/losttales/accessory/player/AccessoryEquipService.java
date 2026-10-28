@@ -69,7 +69,7 @@ public final class AccessoryEquipService {
         ((EntityPlayerMP)player).sendContainerToPlayer(
                 player.inventoryContainer);
         AccessoryInventorySyncManager.send(player);
-        AccessoryEffectService.refresh(player);
+        AccessoryEffectService.reconcile(player);
         return true;
     }
 }

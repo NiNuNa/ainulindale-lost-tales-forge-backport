@@ -35,7 +35,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 
 /**
- * The icon each tab wears before its name — on its tab, in the restore
+ * The icon each page wears before its name — on its tab, in the New Page
  * menu, wherever the name stands alone: an emoji per channel, for the
  * faction channel the LOTR banner of the active character's faction
  * (the Stewards' banner when the faction has none), for a whisper with
@@ -45,13 +45,13 @@ import net.minecraft.item.ItemStack;
  * channels file; the choice arrives with the chat access and stands
  * before the code's own emoji and the faction banner. A whisper whose
  * partner this client cannot place yet, an NPC whose portrait has not
- * been seen, a faction tab without LOTR's banner item, or a channel
+ * been seen, a faction page without LOTR's banner item, or a channel
  * given an item this client does not have wears an emoji. Purely
  * decorative: the catalogue names and ids are untouched.
  *
  * <p>A channel linked to Discord wears two halves side by side, cut
  * straight down the middle: its own icon's left half, and the Discord
- * emoji's right half. A tab's icon may wear a mark in its corner for
+ * emoji's right half. A page's icon may wear a mark in its corner for
  * what waits unread ({@link ChatIconMark}), cut into the icon as a
  * head's status sphere is cut into the head.</p>
  */
@@ -159,19 +159,19 @@ public final class ChatChannelIcons {
     }
 
     /**
-     * Remembers the NPC a conversation is with, for its tab and its member
+     * Remembers the NPC a conversation is with, for its page and its member
      * list: its id and the portrait its speech was drawn with, the last
      * one seen kept where this speech had none.
      */
-    static synchronized void rememberNpc(ConversationPage tab, UUID npcId,
+    static synchronized void rememberNpc(ConversationPage page, UUID npcId,
                                          String texturePath) {
-        if (tab == null || !tab.isNpc() || npcId == null) {
+        if (page == null || !page.isNpc() || npcId == null) {
             return;
         }
-        Speaker previous = NPC_SPEAKERS.remove(tab);
+        Speaker previous = NPC_SPEAKERS.remove(page);
         String portrait = texturePath != null && texturePath.length() > 0
                 ? texturePath : previous == null ? null : previous.portrait;
-        NPC_SPEAKERS.put(tab, new Speaker(npcId, portrait));
+        NPC_SPEAKERS.put(page, new Speaker(npcId, portrait));
         while (NPC_SPEAKERS.size() > MAX_PORTRAITS) {
             Iterator<ConversationPage> oldest = NPC_SPEAKERS.keySet().iterator();
             oldest.next();
@@ -180,14 +180,14 @@ public final class ChatChannelIcons {
     }
 
     /** The portrait an NPC conversation's speech was drawn with; null until one is seen. */
-    static synchronized String npcPortrait(ConversationPage tab) {
-        Speaker speaker = tab == null ? null : NPC_SPEAKERS.get(tab);
+    static synchronized String npcPortrait(ConversationPage page) {
+        Speaker speaker = page == null ? null : NPC_SPEAKERS.get(page);
         return speaker == null ? null : speaker.portrait;
     }
 
     /** The NPC an NPC conversation is with; null until it has spoken this session. */
-    static synchronized UUID npcId(ConversationPage tab) {
-        Speaker speaker = tab == null ? null : NPC_SPEAKERS.get(tab);
+    static synchronized UUID npcId(ConversationPage page) {
+        Speaker speaker = page == null ? null : NPC_SPEAKERS.get(page);
         return speaker == null ? null : speaker.id;
     }
 
@@ -218,48 +218,48 @@ public final class ChatChannelIcons {
     }
 
     /**
-     * Draws the tab's icon with its top-left at the point: the partner's
-     * head for a whisper with a player the client can place, the tab's
+     * Draws the page's icon with its top-left at the point: the partner's
+     * head for a whisper with a player the client can place, the page's
      * emoji otherwise, and no mark in its corner.
      */
-    public static void draw(Minecraft minecraft, ConversationPage tab, float x, float y,
+    public static void draw(Minecraft minecraft, ConversationPage page, float x, float y,
                      int alpha) {
-        draw(minecraft, tab, x, y, alpha, TabMark.NONE);
+        draw(minecraft, page, x, y, alpha, TabMark.NONE);
     }
 
     /** As above, the icon wearing {@code mark} in its corner. */
-    public static void draw(final Minecraft minecraft, ConversationPage tab, float x, float y,
+    public static void draw(final Minecraft minecraft, ConversationPage page, float x, float y,
                      final int alpha, final TabMark mark) {
-        if (minecraft == null || tab == null) {
+        if (minecraft == null || page == null) {
             return;
         }
-        if (!tab.isNpc() && !tab.isWhisper()) {
-            boolean linked = ClientChatChannelState.isLinkedToDiscord(tab);
+        if (!page.isNpc() && !page.isWhisper()) {
+            boolean linked = ClientChatChannelState.isLinkedToDiscord(page);
             // The server's own choice of item stands before everything
             // else, then the faction's banner or the fellowship's icon,
             // each drawn as an item's icon in a line is.
-            ItemStack item = itemIconOf(tab.getChannel());
-            if (item == null && tab.getChannel() == ChatChannel.FACTION) {
+            ItemStack item = itemIconOf(page.getChannel());
+            if (item == null && page.getChannel() == ChatChannel.FACTION) {
                 // A faction's conversation wears its faction's banner; the
                 // Faction channel's own, the character played's.
                 item = LotrFactionBannerResolver.bannerFor(
-                        tab.getOwnerKey().length() > 0 ? tab.getOwnerKey()
+                        page.getOwnerKey().length() > 0 ? page.getOwnerKey()
                                 : ClientChatChannelState.playedFactionId());
             }
-            if (item == null && tab.isFellowship()) {
-                item = ClientFellowshipIcons.stackOf(ChatFellowship.idOf(tab.getOwnerKey()));
+            if (item == null && page.isFellowship()) {
+                item = ClientFellowshipIcons.stackOf(ChatFellowship.idOf(page.getOwnerKey()));
             }
             if (item != null) {
                 drawItemIcon(minecraft, item, x, y, alpha, linked, mark);
                 return;
             }
-            drawEmojiIcon(minecraft, iconOf(tab), x, y, TabIcons.SIZE, alpha, linked,
+            drawEmojiIcon(minecraft, iconOf(page), x, y, TabIcons.SIZE, alpha, linked,
                     mark);
             return;
         }
         final float inset = (TabIcons.SIZE - HEAD_SIZE) / 2.0F;
-        if (tab.isNpc()) {
-            final String portrait = npcPortrait(tab);
+        if (page.isNpc()) {
+            final String portrait = npcPortrait(page);
             if (portrait != null) {
                 final float headX = x + inset;
                 final float headY = y + inset;
@@ -276,7 +276,7 @@ public final class ChatChannelIcons {
                 return;
             }
         } else {
-            final UUID partner = partnerId(minecraft, tab.getPartner());
+            final UUID partner = partnerId(minecraft, page.getPartner());
             if (partner != null) {
                 // The head and its sphere are one icon, so the icon that
                 // is centred in the slot is the pair, not the face: the
@@ -291,7 +291,7 @@ public final class ChatChannelIcons {
                 // something waits unread, which takes the corner.
                 final ChatPresence presence = ClientChatPresence.presenceOf(
                         partner, ChatPresenceIdentity.character(
-                                ClientChatChannelState.partnerCharacterIdOf(tab)));
+                                ClientChatChannelState.partnerCharacterIdOf(page)));
                 LostTalesUiFlatLayers.draw(alpha, x, y, x + TabIcons.SLOT + 1,
                         y + TabIcons.SIZE + LostTalesUiCornerMark.OVERHANG_Y + 1,
                         new LostTalesUiFlatLayers.Layers() {
@@ -304,7 +304,7 @@ public final class ChatChannelIcons {
                 return;
             }
         }
-        drawEmojiIcon(minecraft, iconOf(tab), x, y, TabIcons.SIZE, alpha, false, mark);
+        drawEmojiIcon(minecraft, iconOf(page), x, y, TabIcons.SIZE, alpha, false, mark);
     }
 
     /**
@@ -609,20 +609,20 @@ public final class ChatChannelIcons {
     }
 
     /**
-     * The emoji a tab wears, which also says whether it has an icon's slot
+     * The emoji a page wears, which also says whether it has an icon's slot
      * at all.
      */
-    public static ChatEmoji iconOf(ConversationPage tab) {
-        if (tab == null) {
+    public static ChatEmoji iconOf(ConversationPage page) {
+        if (page == null) {
             return null;
         }
-        if (tab.isNpc()) {
+        if (page.isNpc()) {
             return ChatEmoji.GRINNING;
         }
-        if (tab.isWhisper()) {
+        if (page.isWhisper()) {
             return ChatEmoji.BLUSH;
         }
-        return iconOf(tab.getChannel());
+        return iconOf(page.getChannel());
     }
 
     /**
@@ -663,8 +663,8 @@ public final class ChatChannelIcons {
         if (channel == ChatChannel.OPERATOR) {
             return ChatEmoji.EXPRESSIONLESS;
         }
-        if (channel == ChatChannel.CLIENT_CONSOLE
-                || channel == ChatChannel.SERVER_CONSOLE) {
+        if (channel == ChatChannel.CONSOLE
+                || channel == ChatChannel.SERVER_LOG) {
             return ChatEmoji.CONSOLE;
         }
         if (channel == ChatChannel.WHISPER) {

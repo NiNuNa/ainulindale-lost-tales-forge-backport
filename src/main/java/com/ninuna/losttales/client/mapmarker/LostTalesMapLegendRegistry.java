@@ -128,7 +128,7 @@ public final class LostTalesMapLegendRegistry {
         if (source == LostTalesMapMarkerSource.PLAYER_CREATED) {
             return PLAYER_WAYSTONES;
         }
-        if (source == LostTalesMapMarkerSource.QUEST_DYNAMIC) {
+        if (source == LostTalesMapMarkerSource.QUEST_GIVER) {
             return QUESTS;
         }
         if (source == LostTalesMapMarkerSource.CUSTOM_PRESET

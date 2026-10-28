@@ -220,10 +220,6 @@ public class LostTalesKeyBindings {
         return MODIFIER;
     }
 
-    public static KeyBinding getMapLegendKeyBinding() {
-        return MODIFIER;
-    }
-
     public static KeyBinding getQuestJournalKeyBinding() {
         return QUEST_JOURNAL;
     }

@@ -41,9 +41,31 @@ public class LostTalesQuickLootContainerSyncPacket implements IMessage {
         ItemStack[] items = new ItemStack[size];
         for (int i = 0; i < items.length; i++) {
             ItemStack stack = inventory.getStackInSlot(i);
-            items[i] = stack == null ? null : stack.copy();
+            // A stack of nothing reads as an empty slot.
+            items[i] = stack == null || stack.stackSize <= 0 ? null : stack.copy();
         }
-        return new LostTalesQuickLootContainerSyncPacket(x, y, z, inventory.getInventoryName(), sealed, items);
+        return new LostTalesQuickLootContainerSyncPacket(x, y, z,
+                fitTitle(inventory.getInventoryName()), sealed, items);
+    }
+
+    /** The title cut to its bound at a whole letter; another mod's name may run long. */
+    static String fitTitle(String title) {
+        if (title == null) {
+            return "";
+        }
+        int bytes = 0;
+        int index = 0;
+        while (index < title.length()) {
+            int letter = title.codePointAt(index);
+            int size = letter < 0x80 ? 1 : letter < 0x800 ? 2
+                    : letter < 0x10000 ? 3 : 4;
+            if (bytes + size > MAX_TITLE_BYTES) {
+                return title.substring(0, index);
+            }
+            bytes += size;
+            index += Character.charCount(letter);
+        }
+        return title;
     }
 
     @Override

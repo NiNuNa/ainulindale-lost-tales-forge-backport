@@ -73,6 +73,6 @@ public final class LostTalesMapMarkerRegionResolverTest {
                 hiddenUntilDiscovered,
                 discoverable,
                 requiresRegionUnlock,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
+                LostTalesMapMarkerSource.QUEST_GIVER, false, "", 0);
     }
 }

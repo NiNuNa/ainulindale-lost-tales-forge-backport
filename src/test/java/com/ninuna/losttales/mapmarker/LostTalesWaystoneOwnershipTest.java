@@ -238,6 +238,45 @@ public final class LostTalesWaystoneOwnershipTest {
                 .refusal());
     }
 
+    /** A Save's words are one plain line: no formatting code, line break or direction mark reaches a map. */
+    @Test
+    public void aSaveRefusesWordsThatAreNotOnePlainLine() {
+        assertNull(LostTalesWaystoneSettingsService.applySettings(placed(),
+                settings(placed(), "Bree Gate", 8.0D,
+                        LostTalesMapMarkerVisibility.PRIVATE), false)
+                .refusal());
+        for (String name : new String[] {"§kBree", "Bree\nGate",
+                "Bree\u202eGate", "Bree\u200bGate"}) {
+            assertEquals(name, LostTalesWaystoneStateReason.INVALID_SETTINGS,
+                    LostTalesWaystoneSettingsService.applySettings(placed(),
+                            settings(placed(), name, 8.0D,
+                                    LostTalesMapMarkerVisibility.PRIVATE),
+                            false).refusal());
+        }
+        assertFalse(LostTalesWaystoneSettingsService.isPlainLine(
+                "a§cb", 64));
+        assertFalse(LostTalesWaystoneSettingsService.isPlainLine("abc", 2));
+        assertTrue(LostTalesWaystoneSettingsService.isPlainLine("", 2));
+    }
+
+    /** A Save names one of the page's twelve colours or #rrggbb, as a marker file does. */
+    @Test
+    public void aSaveTakesTheColoursAMarkerFileTakes() {
+        for (String color : LostTalesMapMarkerFiles.COLORS) {
+            assertEquals(color,
+                    LostTalesWaystoneSettingsService.normalizeColor(color));
+        }
+        assertEquals("dark_gray",
+                LostTalesWaystoneSettingsService.normalizeColor(" Dark_Gray "));
+        assertEquals("#a0b1c2",
+                LostTalesWaystoneSettingsService.normalizeColor("#A0B1C2"));
+        for (String color : new String[] {"grey", "dark_grey", "dark gray",
+                "0xa0b1c2", "a0b1c2", "#a0b1c", "chartreuse", "", null}) {
+            assertNull(String.valueOf(color),
+                    LostTalesWaystoneSettingsService.normalizeColor(color));
+        }
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void noPlacedWaystoneRecordHoldsARadiusPastTheBound() {
         placed().toBuilder().radii(128.0D, 1025.0D).build();

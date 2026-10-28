@@ -231,6 +231,18 @@ public final class MissiveTemplateFilesTest {
         assertTrue(MissiveTemplates.templates().isEmpty());
     }
 
+    /**
+     * A world that cannot seal (here, none: no key) posts no letter, though
+     * a template is loaded, so no notice stands that nobody could accept.
+     */
+    @Test
+    public void withoutASealKeyABoardPostsNothing() {
+        load(true, EVERY_ITEM);
+        assertFalse(MissiveTemplates.templates().isEmpty());
+        assertNull(LostTalesMissiveGenerator.createRandomMissiveLetter(null, "dim0_1_64_1",
+                1000L, 0, new Random(1)));
+    }
+
     /** With no template left, a board posts nothing. */
     @Test
     public void withNoTemplateABoardPostsNothing() {

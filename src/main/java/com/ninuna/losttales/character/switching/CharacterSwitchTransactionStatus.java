@@ -1,9 +1,8 @@
 package com.ninuna.losttales.character.switching;
 
 /**
- * Durable phases for one server-authoritative character switch. The last
- * two hold the journal: nothing settles it by itself, and switching stays
- * off while it stands.
+ * How far a switch got. The last two hold the journal: nothing settles it
+ * by itself, and switching stays off while it stands.
  */
 public enum CharacterSwitchTransactionStatus {
     PREPARED("prepared"),

@@ -42,9 +42,10 @@ public final class MissivesTaken {
         if (missive == null) {
             return MissiveBoardStateReason.DAMAGED;
         }
-        long keep = LostTalesConfig.getMissiveBoardNoticeExpirationTicks();
-        if (keep > 0L && world != null && missive.getGenerationWorldTime()
-                + keep <= world.getTotalWorldTime()) {
+        if (world != null && MissiveNotice.isPast(
+                missive.getGenerationWorldTime(),
+                LostTalesConfig.getMissiveBoardNoticeExpirationTicks(),
+                world.getTotalWorldTime())) {
             return MissiveBoardStateReason.EXPIRED;
         }
         MissivesTakenWorldData data = of(world);

@@ -68,14 +68,14 @@ public final class AccessoryPlayerEventHandler {
         }
     }
 
+    /**
+     * The player's own effects; whoever they see wear a ring is told them
+     * as they start tracking that player (ACC-08).
+     */
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerLoggedInEvent event) {
         if (event != null && event.player != null) {
             AccessoryEffectService.reconcile(event.player);
-            if (event.player instanceof net.minecraft.entity.player.EntityPlayerMP) {
-                AccessoryEffectService.sendFullSnapshot(
-                        (net.minecraft.entity.player.EntityPlayerMP)event.player);
-            }
         }
     }
 

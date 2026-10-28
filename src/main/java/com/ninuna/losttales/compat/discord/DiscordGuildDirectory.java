@@ -139,7 +139,7 @@ final class DiscordGuildDirectory {
 
     /** Keeps a member's nickname in a server; an empty one is forgotten, the member going by their own name. */
     void noteNickname(String guildId, String userId, String nick) {
-        if (guildId.length() == 0 || !DiscordChannelBindings.isSnowflake(userId)) {
+        if (guildId.length() == 0 || !DiscordChannelLinks.isSnowflake(userId)) {
             return;
         }
         String key = guildId + ':' + userId;

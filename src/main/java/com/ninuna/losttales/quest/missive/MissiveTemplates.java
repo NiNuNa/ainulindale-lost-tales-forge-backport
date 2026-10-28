@@ -18,8 +18,8 @@ import java.util.Random;
  * bundled template's id taking its place. A gather whose item the game
  * does not have is left out. Read as the server starts and on
  * {@code /losttales reload missives}, which reads
- * {@code bundledMissiveTemplates} again too; cleared as it starts and stops. With none left a board posts nothing, and the log says
- * so once.
+ * {@code bundledMissiveTemplates} again too, and cleared as it stops.
+ * With none left a board posts nothing, and the log says so once.
  */
 public final class MissiveTemplates {
     private static List<MissiveTemplate> templates = Collections.<MissiveTemplate>emptyList();

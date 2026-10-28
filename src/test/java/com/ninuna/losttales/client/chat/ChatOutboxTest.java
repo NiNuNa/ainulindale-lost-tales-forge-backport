@@ -36,7 +36,7 @@ public final class ChatOutboxTest {
     }
 
     @Test
-    public void idleTextCommandsAndSilentTabsAreNot() {
+    public void idleTextCommandsAndSilentPagesAreNot() {
         ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         assertFalse(ChatOutbox.isTyping("hello", ooc,
                 ChatOutbox.TYPING_IDLE_NANOS));
@@ -46,7 +46,7 @@ public final class ChatOutboxTest {
         assertFalse(ChatOutbox.isTyping("/msg Bilbo hi", ooc, 0L));
         // Nobody is on the other end of an NPC conversation.
         assertFalse(ChatOutbox.isTyping("hello", ConversationPage.npc("Bilbo"), 0L));
-        // A tab the player may not send into says nothing either.
+        // A page the player may not send into says nothing either.
         assertFalse(ChatOutbox.isTyping("hello", ConversationPage.of(ChatChannel.OPERATOR),
                 0L));
         LostTalesConfig.sendChatTypingStatus = false;

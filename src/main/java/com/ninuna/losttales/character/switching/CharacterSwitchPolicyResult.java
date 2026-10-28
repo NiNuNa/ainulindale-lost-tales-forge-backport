@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.switching;
 
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 
-/** Structured server-side switching-policy decision. */
+/** A policy's answer: allowed, or refused with its reason and when to try again. */
 public final class CharacterSwitchPolicyResult {
 
     private final boolean allowed;

@@ -7,29 +7,36 @@ import com.ninuna.losttales.accessory.AccessorySlotType;
 import com.ninuna.losttales.accessory.player.AccessoryInventory;
 import com.ninuna.losttales.accessory.player.AccessoryInventorySyncManager;
 import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
-import com.ninuna.losttales.compat.lotr.LotrAccessoryMapHooks;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.AccessoryEffectSyncPacket;
-import com.ninuna.losttales.fellowship.server.FellowshipTrackingSyncManager;
+import net.minecraft.entity.EntityCreature;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.world.WorldServer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Derives every active accessory effect from the authoritative server slot. */
+/**
+ * Derives every active accessory effect from the authoritative server
+ * slot. Who wears what is told only to the players tracking the wearer
+ * and to the wearer, at most once a second per wearer (ACC-08); a player
+ * who starts tracking a wearer is told then. The fellowship trackers and
+ * LOTR's map read concealment from here on their own rounds.
+ */
 public final class AccessoryEffectService {
 
     private static final int HEARTBEAT_TICKS = 100;
     private static final double TARGET_CLEAR_RADIUS = 128.0D;
-    private static final Map<UUID, RuntimeState> STATES =
-            new HashMap<UUID, RuntimeState>();
+    private static final Map<UUID, AccessoryEffectState> STATES =
+            new HashMap<UUID, AccessoryEffectState>();
 
     private AccessoryEffectService() {}
 
@@ -45,54 +52,54 @@ public final class AccessoryEffectService {
             return;
         }
         AccessoryDefinition definition = resolveDefinition(serverPlayer, true);
-        String definitionId = hasPublishedEffect(definition)
-                ? definition.getId() : "";
-        RuntimeState state = getOrCreateState(serverPlayer.getUniqueID());
-        boolean changed = !definitionId.equals(state.definitionId);
-        if (changed) {
-            state.definitionId = definitionId;
-            state.nextSequence();
-            broadcast(serverPlayer, state);
-            refreshTracking(serverPlayer);
+        AccessoryEffectState state = getOrCreateState(serverPlayer.getUniqueID());
+        state.wear(hasPublishedEffect(definition) ? definition.getId() : "");
+        if (state.takeChange(now())) {
+            sendToWatchers(serverPlayer, state);
         } else if (definition != null && isConcealing(definition)
                 && serverPlayer.ticksExisted % 20 == 0) {
             clearTargetingEntities(serverPlayer);
         }
-        if (definitionId.length() > 0
+        if (state.sent().length() > 0
                 && serverPlayer.ticksExisted % HEARTBEAT_TICKS == 0) {
-            broadcast(serverPlayer, state);
+            sendToWatchers(serverPlayer, state);
         }
     }
 
+    /** At death or logout: the watchers are told at once that nothing is worn. */
     public static void deactivate(EntityPlayer player) {
         if (!(player instanceof EntityPlayerMP)
                 || player.getUniqueID() == null) {
             return;
         }
-        RuntimeState state = getOrCreateState(player.getUniqueID());
-        if (state.definitionId.length() == 0) {
-            return;
+        AccessoryEffectState state = getOrCreateState(player.getUniqueID());
+        if (state.takeRemoval(now())) {
+            sendToWatchers((EntityPlayerMP)player, state);
         }
-        state.definitionId = "";
-        state.nextSequence();
-        broadcast((EntityPlayerMP)player, state);
-        refreshTracking((EntityPlayerMP)player);
     }
 
-    /** Re-sends the current state after a world/respawn tracking reset. */
+    /**
+     * After a respawn, a change of dimension or a character switch: the
+     * player's own game is told what they were last told to wear, under
+     * the entity they are now, and any change waits its turn.
+     */
     public static void refresh(EntityPlayer player) {
         if (!(player instanceof EntityPlayerMP) || player.worldObj == null
                 || player.worldObj.isRemote) {
             return;
         }
         reconcile(player);
-        RuntimeState state = STATES.get(player.getUniqueID());
-        if (state != null && state.sequence > 0L) {
-            broadcast((EntityPlayerMP)player, state);
+        AccessoryEffectState state = STATES.get(player.getUniqueID());
+        if (state != null && state.sequence() > 0L) {
+            sendTo((EntityPlayerMP)player, player, state);
         }
-        refreshTracking((EntityPlayerMP)player);
     }
 
+    /**
+     * A player starts tracking {@code target}: they are told what it was
+     * last told to wear, nothing included, so a state they kept from
+     * before is set right.
+     */
     public static void sendCurrentTo(
             EntityPlayerMP viewer, EntityPlayer target) {
         if (viewer == null || target == null || target.getUniqueID() == null) {
@@ -101,26 +108,9 @@ public final class AccessoryEffectService {
         if (target instanceof EntityPlayerMP) {
             reconcile(target);
         }
-        RuntimeState state = STATES.get(target.getUniqueID());
-        if (state != null && state.sequence > 0L
-                && state.definitionId.length() > 0) {
-            LostTalesNetworkHandler.CHANNEL.sendTo(
-                    packet(target, state), viewer);
-        }
-    }
-
-    public static void sendFullSnapshot(EntityPlayerMP viewer) {
-        if (viewer == null) {
-            return;
-        }
-        List<?> players = onlinePlayers();
-        if (players == null) {
-            return;
-        }
-        for (Object value : players) {
-            if (value instanceof EntityPlayerMP) {
-                sendCurrentTo(viewer, (EntityPlayerMP)value);
-            }
+        AccessoryEffectState state = STATES.get(target.getUniqueID());
+        if (state != null && state.sequence() > 0L) {
+            sendTo(viewer, target, state);
         }
     }
 
@@ -225,61 +215,63 @@ public final class AccessoryEffectService {
             if (living.getAITarget() == player) {
                 living.setRevengeTarget(null);
             }
+            // Spiders, endermen and other creatures of the old AI keep their own target.
+            if (living instanceof EntityCreature
+                    && ((EntityCreature) living).getEntityToAttack() == player) {
+                ((EntityCreature) living).setTarget(null);
+            }
         }
     }
 
-    private static RuntimeState getOrCreateState(UUID playerId) {
-        RuntimeState state = STATES.get(playerId);
+    private static AccessoryEffectState getOrCreateState(UUID playerId) {
+        AccessoryEffectState state = STATES.get(playerId);
         if (state == null) {
-            state = new RuntimeState();
+            state = new AccessoryEffectState();
             STATES.put(playerId, state);
         }
         return state;
     }
 
-    private static void broadcast(
-            EntityPlayerMP target, RuntimeState state) {
-        List<?> players = onlinePlayers();
-        if (players == null) {
+    /** Tells the wearer and every player tracking them what they were last told to wear. */
+    private static void sendToWatchers(
+            EntityPlayerMP wearer, AccessoryEffectState state) {
+        sendTo(wearer, wearer, state);
+        if (!(wearer.worldObj instanceof WorldServer)) {
             return;
         }
-        AccessoryEffectSyncPacket packet = packet(target, state);
-        for (Object value : players) {
-            if (value instanceof EntityPlayerMP) {
-                LostTalesNetworkHandler.CHANNEL.sendTo(
-                        packet, (EntityPlayerMP)value);
+        List<EntityPlayer> watchers = new ArrayList<EntityPlayer>(
+                ((WorldServer)wearer.worldObj).getEntityTracker()
+                        .getTrackingPlayers(wearer));
+        for (EntityPlayer watcher : watchers) {
+            if (watcher instanceof EntityPlayerMP && watcher != wearer) {
+                sendTo((EntityPlayerMP)watcher, wearer, state);
             }
         }
     }
 
-    private static AccessoryEffectSyncPacket packet(
-            EntityPlayer target, RuntimeState state) {
-        return new AccessoryEffectSyncPacket(
-                target.getUniqueID(), target.getEntityId(),
-                state.sequence, state.definitionId);
+    private static void sendTo(EntityPlayerMP viewer, EntityPlayer wearer,
+                               AccessoryEffectState state) {
+        if (viewer.playerNetServerHandler != null) {
+            LostTalesNetworkHandler.CHANNEL.sendTo(packet(wearer, state), viewer);
+        }
     }
 
-    private static void refreshTracking(EntityPlayerMP player) {
-        FellowshipTrackingSyncManager.refreshAll();
-        LotrAccessoryMapHooks.refreshPlayerLocations(player.worldObj);
+    private static AccessoryEffectSyncPacket packet(
+            EntityPlayer target, AccessoryEffectState state) {
+        return new AccessoryEffectSyncPacket(
+                target.getUniqueID(), target.getEntityId(),
+                state.sequence(), state.sent());
+    }
+
+    /** The server's tick, the clock the pace of changes is kept by. */
+    private static long now() {
+        MinecraftServer server = MinecraftServer.getServer();
+        return server == null ? 0L : server.getTickCounter();
     }
 
     private static List<?> onlinePlayers() {
         MinecraftServer server = MinecraftServer.getServer();
         return server == null || server.getConfigurationManager() == null
                 ? null : server.getConfigurationManager().playerEntityList;
-    }
-
-    private static final class RuntimeState {
-        private String definitionId = "";
-        private long sequence;
-
-        private void nextSequence() {
-            this.sequence++;
-            if (this.sequence <= 0L) {
-                throw new IllegalStateException(
-                        "accessory effect sequence exhausted");
-            }
-        }
     }
 }

@@ -7,9 +7,10 @@ import net.minecraft.stats.StatisticsFile;
 import net.minecraft.world.storage.IPlayerFileData;
 
 /**
- * Forces the live account files which Minecraft normally writes during an
- * autosave or logout. Character-switch journals must not be cleared until
- * these files agree with the committed roster identity.
+ * Writes the player's own files at once (their player data, statistics and
+ * LOTR data), which the game otherwise writes at an autosave or logout. A
+ * switch journal goes only once these files hold the character the roster
+ * plays.
  */
 public final class CharacterLiveStatePersistence {
 

@@ -1,11 +1,13 @@
 package com.ninuna.losttales.compat.lotr.hired;
 
 import com.ninuna.losttales.LostTalesMetaData;
-import com.ninuna.losttales.character.deletion.CharacterDeletionService;
+import com.ninuna.losttales.character.deletion.CharacterDeletionStorage;
+import com.ninuna.losttales.character.deletion.CharacterDeletionWorldData;
 import com.ninuna.losttales.character.identity.PlayableIdentity;
 import com.ninuna.losttales.character.identity.PlayableIdentityResolver;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipRecord;
 import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipStorage;
+import com.ninuna.losttales.character.lore.ownership.LoreCharacterOwnershipWorldData;
 import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
@@ -179,10 +181,13 @@ public final class LotrHiredUnitCustody {
      */
     private static boolean isGoneForGood(World world, UUID characterId) {
         try {
-            return CharacterDeletionService.getInstance()
-                    .getTombstone(world, characterId) == null
-                    && LoreCharacterOwnershipStorage.get(world)
-                            .getRecordByCharacterId(characterId) == null;
+            CharacterDeletionWorldData deletions = CharacterDeletionStorage.get(world);
+            LoreCharacterOwnershipWorldData figures = LoreCharacterOwnershipStorage.get(world);
+            if (deletions.isReadOnlyForNewerVersion() || figures.isReadOnly()) {
+                return false;
+            }
+            return deletions.getTombstone(characterId) == null
+                    && figures.getRecordByCharacterId(characterId) == null;
         } catch (RuntimeException unreadable) {
             return false;
         }

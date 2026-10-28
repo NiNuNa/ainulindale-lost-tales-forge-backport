@@ -21,18 +21,18 @@ public final class LostTalesClientQuestProgressStore {
     private static final Map<String, String>
             DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY =
                     new LinkedHashMap<String, String>();
-    private static final Set<String> PINNED_QUESTS = new LinkedHashSet<String>();
-    private static String pinnedMapMarkerId = "";
+    private static final Set<String> TRACKED_QUESTS = new LinkedHashSet<String>();
+    private static String trackedMapMarkerId = "";
     private static boolean receivedSync;
 
     private LostTalesClientQuestProgressStore() {}
 
-    public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<LostTalesQuestHistoryEntry> questHistory, Collection<String> pinnedQuestIdsIn, Collection<String> discoveredMarkerIds, String pinnedMapMarkerIdIn) {
+    public static synchronized void update(Collection<LostTalesQuestProgress> activeQuests, Collection<LostTalesQuestHistoryEntry> questHistory, Collection<String> trackedQuestIdsIn, Collection<String> discoveredMarkerIds, String trackedMapMarkerIdIn) {
         ACTIVE_QUESTS.clear();
         QUEST_HISTORY.clear();
         DISCOVERED_MARKERS.clear();
         DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY.clear();
-        PINNED_QUESTS.clear();
+        TRACKED_QUESTS.clear();
         receivedSync = true;
 
         if (activeQuests != null) {
@@ -57,17 +57,17 @@ public final class LostTalesClientQuestProgressStore {
             }
         }
 
-        if (pinnedQuestIdsIn != null) {
-            for (String questId : pinnedQuestIdsIn) {
+        if (trackedQuestIdsIn != null) {
+            for (String questId : trackedQuestIdsIn) {
                 if (questId != null && questId.length() > 0) {
-                    PINNED_QUESTS.add(questId);
+                    TRACKED_QUESTS.add(questId);
                 }
             }
         }
-        String storedPinnedMarkerId =
-                findDiscoveredMarkerId(pinnedMapMarkerIdIn);
-        pinnedMapMarkerId = storedPinnedMarkerId == null
-                ? "" : storedPinnedMarkerId;
+        String storedTrackedMarkerId =
+                findDiscoveredMarkerId(trackedMapMarkerIdIn);
+        trackedMapMarkerId = storedTrackedMarkerId == null
+                ? "" : storedTrackedMarkerId;
     }
 
     /**
@@ -153,8 +153,8 @@ public final class LostTalesClientQuestProgressStore {
         QUEST_HISTORY.clear();
         DISCOVERED_MARKERS.clear();
         DISCOVERED_MARKER_IDS_BY_CANONICAL_KEY.clear();
-        PINNED_QUESTS.clear();
-        pinnedMapMarkerId = "";
+        TRACKED_QUESTS.clear();
+        trackedMapMarkerId = "";
         receivedSync = false;
         WAITING_REWARDS.clear();
     }
@@ -233,19 +233,19 @@ public final class LostTalesClientQuestProgressStore {
         return findDiscoveredMarkerId(markerId) != null;
     }
 
-    public static synchronized boolean isQuestPinned(String questId) {
-        return questId != null && PINNED_QUESTS.contains(questId) && ACTIVE_QUESTS.containsKey(questId);
+    public static synchronized boolean isQuestTracked(String questId) {
+        return questId != null && TRACKED_QUESTS.contains(questId) && ACTIVE_QUESTS.containsKey(questId);
     }
 
-    public static synchronized boolean isQuestReferencePinned(
+    public static synchronized boolean isQuestReferenceTracked(
             String questReference) {
         return questReference != null
-                && PINNED_QUESTS.contains(questReference);
+                && TRACKED_QUESTS.contains(questReference);
     }
 
-    public static synchronized Collection<LostTalesQuestProgress> getPinnedQuests() {
+    public static synchronized Collection<LostTalesQuestProgress> getTrackedQuests() {
         ArrayList<LostTalesQuestProgress> copy = new ArrayList<LostTalesQuestProgress>();
-        for (String questId : PINNED_QUESTS) {
+        for (String questId : TRACKED_QUESTS) {
             LostTalesQuestProgress progress = ACTIVE_QUESTS.get(questId);
             if (progress != null) {
                 copy.add(progress.copy());
@@ -254,8 +254,8 @@ public final class LostTalesClientQuestProgressStore {
         return Collections.unmodifiableCollection(copy);
     }
 
-    public static synchronized boolean isMapMarkerPinned(String markerId) {
-        return sameMarkerIdentity(markerId, pinnedMapMarkerId);
+    public static synchronized boolean isMapMarkerTracked(String markerId) {
+        return sameMarkerIdentity(markerId, trackedMapMarkerId);
     }
 
     public static synchronized boolean hasReceivedSync() {

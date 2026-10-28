@@ -116,7 +116,7 @@ public final class WorldQuestRules {
             problems.add("a world quest is started by an operator, so its"
                     + " startMode must be 'locked'");
         }
-        if (!quest.getDialogue().isEmpty()) {
+        if (!quest.getConversation().isEmpty()) {
             problems.add("a world quest has no conversation");
         }
         if (quest.getStages().size() != 1) {

@@ -240,7 +240,7 @@ public final class Views {
         String binding = bindingHolding(keyCode);
         if (binding != null) {
             return StatCollector.translateToLocalFormatted(
-                    "gui.losttales.window.views.key.taken", name, binding);
+                    "gui.losttales.window.views.key.bound", name, binding);
         }
         return null;
     }

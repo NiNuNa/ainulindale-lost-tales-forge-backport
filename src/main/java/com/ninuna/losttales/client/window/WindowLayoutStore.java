@@ -27,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <pre>
  * view v1 name=Hunting
- * window w1 view=consoles locked=false x=0.00 y=0.00 active=client_console tabs=client_console,operator
+ * window w1 view=consoles locked=false x=0.00 y=0.00 active=console tabs=console,operator
  * window w2 view=v1 locked=true hud=true gui=true x=62.50 y=100.00 height=180.40 width=326 fill=full split=global,page:journal,across,0.5000 active=global tabs=global,page:journal,ooc
  * sub help from=br dx=0.00 dy=0.00 w=120 h=160
  * sub tab from=tl dx=12.00 dy=40.00

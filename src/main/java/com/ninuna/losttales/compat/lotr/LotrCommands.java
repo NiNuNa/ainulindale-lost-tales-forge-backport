@@ -17,8 +17,9 @@ import lotr.common.command.LOTRCommandFellowshipMessage;
  * own conversation page does; {@code /banStructures} and
  * {@code /allowStructures} banned whoever was being played, which
  * {@code /losttales structures} does for an account or a character. Run
- * each time the server starts, after LOTR has registered its commands; a
- * LOTR without them keeps them.
+ * each time the server starts, after LOTR has registered its commands.
+ * Where LOTR lacks one of these command classes, the failure is logged
+ * and none after it is removed.
  */
 public final class LotrCommands {
     private LotrCommands() {}

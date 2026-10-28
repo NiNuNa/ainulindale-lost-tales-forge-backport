@@ -30,7 +30,8 @@ public final class DiscordSlashCommandsTest {
     @Test
     public void theDefinitionsNameFiveCommandsAndWhatEachTakes() {
         JsonArray commands = new JsonParser().parse(
-                DiscordSlashCommands.definitionsBody(ENGLISH)).getAsJsonArray();
+                DiscordSlashCommands.definitionsBody(ENGLISH,
+                        Arrays.asList("en_US", "de_DE"))).getAsJsonArray();
         assertEquals(5, commands.size());
         assertEquals("Who is playing on the server right now",
                 commands.get(0).getAsJsonObject().get("description").getAsString());
@@ -38,21 +39,62 @@ public final class DiscordSlashCommandsTest {
         assertEquals("who", who.get("name").getAsString());
         JsonObject option = who.getAsJsonArray("options").get(0).getAsJsonObject();
         assertEquals("name", option.get("name").getAsString());
-        assertEquals("A character's name, or an account's where the server shows accounts",
+        assertEquals("A character's or an account's name",
                 option.get("description").getAsString());
         assertEquals(3, option.get("type").getAsInt());
         assertTrue(option.get("required").getAsBoolean());
         // Linking is offered to those who may manage the channel's webhooks.
         JsonObject link = commands.get(3).getAsJsonObject();
         assertEquals("link", link.get("name").getAsString());
-        assertEquals("code", link.getAsJsonArray("options").get(0).getAsJsonObject()
-                .get("name").getAsString());
+        JsonObject code = link.getAsJsonArray("options").get(0).getAsJsonObject();
+        assertEquals("code", code.get("name").getAsString());
+        assertFalse("a language alone changes a link's", code.get("required").getAsBoolean());
+        // The link's language, chosen from the languages the mod ships (DISC-30).
+        JsonObject language = link.getAsJsonArray("options").get(1).getAsJsonObject();
+        assertEquals("language", language.get("name").getAsString());
+        assertFalse(language.get("required").getAsBoolean());
+        assertEquals("The language the game writes in here, such as en_US",
+                language.get("description").getAsString());
+        JsonArray choices = language.getAsJsonArray("choices");
+        assertEquals(2, choices.size());
+        assertEquals("de_DE", choices.get(1).getAsJsonObject().get("value").getAsString());
         assertEquals(String.valueOf(1L << 29),
                 link.get("default_member_permissions").getAsString());
         JsonObject unlink = commands.get(4).getAsJsonObject();
         assertEquals("unlink", unlink.get("name").getAsString());
         assertEquals(String.valueOf(1L << 29),
                 unlink.get("default_member_permissions").getAsString());
+    }
+
+    /** Past the choices Discord takes, the language is typed, held short. */
+    @Test
+    public void tooManyLanguagesAreTypedRatherThanChosen() {
+        List<String> many = new java.util.ArrayList<String>();
+        for (int index = 0; index < DiscordSlashCommands.MAX_CHOICES + 1; index++) {
+            many.add("x" + index);
+        }
+        JsonObject language = new JsonParser().parse(
+                DiscordSlashCommands.definitionsBody(ENGLISH, many)).getAsJsonArray()
+                .get(3).getAsJsonObject().getAsJsonArray("options").get(1)
+                .getAsJsonObject();
+        assertFalse(language.has("choices"));
+        assertTrue(language.get("max_length").getAsInt() > 0);
+    }
+
+    /** What /link answers about a language, and with nothing given. */
+    @Test
+    public void theLanguageAnswersNameIt() {
+        assertEquals("This channel reads in **de\\_DE** now.",
+                DiscordSlashCommands.languageSet(ENGLISH, "de_DE"));
+        assertEquals("The game has no words in **fr\\_FR**. It has: `en_US`, `de_DE`.",
+                DiscordSlashCommands.linkUnknownLanguage(ENGLISH, " fr_FR ",
+                        Arrays.asList("en_US", "de_DE")));
+        String longTyped = new String(new char[100]).replace('\0', 'x');
+        assertFalse(DiscordSlashCommands.linkUnknownLanguage(ENGLISH, longTyped,
+                Arrays.asList("en_US")).contains(longTyped));
+        assertEquals("Type the code the game gave you with `/link code:`. Ask for a new one"
+                + " in the game with `/losttales discord link <channel>`.",
+                DiscordSlashCommands.linkNeedsCode(ENGLISH));
     }
 
     @Test

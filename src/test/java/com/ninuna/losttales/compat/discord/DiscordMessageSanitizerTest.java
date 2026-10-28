@@ -288,6 +288,15 @@ public final class DiscordMessageSanitizerTest {
                 name.toString()).length());
     }
 
+    /** A direction mark leaves a name or a file's name, never the whole line. */
+    @Test
+    public void directionMarksAreLeftOutOfNamesAndFiles() {
+        assertEquals("Mira", DiscordMessageSanitizer.inboundName("Mi\u202Era"));
+        assertEquals("look *photogpj.exe*",
+                attached("look", "", Collections.<String>emptyList(),
+                        Collections.singletonList("photo\u202Egpj.exe"), null).getText());
+    }
+
     /** A name is an account name in the chat, so it fits the account's 64 bytes. */
     @Test
     public void aNameFitsTheBytesAnAccountNameTakes() throws Exception {
@@ -537,7 +546,7 @@ public final class DiscordMessageSanitizerTest {
         assertEquals("skull", DiscordMessageSanitizer.placeName(":skull:"));
         assertEquals("&1", DiscordMessageSanitizer.placeName("<@&1>"));
         assertEquals("Mod Team", DiscordMessageSanitizer.placeName(
-                " Mod ​‮ Team\n"));
+                " Mod ​\u202E Team\n"));
         assertEquals("", DiscordMessageSanitizer.placeName("**__~~||``"));
         assertEquals("", DiscordMessageSanitizer.placeName(null));
         StringBuilder long200 = new StringBuilder();

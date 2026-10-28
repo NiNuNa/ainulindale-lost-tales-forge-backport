@@ -10,8 +10,8 @@ import net.minecraft.util.IChatComponent;
 
 /**
  * A channel named in a line as a link: {@code #global} as typed, drawn
- * {@code #Global} in the channel's colour, and on a click the tab it
- * names comes forward. It may also name one line of that tab, which
+ * {@code #Global} in the channel's colour, and on a click the page it
+ * names comes forward. It may also name one line of that page, which
  * the click then lands on: by this
  * client's own line id for the command a console entry is about, or by
  * the server's message id for a link to a message — {@code #global/1234}
@@ -35,33 +35,33 @@ final class ChatChannelLinkMarker {
     private ChatChannelLinkMarker() {}
 
     /**
-     * Marks the run as a link to the tab {@code tabId} names, in
+     * Marks the run as a link to the page {@code pageId} names, in
      * {@code color}, landing on {@code chatLineId} when it is not zero.
      */
     static ChatComponentText apply(ChatComponentText component, int color,
-                                   String tabId, int chatLineId) {
-        return apply(component, color, tabId, chatLineId,
+                                   String pageId, int chatLineId) {
+        return apply(component, color, pageId, chatLineId,
                 ChatMessageIds.NONE);
     }
 
     /**
-     * Marks the run as a link to the tab {@code tabId} names, landing on
+     * Marks the run as a link to the page {@code pageId} names, landing on
      * the message the server calls {@code messageId} — the form that
      * means the same on every client.
      */
     static ChatComponentText applyMessage(ChatComponentText component,
-                                          int color, String tabId,
+                                          int color, String pageId,
                                           long messageId) {
-        return apply(component, color, tabId, 0, messageId);
+        return apply(component, color, pageId, 0, messageId);
     }
 
     private static ChatComponentText apply(ChatComponentText component,
-                                           int color, String tabId,
+                                           int color, String pageId,
                                            int chatLineId, long messageId) {
-        if (component != null && tabId != null && tabId.length() > 0) {
+        if (component != null && pageId != null && pageId.length() > 0) {
             String payload = PREFIX + ChatColorMarkers.hex(color) + ':' + chatLineId + ':'
                     + Base64.getUrlEncoder().withoutPadding()
-                            .encodeToString(tabId.getBytes(UTF_8));
+                            .encodeToString(pageId.getBytes(UTF_8));
             if (ChatMessageIds.isServerId(messageId)) {
                 payload += ":" + messageId;
             }
@@ -85,15 +85,15 @@ final class ChatChannelLinkMarker {
         try {
             int color = Integer.parseInt(fields[0], 16) & 0xFFFFFF;
             int chatLineId = Integer.parseInt(fields[1]);
-            String tabId = new String(
+            String pageId = new String(
                     Base64.getUrlDecoder().decode(fields[2]), UTF_8);
             long messageId = fields.length == 4
                     ? Long.parseLong(fields[3]) : ChatMessageIds.NONE;
             if (fields.length == 4 && !ChatMessageIds.isServerId(messageId)) {
                 return null;
             }
-            return tabId.length() == 0 ? null
-                    : new Data(color, tabId, chatLineId, messageId);
+            return pageId.length() == 0 ? null
+                    : new Data(color, pageId, chatLineId, messageId);
         } catch (IllegalArgumentException malformed) {
             return null;
         }
@@ -106,8 +106,8 @@ final class ChatChannelLinkMarker {
     /**
      * Whether the run is a piece of a link to a message, by this client's
      * own line id or by the server's message id, read off its payload
-     * without decoding the tab's name: the answer {@link Data#linksMessage}
-     * gives. The tab's name, in base64, holds no colon.
+     * without decoding the page's name: the answer {@link Data#linksMessage}
+     * gives. The page's name, in base64, holds no colon.
      */
     static boolean linksMessage(IChatComponent component) {
         String payload = payload(component);
@@ -162,9 +162,9 @@ final class ChatChannelLinkMarker {
 
     static final class Data {
         final int color;
-        /** The tab the link opens, as {@link ConversationPage#id()} writes it. */
-        final String tabId;
-        /** The line the click lands on, or zero for the tab alone. */
+        /** The page the link opens, as {@link ConversationPage#id()} writes it. */
+        final String pageId;
+        /** The line the click lands on, or zero for the page alone. */
         final int chatLineId;
         /**
          * The message the click lands on by the server's id, or
@@ -172,15 +172,15 @@ final class ChatChannelLinkMarker {
          */
         final long messageId;
 
-        private Data(int color, String tabId, int chatLineId,
+        private Data(int color, String pageId, int chatLineId,
                      long messageId) {
             this.color = color;
-            this.tabId = tabId;
+            this.pageId = pageId;
             this.chatLineId = chatLineId;
             this.messageId = messageId;
         }
 
-        /** Whether the link names a message rather than the tab alone. */
+        /** Whether the link names a message rather than the page alone. */
         boolean linksMessage() {
             return this.chatLineId != 0 || this.messageId != ChatMessageIds.NONE;
         }

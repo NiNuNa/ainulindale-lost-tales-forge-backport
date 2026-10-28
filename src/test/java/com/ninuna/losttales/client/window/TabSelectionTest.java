@@ -102,11 +102,11 @@ public final class TabSelectionTest {
         TabSelection.toggle("w2", this.tabs.get(0), this.tabs.get(1));
         // A tab of another window starts that window's marks instead of
         // joining the ones already made.
-        TabSelection.toggle("w1", ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
+        TabSelection.toggle("w1", ConversationPage.of(ChatChannel.CONSOLE),
                 ConversationPage.of(ChatChannel.OPERATOR));
         assertEquals("w1", TabSelection.windowId());
         assertTrue(TabSelection.selectedIn(this.window).isEmpty());
-        assertEquals(Arrays.asList(ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
+        assertEquals(Arrays.asList(ConversationPage.of(ChatChannel.CONSOLE),
                 ConversationPage.of(ChatChannel.OPERATOR)),
                 TabSelection.selectedIn(WindowLayout.window("w1")));
     }
@@ -123,7 +123,7 @@ public final class TabSelectionTest {
         TabSelection.prune();
         assertNull(TabSelection.windowId());
         // And a window that has gone takes its marks with it.
-        TabSelection.toggle("w1", null, ConversationPage.of(ChatChannel.CLIENT_CONSOLE));
+        TabSelection.toggle("w1", null, ConversationPage.of(ChatChannel.CONSOLE));
         assertTrue(WindowLayout.closeWindow("w1"));
         TabSelection.prune();
         assertNull(TabSelection.windowId());

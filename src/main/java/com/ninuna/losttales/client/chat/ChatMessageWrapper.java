@@ -53,9 +53,12 @@ final class ChatMessageWrapper {
                     };
             float speakerScale =
                     LostTalesChatVisualStyle.speakerRowScale(chatOpen);
+            // A line heard nearby read a size larger or smaller has the
+            // room that size leaves its words (CHAT-37).
             lines = ChatLineWrapper.wrap(metrics, root, width, chatOpen,
                     speakerScale,
-                    LostTalesChatVisualStyle.messageRowScale(chatOpen),
+                    LostTalesChatVisualStyle.messageRowScale(chatOpen,
+                            ChatLayoutMarker.bodyStepOf(root)),
                     LostTalesChatVisualStyle.quoteRowScale(chatOpen),
                     stamp == null ? null : ChatStampMarker.of(stamp,
                             stampWidth(metrics.width(stamp),

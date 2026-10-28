@@ -1,12 +1,14 @@
 package com.ninuna.losttales.quest;
 
+import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import com.ninuna.losttales.util.LostTalesDimensionHelper;
+import com.ninuna.losttales.util.LostTalesLog;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
@@ -16,25 +18,28 @@ import net.minecraft.world.storage.MapStorage;
 import net.minecraftforge.common.util.Constants;
 
 /**
- * The quest givers killed in this world, by their entity id, with when
- * they fell (QUEST-32). A quest that fails when its giver is killed fails
- * for a player online as it happens, and for one who was away at their
- * next login, read from here. The latest {@link #MAX_ENTRIES} are kept.
- * Data of another version, or not shaped as written, is kept as it was
- * and nothing more is recorded; an entry that cannot be read is kept
- * aside, untouched.
+ * The quest givers killed in this world, by their entity id, oldest first
+ * (QUEST-32). A quest that fails when its giver is killed fails for a
+ * player online as it happens, and for one who was away at their next
+ * login, read from here. The latest {@link #MAX_ENTRIES} are kept.
+ *
+ * <p>An entry that cannot be read, or the later of two for one giver, is
+ * set aside in the quarantine, never dropped (DATA-10). Data of another
+ * version, a quarantine this build cannot read, or one that would hold
+ * more than {@link NbtQuarantine#MAX_ENTRIES} is kept as it was, logged
+ * once as it is read, and nothing more is recorded.</p>
  */
 public final class FallenGiversWorldData extends WorldSavedData {
     public static final String DATA_NAME = "losttales_fallen_givers";
-    static final int DATA_VERSION = 1;
+    static final int DATA_VERSION = 2;
     public static final int MAX_ENTRIES = 4096;
     static final String TAG_VERSION = "DataVersion";
     static final String TAG_FALLEN = "Fallen";
-    static final String TAG_QUARANTINED = "Quarantined";
     static final String TAG_ENTITY_ID = "EntityId";
-    static final String TAG_FELL_AT = "FellAt";
+    /** Where an entry set aside stood in the list of givers killed. */
+    static final String TAG_FALLEN_INDEX = "FallenIndex";
 
-    private final Map<String, Long> fallen = new LinkedHashMap<String, Long>();
+    private final Set<String> fallen = new LinkedHashSet<String>();
     private final List<NBTTagCompound> quarantined = new ArrayList<NBTTagCompound>();
     private NBTTagCompound preserved;
 
@@ -47,29 +52,53 @@ public final class FallenGiversWorldData extends WorldSavedData {
         this.fallen.clear();
         this.quarantined.clear();
         this.preserved = null;
-        if (compound.getInteger(TAG_VERSION) != DATA_VERSION
-                || compound.hasKey(TAG_FALLEN)
-                && !compound.hasKey(TAG_FALLEN, Constants.NBT.TAG_LIST)
-                || !NbtTags.hasCompoundListWithinLimit(compound, TAG_FALLEN, MAX_ENTRIES)
-                || !NbtTags.hasCompoundListWithinLimit(compound, TAG_QUARANTINED, MAX_ENTRIES)) {
-            this.preserved = (NBTTagCompound) compound.copy();
+        if (compound.getInteger(TAG_VERSION) != DATA_VERSION) {
+            preserve(compound, "it is of version "
+                    + compound.getInteger(TAG_VERSION));
             return;
         }
+        if (!compound.hasKey(TAG_FALLEN, Constants.NBT.TAG_LIST)
+                || !NbtTags.hasCompoundListWithinLimit(compound, TAG_FALLEN, MAX_ENTRIES)) {
+            preserve(compound, "its givers are no list of at most "
+                    + MAX_ENTRIES + " entries");
+            return;
+        }
+        NbtQuarantine.Read stored = NbtQuarantine.read(compound);
+        if (!stored.isSupported()) {
+            preserve(compound, "its quarantine cannot be read");
+            return;
+        }
+        List<NBTTagCompound> aside = new ArrayList<NBTTagCompound>(stored.getEntries());
         NBTTagList list = compound.getTagList(TAG_FALLEN, Constants.NBT.TAG_COMPOUND);
         for (int index = 0; index < list.tagCount(); index++) {
             NBTTagCompound entry = list.getCompoundTagAt(index);
             String entityId = entry.getString(TAG_ENTITY_ID);
-            if (!isEntityId(entityId) || !entry.hasKey(TAG_FELL_AT, Constants.NBT.TAG_LONG)
-                    || this.fallen.containsKey(entityId)) {
-                this.quarantined.add((NBTTagCompound) entry.copy());
+            String problem = !entry.hasKey(TAG_ENTITY_ID, Constants.NBT.TAG_STRING)
+                    ? "missing_entity_id"
+                    : !isEntityId(entityId) ? "unreadable_entity_id"
+                    : this.fallen.contains(entityId) ? "duplicate_giver" : "";
+            if (problem.length() > 0) {
+                aside.add(NbtQuarantine.entry(problem, TAG_FALLEN_INDEX, index, entry));
                 continue;
             }
-            this.fallen.put(entityId, Long.valueOf(entry.getLong(TAG_FELL_AT)));
+            this.fallen.add(entityId);
         }
-        NBTTagList aside = compound.getTagList(TAG_QUARANTINED, Constants.NBT.TAG_COMPOUND);
-        for (int index = 0; index < aside.tagCount(); index++) {
-            this.quarantined.add((NBTTagCompound) aside.getCompoundTagAt(index).copy());
+        if (aside.size() > NbtQuarantine.MAX_ENTRIES) {
+            this.fallen.clear();
+            preserve(compound, "its quarantine would hold " + aside.size()
+                    + " entries, past its " + NbtQuarantine.MAX_ENTRIES);
+            return;
         }
+        this.quarantined.addAll(aside);
+        if (aside.size() > stored.getEntries().size()) {
+            markDirty();
+        }
+    }
+
+    private void preserve(NBTTagCompound compound, String because) {
+        this.preserved = (NBTTagCompound) compound.copy();
+        LostTalesLog.warning("The record of quest givers killed cannot be read,"
+                + " since %s; it is kept as it is and records no more", because);
     }
 
     @Override
@@ -80,45 +109,34 @@ public final class FallenGiversWorldData extends WorldSavedData {
         }
         compound.setInteger(TAG_VERSION, DATA_VERSION);
         NBTTagList list = new NBTTagList();
-        for (Map.Entry<String, Long> entry : this.fallen.entrySet()) {
+        for (String entityId : this.fallen) {
             NBTTagCompound tag = new NBTTagCompound();
-            tag.setString(TAG_ENTITY_ID, entry.getKey());
-            tag.setLong(TAG_FELL_AT, entry.getValue().longValue());
+            tag.setString(TAG_ENTITY_ID, entityId);
             list.appendTag(tag);
         }
         compound.setTag(TAG_FALLEN, list);
-        if (!this.quarantined.isEmpty()) {
-            NBTTagList aside = new NBTTagList();
-            for (NBTTagCompound entry : this.quarantined) {
-                aside.appendTag(entry.copy());
-            }
-            compound.setTag(TAG_QUARANTINED, aside);
-        }
+        NbtQuarantine.write(compound, this.quarantined);
     }
 
     /** Records a giver killed; past {@link #MAX_ENTRIES} the oldest goes. Nothing while read-only. */
-    public synchronized boolean record(String entityId, long fellAt) {
+    public synchronized boolean record(String entityId) {
         if (this.preserved != null || !isEntityId(entityId)) {
             return false;
         }
         this.fallen.remove(entityId);
         while (this.fallen.size() >= MAX_ENTRIES) {
-            Iterator<String> oldest = this.fallen.keySet().iterator();
+            Iterator<String> oldest = this.fallen.iterator();
             oldest.next();
             oldest.remove();
         }
-        this.fallen.put(entityId, Long.valueOf(fellAt));
+        this.fallen.add(entityId);
         markDirty();
         return true;
     }
 
     /** Whether the giver with this entity id was killed. */
     public synchronized boolean hasFallen(String entityId) {
-        return entityId != null && this.fallen.containsKey(entityId);
-    }
-
-    public synchronized boolean isUsable() {
-        return this.preserved == null;
+        return entityId != null && this.fallen.contains(entityId);
     }
 
     /** The overworld's record, made on first use; null off the server. */

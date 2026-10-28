@@ -18,7 +18,7 @@ import net.minecraft.client.gui.ChatLine;
  * the motion every window has, the line bands the last draw recorded,
  * the line list they index into, the stack's rows and their glide, the
  * unread divider, the member list, the message toolbar, the scrollbar
- * and the jump-to-present button. The closed feed has one of its own.
+ * and the jump-to-present button. The feed has one of its own.
  */
 public final class ChatFrame extends WindowFrame {
     /** Whether this frame draws the conversation beside the one in front of a split. */
@@ -203,7 +203,7 @@ public final class ChatFrame extends WindowFrame {
 
     private int dividerSourceLineId;
 
-    /** The conversation shown while open; null for the closed-chat feed and for a page. */
+    /** The conversation shown while open; null for the feed and for a page. */
     public ConversationPage view;
 
     /**
@@ -526,21 +526,21 @@ public final class ChatFrame extends WindowFrame {
 
     /**
      * Moves the timestamp area's and the member list's motions on to
-     * this instant, toward where {@code tab}'s buttons left them. Called
+     * this instant, toward where {@code page}'s buttons left them. Called
      * once a frame before a conversation is laid out. Each conversation
      * keeps its own area and list, so another conversation coming to this
      * frame stands them in its state at once, as switching pages is a hard
      * cut. Only the buttons move them: a window the view hides comes back
      * with its list as it was.
      */
-    public void advancePanels(ConversationPage tab) {
-        if (tab == null) {
+    public void advancePanels(ConversationPage page) {
+        if (page == null) {
             return;
         }
-        boolean areaOut = !ChatLayout.isAreaHidden(tab);
-        boolean membersOut = !ChatLayout.isMembersHidden(tab);
-        if (!tab.equals(this.panelsOf)) {
-            this.panelsOf = tab;
+        boolean areaOut = !ChatLayout.isAreaHidden(page);
+        boolean membersOut = !ChatLayout.isMembersHidden(page);
+        if (!page.equals(this.panelsOf)) {
+            this.panelsOf = page;
             this.areaMotion.settle(areaOut);
             this.membersMotion.settle(membersOut);
             return;
@@ -745,7 +745,7 @@ public final class ChatFrame extends WindowFrame {
     }
 
     /**
-     * Whether this is the closed feed's frame rather than a window's:
+     * Whether this is the feed's frame rather than a window's:
      * the feed draws a message at sizes of its own, so its rows are laid
      * out for the feed.
      */
@@ -856,14 +856,14 @@ public final class ChatFrame extends WindowFrame {
         return this.rows.rowsAt(bounded * reach);
     }
 
-    /** The closed-chat feed's frame; not a window, never pruned. */
+    /** The feed's frame; not a window, never pruned. */
     private static final ChatFrame FEED = new ChatFrame("feed");
 
     public static ChatFrame feed() {
         return FEED;
     }
 
-    /** Forgets every window's frame and what the closed feed remembers. */
+    /** Forgets every window's frame and what the feed remembers. */
     public static synchronized void clear() {
         clearFrames();
         FEED.lines = Collections.emptyList();

@@ -106,7 +106,7 @@ public final class CharacterRaceFilesTest {
         assertWarns(BEORNING.replace("\"faction_categories\": [\"human\"], \"factions\": [\"lotr:dale\"],",
                 ""), "nobody could start");
         assertWarns(BEORNING.replace("[\"losttales:masculine\", \"losttales:feminine\"]", "[]"),
-                "names no sexes");
+                "names no body types");
         assertWarns(BEORNING.replace("\"losttales:feminine\"]", "\"losttales:centaur\"]"),
                 "which is none the game has");
     }
@@ -121,7 +121,7 @@ public final class CharacterRaceFilesTest {
         assertWarns(BEORNING.replace("\"group\": \"beorning\"", "\"group\": \"account\""),
                 "not 'account'");
         assertWarns(BEORNING.replace("\"body_type\": \"losttales:masculine\"",
-                "\"body_type\": \"losttales:neutral\""), "no sex the race has");
+                "\"body_type\": \"losttales:neutral\""), "no body type the race has");
     }
 
     @Test

@@ -42,26 +42,26 @@ public final class ChatMenusTest {
     }
 
     @Test
-    public void theChannelTabsAreTheOnesThePlayerCanRead() {
-        for (ConversationPage tab : ChatMenus.channelTabs(false)) {
-            assertTrue(ClientChatChannelState.isAvailable(tab));
+    public void theChannelPagesAreTheOnesThePlayerCanRead() {
+        for (ConversationPage page : ChatMenus.channelPages(false)) {
+            assertTrue(ClientChatChannelState.isAvailable(page));
         }
-        for (ConversationPage tab : ChatMenus.channelTabs(true)) {
-            assertTrue(ClientChatChannelState.isAvailable(tab));
-            assertFalse(ChatLayout.isOpen(tab));
+        for (ConversationPage page : ChatMenus.channelPages(true)) {
+            assertTrue(ClientChatChannelState.isAvailable(page));
+            assertFalse(ChatLayout.isOpen(page));
         }
     }
 
-    /** The Fellowship channel is offered as one tab for each fellowship, never as its own. */
+    /** The Fellowship channel is offered as one page for each fellowship, never as its own. */
     @Test
-    public void eachFellowshipIsOfferedByItsOwnTab() {
+    public void eachFellowshipIsOfferedByItsOwnPage() {
         UUID grey = new UUID(7L, 7L);
         ClientChatIdentitySelection.accept(new LostTalesChatIdentitySyncPacket(
                 Collections.<UUID>emptyList(),
                 Collections.singletonList(new ChatFellowship(grey, "Grey Company", 0x123456)),
                 Collections.singletonList(grey)));
         try {
-            List<ConversationPage> offered = ChatMenus.channelTabs(false);
+            List<ConversationPage> offered = ChatMenus.channelPages(false);
             assertTrue(offered.contains(ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString())));
             assertFalse(offered.contains(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         } finally {
@@ -72,8 +72,8 @@ public final class ChatMenusTest {
     @Test
     public void closedUnreadCountIsCappedJustPastTheCounterLimit() {
         int total = 0;
-        for (ConversationPage tab : ChatMenus.channelTabs(true)) {
-            total += ClientChatChannelViews.unreadCount(tab);
+        for (ConversationPage page : ChatMenus.channelPages(true)) {
+            total += ClientChatChannelViews.unreadCount(page);
         }
         assertEquals(Math.min(ClientChatChannelViews.MAX_UNREAD + 1, total),
                 ChatMenus.closedUnreadCount());
@@ -103,12 +103,12 @@ public final class ChatMenusTest {
 
     /**
      * The chat's part of the New Page and Page Search: every channel
-     * the player can read, open or not, each row's id its tab's, and
+     * the player can read, open or not, each row's id its page's, and
      * nothing else while no player list can be read; a filter matching
      * nothing leaves no row.
      */
     @Test
-    public void theChatOffersEveryChannelByItsTab() {
+    public void theChatOffersEveryChannelByItsPage() {
         List<MenuWindow.Entry> entries = new ArrayList<MenuWindow.Entry>();
         ChatMenus.addEveryConversation(null, entries, "");
         int rows = 0;
@@ -116,7 +116,7 @@ public final class ChatMenusTest {
             rows++;
             assertTrue(ConversationPage.fromId(entry.id) != null);
         }
-        assertEquals(ChatMenus.channelTabs(false).size(), rows);
+        assertEquals(ChatMenus.channelPages(false).size(), rows);
         List<MenuWindow.Entry> none = new ArrayList<MenuWindow.Entry>();
         ChatMenus.addEveryConversation(null, none, "zzzz-nothing");
         assertTrue(none.isEmpty());
@@ -124,8 +124,8 @@ public final class ChatMenusTest {
 
     /**
      * The NPC conversations of the session are offered after the players,
-     * open or not, the one that spoke last first, each row's id its tab's
-     * and the tab its icon; the filter narrows them by name.
+     * open or not, the one that spoke last first, each row's id its page's
+     * and the page its icon; the filter narrows them by name.
      */
     @Test
     public void theChatOffersItsNpcConversations() {

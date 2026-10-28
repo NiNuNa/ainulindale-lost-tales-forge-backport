@@ -35,8 +35,8 @@ public final class ChatCodeNamesTest {
         assertEquals("fellowship", ChatCodeNames.of(ChatChannel.FELLOWSHIP, "some-fellowship"));
         assertEquals("operator", ChatCodeNames.of(ChatChannel.OPERATOR, ""));
         assertEquals("whisper", ChatCodeNames.of(ChatChannel.WHISPER, ""));
-        assertEquals("client_console", ChatCodeNames.of(ChatChannel.CLIENT_CONSOLE, ""));
-        assertEquals("server_console", ChatCodeNames.of(ChatChannel.SERVER_CONSOLE, ""));
+        assertEquals("console", ChatCodeNames.of(ChatChannel.CONSOLE, ""));
+        assertEquals("server_log", ChatCodeNames.of(ChatChannel.SERVER_LOG, ""));
         assertNull(ChatCodeNames.of(null, ""));
     }
 

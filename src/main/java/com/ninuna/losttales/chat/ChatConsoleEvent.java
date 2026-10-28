@@ -50,7 +50,7 @@ public final class ChatConsoleEvent {
     public static final int MAX_ACTOR_LENGTH = 64;
     public static final int MAX_TEXT_LENGTH = 512;
     /**
-     * The longest tab id a command's context may name: a whisper
+     * The longest page id a command's context may name: a whisper
      * conversation's id carries two names and a character id.
      */
     public static final int MAX_CONTEXT_LENGTH = 384;
@@ -71,13 +71,20 @@ public final class ChatConsoleEvent {
     private final ChatNamedPlayer actorIdentity;
     private final String text;
     /**
-     * For a command, the id of the tab the actor typed it in, as their
+     * For a command, the id of the page the actor typed it in, as their
      * client reported it; empty when unknown — a command run from the
      * server's own console, or by a client that said nothing.
      */
     private final String context;
     /** What was reported, for a {@link Kind#REPORT} entry; null for every other. */
     private final Report report;
+    /**
+     * The text as staff holding {@code chat.moderate} read it, where it
+     * names the speaker an unseen voice hid (CHAT-84); empty where they
+     * read {@link #text} like everyone else. Kept with the entry, never
+     * sent: each reader is sent their own form ({@link #forReader}).
+     */
+    private final String staffText;
 
     /**
      * An identity naming another account than {@code actor} is dropped. A
@@ -110,9 +117,55 @@ public final class ChatConsoleEvent {
             throw new IllegalArgumentException("a console event says something");
         }
         String where = context == null ? "" : context.trim();
-        // A context that would not be a tab id names nothing.
+        // A context that would not be a page id names nothing.
         this.context = kind == Kind.COMMAND && isContext(where)
                 && where.length() <= MAX_CONTEXT_LENGTH ? where : "";
+        this.staffText = "";
+    }
+
+    /** The same entry reading {@code text}, held as {@code staffText} for staff, reporting {@code report}. */
+    private ChatConsoleEvent(ChatConsoleEvent from, String text,
+                             String staffText, Report report) {
+        this.id = from.id;
+        this.timestampMillis = from.timestampMillis;
+        this.kind = from.kind;
+        this.severity = from.severity;
+        this.actor = from.actor;
+        this.actorIdentity = from.actorIdentity;
+        this.context = from.context;
+        this.text = text;
+        String staff = clip(staffText, MAX_TEXT_LENGTH);
+        this.staffText = staff.equals(text) ? "" : staff;
+        this.report = report;
+    }
+
+    /**
+     * The same entry naming, for staff holding {@code chat.moderate}
+     * alone, the speaker an unseen voice hid: {@code staffText} is the
+     * entry as they read it; empty for none.
+     */
+    public ChatConsoleEvent withStaffText(String staffText) {
+        return new ChatConsoleEvent(this, this.text, staffText, this.report);
+    }
+
+    /** The entry as staff read it where it differs; empty for none. */
+    public String getStaffText() { return this.staffText; }
+
+    /**
+     * The entry as one reader is sent it: staff holding
+     * {@code chat.moderate} ({@code moderates}) read who an unseen voice
+     * was, everyone else the unseen voice. Neither form carries the other.
+     */
+    public ChatConsoleEvent forReader(boolean moderates) {
+        boolean staffReport = this.report != null
+                && this.report.getStaffAuthor().length() > 0;
+        if (this.staffText.length() == 0 && !staffReport) {
+            return this;
+        }
+        return new ChatConsoleEvent(this,
+                moderates && this.staffText.length() > 0 ? this.staffText
+                        : this.text, "",
+                this.report == null ? null : this.report.forReader(moderates));
     }
 
     /**
@@ -139,7 +192,7 @@ public final class ChatConsoleEvent {
     /** The actor's account as the server knew it, or null; see {@link #actorIdentity}. */
     public ChatNamedPlayer getActorIdentity() { return this.actorIdentity; }
     public String getText() { return this.text; }
-    /** The tab a command was typed in, or empty; see {@link #context}. */
+    /** The page a command was typed in, or empty; see {@link #context}. */
     public String getContext() { return this.context; }
     /** What was reported, for a report entry; null for every other. */
     public Report getReport() { return this.report; }
@@ -172,10 +225,23 @@ public final class ChatConsoleEvent {
         private final int authorColor;
         private final String excerpt;
         private final String link;
+        /**
+         * Who said it as staff holding {@code chat.moderate} are told, where
+         * {@link #author} is the unseen voice that hid them (CHAT-84);
+         * empty where everyone is told the same.
+         */
+        private final String staffAuthor;
 
         public Report(ChatReportReason reason, String note, long messageId,
                       String author, int authorColor, String excerpt,
                       String link) {
+            this(reason, note, messageId, author, authorColor, excerpt, link,
+                    "");
+        }
+
+        private Report(ChatReportReason reason, String note, long messageId,
+                       String author, int authorColor, String excerpt,
+                       String link, String staffAuthor) {
             if (reason == null || !ChatMessageIds.isServerId(messageId)) {
                 throw new IllegalArgumentException("a report names a reason and a message");
             }
@@ -190,6 +256,26 @@ public final class ChatConsoleEvent {
             if (this.author.length() == 0 || !isContext(this.link)) {
                 throw new IllegalArgumentException("a report names who said it and where");
             }
+            String staff = printable(clip(staffAuthor, MAX_AUTHOR_LENGTH));
+            this.staffAuthor = staff.equals(this.author) ? "" : staff;
+        }
+
+        /** The same report naming {@code staffAuthor} to staff alone; empty for none. */
+        public Report withStaffAuthor(String staffAuthor) {
+            return new Report(this.reason, this.note, this.messageId,
+                    this.author, this.authorColor, this.excerpt, this.link,
+                    staffAuthor);
+        }
+
+        /** Who said it as staff are told, where it differs; empty for none. */
+        public String getStaffAuthor() { return this.staffAuthor; }
+
+        /** The report as one reader is told it: staff the speaker, everyone else the unseen voice. */
+        Report forReader(boolean moderates) {
+            return new Report(this.reason, this.note, this.messageId,
+                    moderates && this.staffAuthor.length() > 0
+                            ? this.staffAuthor : this.author,
+                    this.authorColor, this.excerpt, this.link, "");
         }
 
         public ChatReportReason getReason() { return this.reason; }

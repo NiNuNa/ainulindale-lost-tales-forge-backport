@@ -221,9 +221,12 @@ public final class LostTalesMapPage extends PageContent {
                         Keyboard.KEY_A, Keyboard.KEY_S, Keyboard.KEY_D),
                 PageKeys.pageKey(PAGE_ID, "zoom", PageKeys.WHEEL),
                 PageKeys.pageKey(PAGE_ID, "turn", PageKeys.RIGHT_DRAG),
-                PageKeys.pageKey(PAGE_ID, "location", Keyboard.KEY_R),
-                PageKeys.pageKey(PAGE_ID, "waypoint", Keyboard.KEY_C),
-                PageKeys.pageKey(PAGE_ID, "find", Keyboard.KEY_F),
+                PageKeys.pageKey(PAGE_ID, "location",
+                        LostTalesLotrMapGui.CURRENT_LOCATION_KEY),
+                PageKeys.pageKey(PAGE_ID, "waypoint",
+                        LostTalesLotrMapGui.CREATE_WAYPOINT_KEY),
+                PageKeys.pageKey(PAGE_ID, "find",
+                        LostTalesLotrMapGui.FIND_LOCATION_KEY),
                 PageKeys.pageKey(PAGE_ID, "legend", legendKey()),
                 PageKeys.pageKey(PAGE_ID, "travel", PageKeys.CLICK),
                 PageKeys.pageKey(PAGE_ID, "gather", PageKeys.CLICK),
@@ -246,7 +249,7 @@ public final class LostTalesMapPage extends PageContent {
      * mouse button, which the key icons cannot draw.
      */
     private static Integer legendKey() {
-        int code = LostTalesKeyBindings.getMapLegendKeyBinding().getKeyCode();
+        int code = LostTalesKeyBindings.getModifierKeyBinding().getKeyCode();
         return Integer.valueOf(code > 0 ? code : Keyboard.KEY_LMENU);
     }
 

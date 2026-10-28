@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest;
 
 import com.ninuna.losttales.character.identity.RoleplayCharacterIdentityHook;
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.quest.FellowshipQuestProgressCoordinator;
@@ -26,9 +27,10 @@ import net.minecraft.server.MinecraftServer;
  * quests they run too (QUEST-25): the members playing now, as the
  * character in the fellowship, at the player's stage with their counts or
  * past it, and whether each shares the player's credit, travelling with
- * the same fellowship (FEL-28). Sent whenever a quest log changes, or the
- * fellowship a player travels with, to its player and to everyone it is
- * shown to, and only when what they were sent changes.
+ * the same fellowship (FEL-28), with whether the server shares progress at
+ * all. Sent whenever a quest log changes, or the fellowship a player
+ * travels with, to its player and to everyone it is shown to, and only
+ * when what they were sent changes.
  *
  * <p>What each player was last sent, and whose logs it came from, is kept
  * by account until they leave: static state, cleared with the server's
@@ -60,11 +62,18 @@ public final class QuestFellows {
 
     private static final class Sent {
         final List<QuestFellowCount> counts;
+        final boolean shared;
         final Set<UUID> from;
 
-        Sent(List<QuestFellowCount> counts, Set<UUID> from) {
+        Sent(List<QuestFellowCount> counts, boolean shared, Set<UUID> from) {
             this.counts = counts;
+            this.shared = shared;
             this.from = from;
+        }
+
+        /** Whether these are the counts and the sharing a player was sent. */
+        boolean same(List<QuestFellowCount> others, boolean sharedNow) {
+            return this.shared == sharedNow && this.counts.equals(others);
         }
     }
 
@@ -160,20 +169,23 @@ public final class QuestFellows {
         }
         List<QuestFellowCount> counts = countsFor(
                 LostTalesQuestPlayerData.get(reader), each);
+        // With sharing off the journal dims every member (QUEST-25).
+        boolean shared = LostTalesConfig.enableSharedQuestProgress;
         UUID account = reader.getUniqueID();
         synchronized (QuestFellows.class) {
             Sent before = SENT.get(account);
-            if (before == null ? counts.isEmpty() : before.counts.equals(counts)) {
+            if (before == null ? counts.isEmpty() : before.same(counts, shared)) {
                 if (before != null) {
-                    SENT.put(account, new Sent(before.counts,
+                    SENT.put(account, new Sent(before.counts, before.shared,
                             new HashSet<UUID>(fellows.keySet())));
                 }
                 return;
             }
-            SENT.put(account, new Sent(counts, new HashSet<UUID>(fellows.keySet())));
+            SENT.put(account, new Sent(counts, shared,
+                    new HashSet<UUID>(fellows.keySet())));
         }
-        LostTalesNetworkHandler.CHANNEL.sendTo(new LostTalesQuestFellowsPacket(counts),
-                reader);
+        LostTalesNetworkHandler.CHANNEL.sendTo(
+                new LostTalesQuestFellowsPacket(counts, shared), reader);
     }
 
     /** The online players last sent counts that came from {@code account}'s log. */

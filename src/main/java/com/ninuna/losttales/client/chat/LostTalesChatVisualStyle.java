@@ -40,7 +40,7 @@ import org.lwjgl.opengl.GL11;
  * state it is handed, so no call site has to remember that.</p>
  *
  * <p>Channel prefix components are skipped entirely while the chat
- * screen is open (the tabs already say which channel a line belongs
+ * screen is open (the pages already say which channel a line belongs
  * to), and layout markers advance the cursor without drawing.</p>
  */
 public final class LostTalesChatVisualStyle {
@@ -56,7 +56,7 @@ public final class LostTalesChatVisualStyle {
      * every one of them with it.
      */
     public static int asideRgb() {
-        return ClientChatChannelState.displayColor(ChatChannel.CLIENT_CONSOLE);
+        return ClientChatChannelState.displayColor(ChatChannel.CONSOLE);
     }
 
     /** The line under the pointer: the windows' secondary colour, as every lit row. */
@@ -254,7 +254,7 @@ public final class LostTalesChatVisualStyle {
     /**
      * The step a message's own words take in this state. The open
      * window's words are the size every other row is measured against,
-     * so they never step; the closed feed may take them down, and
+     * so they never step; the feed may take them down, and
      * everything a message is made of goes with them.
      */
     static int messageStep(boolean chatOpen) {
@@ -276,6 +276,42 @@ public final class LostTalesChatVisualStyle {
     /** The size a message's own words are drawn at. */
     static float messageRowScale(boolean chatOpen) {
         return stackRowScale(messageStep(chatOpen));
+    }
+
+    /**
+     * The size the words of a line heard nearby are drawn at, its reader
+     * reading them {@code distanceStep} sizes from the usual by how far its
+     * speaker stood (CHAT-37): one step up or down the ladder from the
+     * words of that state, or the usual size while the client's Speech
+     * Size by Distance is off.
+     */
+    static float messageRowScale(boolean chatOpen, int distanceStep) {
+        return stackRowScale(messageStep(chatOpen) + distanceStep(distanceStep));
+    }
+
+    /** The size step a line carries as this client shows it: none while the setting is off. */
+    static int distanceStep(int carried) {
+        if (LostTalesConfig.CHAT_DISTANCE_OFF.equals(LostTalesConfig.chatDistanceSizes)) {
+            return 0;
+        }
+        return Math.max(-1, Math.min(1, carried));
+    }
+
+    /** The share of their strength a far line's words keep under Sizes and Fainter. */
+    static final float FAR_WORDS_SHARE = 2.0F / 3.0F;
+
+    /**
+     * A row's opacity as its words show how far their speaker stood: a row
+     * of words read a size smaller is fainter too under the client's
+     * Sizes and Fainter; every other row as it is.
+     */
+    static int distanceAlpha(int alpha, IChatComponent row) {
+        if (!LostTalesConfig.CHAT_DISTANCE_SIZES_AND_FAINTER.equals(
+                LostTalesConfig.chatDistanceSizes)
+                || ChatLayoutMarker.bodyRowStep(row) >= 0) {
+            return alpha;
+        }
+        return Math.round(alpha * FAR_WORDS_SHARE);
     }
 
     /**
@@ -630,7 +666,7 @@ public final class LostTalesChatVisualStyle {
      * Where a row's ink ends, in its text space: past its last glyph,
      * icon or chip, leaving out trailing spaces and the spacing column
      * the font's advance carries after a run's last glyph. What the
-     * closed feed stands a right-aligned or centred row by, so its drawn
+     * feed stands a right-aligned or centred row by, so its drawn
      * pixels meet the edge rather than the room after them.
      */
     static int inkEnd(FontRenderer font, IChatComponent row,

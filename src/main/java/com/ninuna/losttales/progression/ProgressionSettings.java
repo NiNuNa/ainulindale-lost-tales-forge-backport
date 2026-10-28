@@ -20,6 +20,12 @@ public final class ProgressionSettings {
         return LostTalesConfig.perkPointsPerLevel;
     }
 
+    public static HourlyCap hourlyCap() {
+        return new HourlyCap(LostTalesConfig.skillHourlyCap,
+                LostTalesConfig.finishedQuestsPassHourlyCap,
+                LostTalesConfig.firstFindsPassHourlyCap);
+    }
+
     public static RepeatRule repeatRule() {
         return new RepeatRule(LostTalesConfig.repeatsCountedInFull,
                 LostTalesConfig.repeatShrinkPercent, LostTalesConfig.repeatFloorPercent,

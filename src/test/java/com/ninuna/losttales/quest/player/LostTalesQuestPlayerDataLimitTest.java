@@ -34,7 +34,7 @@ public final class LostTalesQuestPlayerDataLimitTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void invalidDynamicMarkerPriorityIsRejected() {
+    public void invalidGiverMarkerPriorityIsRejected() {
         NBTTagCompound questData = new NBTTagCompound();
         questData.setInteger("DataVersion",
                 LostTalesQuestPlayerData.CURRENT_DATA_VERSION);
@@ -50,7 +50,7 @@ public final class LostTalesQuestPlayerDataLimitTest {
                         .LostTalesMapMarkerDefinition.MAX_PRIORITY + 1);
         NBTTagList markers = new NBTTagList();
         markers.appendTag(marker);
-        questData.setTag("DynamicMapMarkers", markers);
+        questData.setTag("GiverMarkers", markers);
 
         LostTalesQuestPlayerData.validateCharacterState(questData);
     }

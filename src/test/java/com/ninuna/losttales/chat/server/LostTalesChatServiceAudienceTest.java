@@ -120,7 +120,7 @@ public final class LostTalesChatServiceAudienceTest {
     public void proximityWhispersAndConsoleNotesReachOnlyWhoWasSentThem() {
         record(ChatChannel.PROXIMITY, null, "", Arrays.asList(ALICE, BOB));
         record(ChatChannel.WHISPER, null, "", Arrays.asList(ALICE, BOB));
-        record(ChatChannel.CLIENT_CONSOLE, null, "", Arrays.asList(ALICE, BOB));
+        record(ChatChannel.CONSOLE, null, "", Arrays.asList(ALICE, BOB));
         assertEquals(3, replay(BOB, "", 0L, null, EVERY_CHANNEL).size());
         // Carol was near nobody, whispered with nobody and was sent no
         // note: an operator's role opens none of them.

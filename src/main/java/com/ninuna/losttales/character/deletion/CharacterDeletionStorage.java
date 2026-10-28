@@ -5,7 +5,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 
-/** Resolves and synchronously flushes the deletion-recovery journal. */
+/** Finds the deleted-character store in dimension 0's storage, and writes it to disk. */
 public final class CharacterDeletionStorage {
 
     private CharacterDeletionStorage() {}

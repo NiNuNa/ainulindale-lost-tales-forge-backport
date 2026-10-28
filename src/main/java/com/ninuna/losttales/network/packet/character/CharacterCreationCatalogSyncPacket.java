@@ -13,7 +13,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Server-authoritative race-to-starting-faction option catalogue. */
+/**
+ * What the creator offers, as the server allows it: the starting factions
+ * of each race, the starting waypoints of each faction, and every waypoint
+ * an unconventional start may take.
+ */
 public final class CharacterCreationCatalogSyncPacket implements IMessage {
 
     private static final int MAX_RACES = 32;

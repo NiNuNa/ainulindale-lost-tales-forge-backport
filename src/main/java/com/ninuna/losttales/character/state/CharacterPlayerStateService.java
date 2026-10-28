@@ -35,7 +35,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Captures, validates, persists, applies, and synchronizes character state. */
+/**
+ * Takes a character's saved life from the live player and puts one back,
+ * part by part ({@link CharacterStateComponent}), each part checked first.
+ */
 public final class CharacterPlayerStateService {
 
     private static final CharacterPlayerStateService INSTANCE =

@@ -4,7 +4,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 
-/** Result returned by authoritative character-management operations. */
+/** What a character request came to: done or refused with a reason, and the roster after it. */
 public final class CharacterOperationResult {
 
     private final boolean successful;
@@ -27,9 +27,17 @@ public final class CharacterOperationResult {
         this.retryAtEpochMillis = retryAtEpochMillis;
     }
 
+    /**
+     * A request carried out. The roster goes to the client with the
+     * answer, which reads a success without one as malformed, so none is
+     * made without it.
+     */
     public static CharacterOperationResult success(boolean changed,
                                                    CharacterRoster roster,
                                                    RoleplayCharacter character) {
+        if (roster == null) {
+            throw new IllegalArgumentException("success requires the roster the client is sent");
+        }
         return new CharacterOperationResult(true, changed, CharacterErrorId.NONE,
                 roster, character, -1L);
     }

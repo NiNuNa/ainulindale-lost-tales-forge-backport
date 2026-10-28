@@ -30,7 +30,7 @@ public final class LostTalesQuestDefinition {
     private final Map<String, String> interaction;
     private final Map<String, String> markers;
     private final Map<String, String> journalLog;
-    private final Map<String, String> dialogue;
+    private final Map<String, String> conversation;
     private final Map<String, String> world;
     private final List<LostTalesQuestStageDefinition> stages;
     private final boolean bundled;
@@ -51,7 +51,7 @@ public final class LostTalesQuestDefinition {
             String startMode, Map<String, String> prerequisites,
             Map<String, String> rewards, Map<String, String> interaction,
             Map<String, String> markers, Map<String, String> journalLog,
-            Map<String, String> dialogue, Map<String, String> world,
+            Map<String, String> conversation, Map<String, String> world,
             List<LostTalesQuestStageDefinition> stages, boolean bundled,
             Map<String, String> words, Map<String, String> rules) {
         this.id = id;
@@ -65,7 +65,7 @@ public final class LostTalesQuestDefinition {
         this.interaction = Collections.unmodifiableMap(new LinkedHashMap<String, String>(interaction == null ? Collections.<String, String>emptyMap() : interaction));
         this.markers = Collections.unmodifiableMap(new LinkedHashMap<String, String>(markers == null ? Collections.<String, String>emptyMap() : markers));
         this.journalLog = Collections.unmodifiableMap(new LinkedHashMap<String, String>(journalLog == null ? Collections.<String, String>emptyMap() : journalLog));
-        this.dialogue = Collections.unmodifiableMap(new LinkedHashMap<String, String>(dialogue == null ? Collections.<String, String>emptyMap() : dialogue));
+        this.conversation = Collections.unmodifiableMap(new LinkedHashMap<String, String>(conversation == null ? Collections.<String, String>emptyMap() : conversation));
         this.world = Collections.unmodifiableMap(new LinkedHashMap<String, String>(world == null ? Collections.<String, String>emptyMap() : world));
         // A missive keeps only its letter's ids; its objectives read by its
         // kinds' missive lines wherever its quest is made or read again.
@@ -104,10 +104,10 @@ public final class LostTalesQuestDefinition {
     /**
      * What the quest's giver says and what the player may say back, as
      * written; empty for a quest nobody talks about. Read it through
-     * {@link LostTalesQuestDialogue}.
+     * {@link LostTalesQuestConversation}.
      */
-    public Map<String, String> getDialogue() {
-        return this.dialogue;
+    public Map<String, String> getConversation() {
+        return this.conversation;
     }
 
     /**

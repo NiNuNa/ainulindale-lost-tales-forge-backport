@@ -26,7 +26,9 @@ import net.minecraft.util.StatCollector;
  * after its name. Every setting is named, explained in its row's
  * tip and given its words by the lang file, in the player's language
  * ({@link LostTalesConfigWords}). Numbers and lines are typed in Settings'
- * own value window and kept by the page ({@link Settings.Store#NONE}).
+ * own value window and kept by the page ({@link Settings.Store#NONE}). A
+ * setting too long for the page stands as one greyed row that says so
+ * and takes nothing (DATA-16).
  */
 final class ServerSettingsRows {
     private static final String LANG = "gui.losttales.server_settings.";
@@ -37,12 +39,14 @@ final class ServerSettingsRows {
     /** The ids of a list's lines and of its Add a Line row. */
     private static final String ITEM_ROW = "item:";
     private static final String ADD_ROW = "add:";
+    /** The ids of the rows of settings too long for the page, which nothing acts on. */
+    private static final String LONG_ROW = "long:";
 
     /** What the rows read from: the page. */
     interface Host {
         ServerSettingsDraft draft();
 
-        /** Counts the snapshots the page has read: rows made for an earlier one no longer stand. */
+        /** Counts the snapshots the page has read: a row made for an earlier one does not stand. */
         int generation();
 
         /** Whether the page still shows the snapshot {@code generation} counts, its tab open. */
@@ -99,7 +103,9 @@ final class ServerSettingsRows {
                 singles = new ArrayList<MenuWindow.Entry>();
                 lists = new ArrayList<MenuWindow.Entry>();
             }
-            if (entry.isList()) {
+            if (entry.isTooLong()) {
+                (entry.isList() ? lists : singles).add(tooLongRow(entry));
+            } else if (entry.isList()) {
                 addList(lists, entry);
             } else {
                 singles.add(row(entry));
@@ -207,6 +213,15 @@ final class ServerSettingsRows {
         MenuWindow.Entry tipped = row.withTip(settingTip(entry));
         return draft().isChanged(entry) ? tipped.withValueColor(honey())
                 : tipped;
+    }
+
+    /**
+     * A setting too long for the page: its name, greyed, saying under the
+     * pointer that it is edited in {@code server.cfg}.
+     */
+    private static MenuWindow.Entry tooLongRow(ServerConfigEntry entry) {
+        return new MenuWindow.Entry(LONG_ROW + entry.qualifiedName(), settingName(entry))
+                .unavailable(word("too_long"));
     }
 
     /**
@@ -446,11 +461,6 @@ final class ServerSettingsRows {
     }
 
     /**
-     * A number between its chevrons, a step at a time or ten with Shift,
-     * within the bounds the server names; its value is typed in Settings'
-     * value window, whose Use the Default is the server's shipped value.
-     */
-    /**
      * A few-word option of the server's, its words picked in a sub-window
      * of their own as every few-word setting's are, into the page's
      * waiting changes.
@@ -534,6 +544,11 @@ final class ServerSettingsRows {
         }
     }
 
+    /**
+     * A number between its chevrons, a step at a time or ten with Shift,
+     * within the bounds the server names; its value is typed in Settings'
+     * value window, whose Use the Default is the server's shipped value.
+     */
     private final class NumberValue extends Settings.Numeric {
         private final String name;
         private final int made = ServerSettingsRows.this.host.generation();

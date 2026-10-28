@@ -5,9 +5,9 @@ package com.ninuna.losttales.client.window;
  * pages only the game opens, every page's content, the screen's
  * entrance, the marked tabs, every copy's search words, the pages
  * filling their windows but those held there, the sub-windows open as the
- * screen last closed, the view, and what the pinned windows were showing.
- * The layout
- * itself is the account's and stays, the views with it.
+ * screen last closed, the view, the page and view a screen was waiting
+ * to open on, and what the pinned windows were showing. The layout itself
+ * is the account's and stays, the views with it.
  */
 public final class WindowSession {
     private WindowSession() {}
@@ -21,10 +21,11 @@ public final class WindowSession {
         WindowOpening.clear();
         TabSelection.clear();
         WindowSearch.forgetAll();
-        ContentView.leaveAll();
+        Borderless.leaveAll();
         SubWindowPlaces.forgetOpen();
         WindowView.clear();
         WindowView.forgetPrevious();
+        WindowScreen.forgetPending();
         PinnedWindows.clear();
     }
 }

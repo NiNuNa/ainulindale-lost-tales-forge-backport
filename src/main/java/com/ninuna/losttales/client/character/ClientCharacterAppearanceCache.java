@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 
-/** Client-only cache of public active-character rendering information. */
+/** The look every player online plays in, as the server sent it, and the stage's preview of your own. */
 public final class ClientCharacterAppearanceCache {
 
     private static final Map<UUID, CharacterAppearance> APPEARANCES =

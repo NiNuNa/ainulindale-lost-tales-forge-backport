@@ -1,11 +1,9 @@
 package com.ninuna.losttales.character.registry;
 
 /**
- * Immutable resolved gameplay values for one race.
- *
- * Combat values normally come from representative LOTR Legacy NPCs. Physical
- * dimensions are copied from the deterministic race registry, so a failed or
- * unusual NPC compatibility probe cannot resize a player.
+ * One race's numbers as they play: health, speed and attack from the LOTR
+ * NPC its file names, else the file's own; size and eye height always from
+ * the file, so an NPC that cannot be read never resizes a player.
  */
 public final class CharacterRaceGameplayProfile {
 

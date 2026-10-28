@@ -85,12 +85,12 @@ public final class ChatStackRowsTest {
      */
     @Test
     public void theScrollCeilingReachesTheDividersRow() {
-        ConversationPage tab = ConversationPage.of(ChatChannel.OOC);
+        ConversationPage page = ConversationPage.of(ChatChannel.OOC);
         int lines = 30;
         int rows = lines + 1;
         double room = 10.0D;
-        scroll(tab, 1000, rows, room);
-        double ceiling = ClientChatChannelViews.getScroll(tab, rows, room);
+        scroll(page, 1000, rows, room);
+        double ceiling = ClientChatChannelViews.getScroll(page, rows, room);
         // The topmost row is the oldest line, pushed up by the divider.
         int topRow = LostTalesChatOverlayRenderer.rowOfLine(lines - 1, 0);
         assertEquals(rows - room, ceiling, 0.0001D);
@@ -98,14 +98,14 @@ public final class ChatStackRowsTest {
                 ceiling + room - 1 >= topRow);
         // Measured in lines, as it used to be, the same view stops a row
         // short of it.
-        double lineCeiling = ClientChatChannelViews.getScroll(tab, lines,
+        double lineCeiling = ClientChatChannelViews.getScroll(page, lines,
                 room);
         assertTrue(lineCeiling + room - 1 < topRow);
     }
 
     /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
-    private static void scroll(ConversationPage tab, int lines, int totalLines, double roomLines) {
-        double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
-        ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
+    private static void scroll(ConversationPage page, int lines, int totalLines, double roomLines) {
+        double current = ClientChatChannelViews.getScroll(page, totalLines, roomLines);
+        ClientChatChannelViews.scrollTo(page, current + lines, totalLines, roomLines);
     }
 }

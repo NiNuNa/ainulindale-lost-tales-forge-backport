@@ -33,8 +33,12 @@ import java.util.UUID;
  * <p>The root, each fellowship and each member are read only at the version
  * this build writes; any other version keeps the whole store as it is,
  * read-only. A fellowship or a member that lacks a key this build always
- * writes, or holds a value it cannot read, goes to the quarantine whole and
- * is never filled in.</p>
+ * writes, or holds a value it cannot read, goes to the quarantine whole.
+ * Three things are mended instead: a leader whose own entry went to the
+ * quarantine is followed by the member who joined first, a guide who is no
+ * member is dropped, and an icon that does not read is dropped, with a copy
+ * of the fellowship set aside. A travelling choice or a mirror that does
+ * not read is dropped.</p>
  */
 public final class FellowshipNbtCodec {
 
@@ -363,11 +367,12 @@ public final class FellowshipNbtCodec {
             return FellowshipReadResult.failed(true, "fellowship_has_no_valid_members");
         }
 
-        // A leader whose own entry went to the quarantine above is followed
-        // by the member who joined first, as when a leader's character goes.
-        if (!identityIds.contains(leaderId)) {
-            leaderId = selectFirstMember(members).getIdentityId();
-            repaired = true;
+        // A leader is a member somebody holds. A leader whose entry went to
+        // the quarantine above, or a figure nobody holds (CHAR-36), cannot
+        // lead, so the whole fellowship goes to the quarantine as saved
+        // rather than be given a leader here.
+        if (!leadsHeld(members, leaderId)) {
+            return FellowshipReadResult.failed(true, "leader_not_a_held_member");
         }
         List<UUID> guides = new ArrayList<UUID>();
         NBTTagList guideList = source.getTagList(TAG_GUIDES, Constants.NBT.TAG_COMPOUND);
@@ -383,8 +388,7 @@ public final class FellowshipNbtCodec {
 
         try {
             Fellowship fellowship = new Fellowship(fellowshipId, leaderId, members,
-                    guides, name, icon, switches, createdAt, revision,
-                    Fellowship.CURRENT_DATA_VERSION);
+                    guides, name, icon, switches, createdAt, revision);
             return FellowshipReadResult.success(fellowship, repaired, quarantine);
         } catch (RuntimeException exception) {
             LostTalesLog.warning("Skipping invalid fellowship %s at index %d: %s",
@@ -429,21 +433,14 @@ public final class FellowshipNbtCodec {
                 new FellowshipMember(identityId, ownerId, name, joinedAt, color), false);
     }
 
-    private static FellowshipMember selectFirstMember(List<FellowshipMember> members) {
-        ArrayList<FellowshipMember> ordered = new ArrayList<FellowshipMember>(members);
-        Collections.sort(ordered, new Comparator<FellowshipMember>() {
-            @Override
-            public int compare(FellowshipMember left, FellowshipMember right) {
-                if (left.getJoinedAt() < right.getJoinedAt()) {
-                    return -1;
-                }
-                if (left.getJoinedAt() > right.getJoinedAt()) {
-                    return 1;
-                }
-                return left.getIdentityId().toString().compareTo(right.getIdentityId().toString());
+    /** Whether {@code leaderId} names one of {@code members} that somebody holds. */
+    private static boolean leadsHeld(List<FellowshipMember> members, UUID leaderId) {
+        for (FellowshipMember member : members) {
+            if (member.getIdentityId().equals(leaderId)) {
+                return !member.isUnheld();
             }
-        });
-        return ordered.get(0);
+        }
+        return false;
     }
 
     private static NBTTagCompound createQuarantineEntry(String reason,

@@ -111,36 +111,12 @@ public enum LostTalesCompassMarkerIcon {
         return (artTop + artBottom) * 0.5F;
     }
 
+    /** The icon a marker names, in any case; the question mark for a name no icon goes by. */
     public static LostTalesCompassMarkerIcon fromName(String name) {
         if (name == null || name.length() == 0) {
             return UNDISCOVERED;
         }
-
-        String normalized = name.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
-        if ("NORTH".equals(normalized)) return N;
-        if ("NORTH_EAST".equals(normalized) || "NORTHEAST".equals(normalized)) return NE;
-        if ("EAST".equals(normalized)) return E;
-        if ("SOUTH_EAST".equals(normalized) || "SOUTHEAST".equals(normalized)) return SE;
-        if ("SOUTH".equals(normalized)) return S;
-        if ("SOUTH_WEST".equals(normalized) || "SOUTHWEST".equals(normalized)) return SW;
-        if ("WEST".equals(normalized)) return W;
-        if ("NORTH_WEST".equals(normalized) || "NORTHWEST".equals(normalized)) return NW;
-        if ("CITY".equals(normalized) || "SETTLEMENT".equals(normalized)
-                || "HOUSE".equals(normalized) || "HUT".equals(normalized)) return SHACK;
-        if ("GRAVE".equals(normalized) || "CEMETERY".equals(normalized)) return GRAVEYARD;
-        if ("WOODS".equals(normalized)) return FOREST;
-        if ("MOUNTAIN".equals(normalized) || "PEAK".equals(normalized)
-                || "HILLS".equals(normalized)) return MOUNTAINS;
-        if ("HARBOUR".equals(normalized) || "HARBOR".equals(normalized)
-                || "DOCK".equals(normalized) || "DOCKS".equals(normalized)) return PORT;
-        if ("LARGE_PORT".equals(normalized)
-                || "HARBOUR_LARGE".equals(normalized)) return BIG_PORT;
-        if ("POI".equals(normalized)
-                || "INTEREST".equals(normalized)) return POINT_OF_INTEREST;
-        if ("PLAYER".equals(normalized) || "CUSTOM".equals(normalized)
-                || "WAYPOINT".equals(normalized)) return PERSONAL;
-        if ("TENT".equals(normalized) || "ENCAMPMENT".equals(normalized)) return CAMP;
-
+        String normalized = name.trim().toUpperCase(Locale.ROOT);
         for (LostTalesCompassMarkerIcon icon : values()) {
             if (icon.name().equals(normalized)) {
                 return icon;

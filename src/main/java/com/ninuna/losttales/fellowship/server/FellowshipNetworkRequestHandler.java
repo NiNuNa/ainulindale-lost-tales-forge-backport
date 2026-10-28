@@ -4,6 +4,7 @@ import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
 import com.ninuna.losttales.fellowship.model.FellowshipInvitation;
+import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.fellowship.model.FellowshipNames;
 import com.ninuna.losttales.fellowship.model.FellowshipSwitch;
 import com.ninuna.losttales.fellowship.storage.FellowshipWorldData;
@@ -14,6 +15,8 @@ import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -69,105 +72,81 @@ public final class FellowshipNetworkRequestHandler {
         FellowshipService service = FellowshipService.getInstance();
         UUID fellowshipId = expectedFellowshipId;
         long revision = expectedFellowshipRevision;
+        FellowshipOperationResult result = null;
+        FellowshipInvitationOperationResult invitation = null;
         try {
             switch (operationType) {
                 case CREATE:
-                    finish(player, requestId, operationType, before,
-                            service.createFellowship(player, name));
-                    return;
+                    result = service.createFellowship(player, name);
+                    break;
                 case LEAVE:
-                    finish(player, requestId, operationType, before,
-                            service.leaveFellowship(player, fellowshipId, revision));
-                    return;
+                    result = service.leaveFellowship(player, fellowshipId, revision);
+                    break;
                 case REMOVE_MEMBER:
-                    finish(player, requestId, operationType, before,
-                            service.removeMember(player, fellowshipId, revision, targetId));
-                    return;
+                    result = service.removeMember(player, fellowshipId, revision, targetId);
+                    break;
                 case DISBAND:
-                    finish(player, requestId, operationType, before,
-                            service.disbandFellowship(player, fellowshipId, revision));
-                    return;
+                    result = service.disbandFellowship(player, fellowshipId, revision);
+                    break;
                 case TRANSFER_LEADERSHIP:
-                    finish(player, requestId, operationType, before,
-                            service.transferLeadership(player, fellowshipId, revision,
-                                    targetId));
-                    return;
+                    result = service.transferLeadership(player, fellowshipId, revision,
+                            targetId);
+                    break;
                 case SET_GUIDE:
-                    finish(player, requestId, operationType, before,
-                            service.setGuide(player, fellowshipId, revision, targetId,
-                                    value == 1));
-                    return;
+                    result = service.setGuide(player, fellowshipId, revision, targetId,
+                            value == 1);
+                    break;
                 case SET_COLOR:
-                    finish(player, requestId, operationType, before,
-                            service.setMemberColor(player, fellowshipId, revision, color));
-                    return;
+                    result = service.setMemberColor(player, fellowshipId, revision, color);
+                    break;
                 case RENAME:
-                    finish(player, requestId, operationType, before,
-                            service.renameFellowship(player, fellowshipId, revision, name));
-                    return;
+                    result = service.renameFellowship(player, fellowshipId, revision, name);
+                    break;
                 case SET_ICON:
-                    finish(player, requestId, operationType, before,
-                            service.setIcon(player, fellowshipId, revision));
-                    return;
+                    result = service.setIcon(player, fellowshipId, revision);
+                    break;
                 case SET_SWITCH:
-                    finish(player, requestId, operationType, before,
-                            service.setSwitch(player, fellowshipId, revision,
-                                    FellowshipSwitch.fromNetworkId(value >> 1),
-                                    (value & 1) == 1));
-                    return;
+                    result = service.setSwitch(player, fellowshipId, revision,
+                            FellowshipSwitch.fromNetworkId(value >> 1), (value & 1) == 1);
+                    break;
                 case SET_TRAVELLING:
-                    finish(player, requestId, operationType, before,
-                            service.setTravelling(player, fellowshipId, revision));
-                    // Who shares the player's quest credit goes with it,
-                    // and the journals dim by that (QUEST-25).
-                    QuestFellows.refreshAround(player);
-                    return;
-                case SET_GO_HERE_MARKER:
-                    finishGoHere(player, requestId, operationType, expectedActiveIdentityId,
-                            service.setGoHere(player, hasMarkerPosition,
-                                    markerDimensionId, markerX, markerZ));
-                    return;
-                case REMOVE_GO_HERE_MARKER:
-                    finishGoHere(player, requestId, operationType, expectedActiveIdentityId,
-                            service.removeGoHere(player));
-                    return;
+                    result = service.setTravelling(player, fellowshipId, revision);
+                    break;
+                case SET_GO_HERE_MARK:
+                    result = service.setGoHere(player, hasMarkerPosition,
+                            markerDimensionId, markerX, markerZ);
+                    break;
+                case REMOVE_GO_HERE_MARK:
+                    result = service.removeGoHere(player);
+                    break;
                 case PLACE_MARK:
-                    finishMark(player, requestId, operationType, before,
-                            service.placeMark(player, fellowshipId, revision, name,
-                                    markerDimensionId, markerX, markerZ));
-                    return;
+                    result = service.placeMark(player, fellowshipId, revision, name,
+                            markerDimensionId, markerX, markerZ);
+                    break;
                 case MOVE_MARK:
-                    finishMark(player, requestId, operationType, before,
-                            service.moveMark(player, fellowshipId, revision, targetId,
-                                    markerDimensionId, markerX, markerZ));
-                    return;
+                    result = service.moveMark(player, fellowshipId, revision, targetId,
+                            markerDimensionId, markerX, markerZ);
+                    break;
                 case REMOVE_MARK:
-                    finishMark(player, requestId, operationType, before,
-                            service.removeMark(player, fellowshipId, revision, targetId));
-                    return;
-                case INVITE_PLAYER: {
-                    FellowshipInvitationOperationResult invited =
-                            service.invitePlayer(player, fellowshipId, revision, name);
-                    finish(player, requestId, operationType, before, invited);
-                    tellInvited(invited);
-                    return;
-                }
+                    result = service.removeMark(player, fellowshipId, revision, targetId);
+                    break;
+                case INVITE_PLAYER:
+                    invitation = service.invitePlayer(player, fellowshipId, revision, name);
+                    break;
                 case ACCEPT_INVITATION:
-                    finish(player, requestId, operationType, before,
-                            service.acceptInvitation(player, targetId));
-                    return;
+                    invitation = service.acceptInvitation(player, targetId);
+                    break;
                 case DECLINE_INVITATION:
-                    finish(player, requestId, operationType, before,
-                            service.declineInvitation(player, targetId));
-                    return;
+                    invitation = service.declineInvitation(player, targetId);
+                    break;
                 case CANCEL_INVITATION:
-                    finish(player, requestId, operationType, before,
-                            service.cancelInvitation(player, fellowshipId, revision,
-                                    targetId));
-                    return;
+                    invitation = service.cancelInvitation(player, fellowshipId, revision,
+                            targetId);
+                    break;
                 default:
                     FellowshipSyncManager.sendFailure(player, requestId, operationType,
                             FellowshipErrorId.MALFORMED_REQUEST, -1L, true);
+                    return;
             }
         } catch (Throwable throwable) {
             FMLLog.warning("[%s] Fellowship %s request failed for player %s: %s",
@@ -175,6 +154,96 @@ public final class FellowshipNetworkRequestHandler {
                     player.getUniqueID(), throwable.toString());
             FellowshipSyncManager.sendFailure(player, requestId, operationType,
                     FellowshipErrorId.INTERNAL_ERROR, -1L, true);
+            return;
+        }
+        // The request is carried out and answered once: a fault in telling
+        // the players about it is logged, never answered a second time.
+        try {
+            if (invitation != null) {
+                finish(player, requestId, operationType, before, invitation);
+                if (operationType == FellowshipOperationType.INVITE_PLAYER) {
+                    tellInvited(invitation);
+                }
+                if (invitation.wasChanged()
+                        && operationType == FellowshipOperationType.ACCEPT_INVITATION) {
+                    refreshQuestFellows(player, invitation.getAffectedMember(), null);
+                }
+            } else if (result != null) {
+                finishResult(player, requestId, operationType, expectedActiveIdentityId,
+                        before, result);
+            }
+        } catch (Throwable throwable) {
+            FMLLog.warning("[%s] Fellowship %s request for player %s was carried out, "
+                            + "but telling the players failed: %s",
+                    LostTalesMetaData.MOD_ID, operationType.getId(),
+                    player.getUniqueID(), throwable.toString());
+        }
+    }
+
+    /** Sends the answer to a request carried out, and its state to whoever it reaches. */
+    private static void finishResult(EntityPlayerMP player, int requestId,
+                                     FellowshipOperationType operationType,
+                                     UUID expectedActiveIdentityId,
+                                     FellowshipSyncManager.AudienceSnapshot before,
+                                     FellowshipOperationResult result) {
+        switch (operationType) {
+            case SET_GO_HERE_MARK:
+            case REMOVE_GO_HERE_MARK:
+                finishGoHere(player, requestId, operationType, expectedActiveIdentityId,
+                        result);
+                return;
+            case PLACE_MARK:
+            case MOVE_MARK:
+            case REMOVE_MARK:
+                finishMark(player, requestId, operationType, before, result);
+                return;
+            case SET_TRAVELLING:
+                finish(player, requestId, operationType, before, result);
+                // Who shares the player's quest credit goes with it, and
+                // the journals dim by that (QUEST-25).
+                QuestFellows.refreshAround(player);
+                return;
+            case LEAVE:
+            case REMOVE_MEMBER:
+            case DISBAND:
+                finish(player, requestId, operationType, before, result);
+                if (result.wasChanged()) {
+                    refreshQuestFellows(player, result.getAffectedMember(),
+                            result.wasFellowshipDisbanded() ? result.getFellowship() : null);
+                }
+                return;
+            default:
+                finish(player, requestId, operationType, before, result);
+        }
+    }
+
+    /**
+     * The journal's fellows follow the members (QUEST-25): the player, the
+     * member who joined, left or was sent away, and every member of a
+     * fellowship that {@code ended}, each playing now, are brought up to
+     * date along with whoever was shown their counts.
+     */
+    private static void refreshQuestFellows(EntityPlayerMP player,
+                                            FellowshipMember affected,
+                                            Fellowship ended) {
+        Set<UUID> accounts = new LinkedHashSet<UUID>();
+        accounts.add(player.getUniqueID());
+        if (affected != null && !affected.isUnheld()) {
+            accounts.add(affected.getOwnerId());
+        }
+        if (ended != null) {
+            for (FellowshipMember member : ended.getMembers()) {
+                if (!member.isUnheld()) {
+                    accounts.add(member.getOwnerId());
+                }
+            }
+        }
+        for (UUID account : accounts) {
+            EntityPlayerMP online = account.equals(player.getUniqueID()) ? player
+                    : LostTalesServerPlayers.findOnline(account);
+            if (online != null) {
+                QuestFellows.refreshAround(online);
+            }
         }
     }
 

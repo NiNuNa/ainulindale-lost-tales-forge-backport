@@ -49,7 +49,7 @@ public final class LostTalesLotrMapControlBar {
         hints.add(Hint.wheel(minecraft, font,
                 I18n.format("gui.losttales.map.control.zoom")));
         hints.add(Hint.binding(minecraft, font,
-                LostTalesKeyBindings.getMapLegendKeyBinding(),
+                LostTalesKeyBindings.getModifierKeyBinding(),
                 I18n.format("gui.losttales.map.control.legend")));
         hints.add(Hint.key(minecraft, font,
                 LostTalesLotrMapGui.FIND_LOCATION_KEY,

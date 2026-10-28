@@ -7,7 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Immutable generation of allowlisted character-owned player state. */
+/** One generation of a character's saved life, part by part (component id to its data). */
 public final class CharacterPlayerStateSnapshot {
 
     public static final int CURRENT_DATA_VERSION = 12;

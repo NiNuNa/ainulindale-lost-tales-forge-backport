@@ -130,9 +130,9 @@ public final class ClientSettingsSections {
             {
                 panel("compass", "compass", "Compass");
                 panel("fellowship", "fellowship", "Fellowship");
-                panel("quick_loot", "quickloot", "QuickLoot");
+                panel("quick_loot", "quick_loot", "QuickLoot");
                 add(number(OptionFile.CLIENT, "quickLootHudMaxRows", 1.0D, 0));
-                panel("quest", "quest", "Quest");
+                panel("quest", "quest", "QuestTracker");
                 panel("notifications", "notifications", "notification");
             }
 
@@ -208,15 +208,15 @@ public final class ClientSettingsSections {
     private static Settings.Section quests() {
         return new OptionSection("quests") {
             {
-                add(number(OptionFile.CLIENT, "questHudMaxTrackedQuests", 1.0D, 0));
-                add(number(OptionFile.CLIENT, "questHudObjectiveLineCount", 1.0D, 0));
-                add(toggle(OptionFile.CLIENT, "showQuestHudNotifications"));
+                add(number(OptionFile.CLIENT, "questTrackerMaxQuests", 1.0D, 0));
+                add(number(OptionFile.CLIENT, "questTrackerObjectiveLineCount", 1.0D, 0));
+                add(toggle(OptionFile.CLIENT, "showQuestBanners"));
                 add(toggle(OptionFile.CLIENT, "showNativeLotrQuestTracker"));
-                add(toggle(OptionFile.CLIENT, "enableQuestDialogue"));
+                add(toggle(OptionFile.CLIENT, "enableQuestConversation"));
                 add(toggle(OptionFile.CLIENT, "showQuestChatFeedback"));
                 add(toggle(OptionFile.CLIENT, "playQuestSounds"));
                 group(PREFIX + "quests.group.world");
-                add(toggle(OptionFile.CLIENT, "showWorldQuestMarkers"));
+                add(toggle(OptionFile.CLIENT, "showWorldLabels"));
                 add(toggle(OptionFile.CLIENT, "showDiscoveredWorldMapMarkers"));
                 add(number(OptionFile.CLIENT, "worldQuestMarkerMaxDistance", 8.0D, 0));
             }

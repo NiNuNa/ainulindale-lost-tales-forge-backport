@@ -75,6 +75,28 @@ public final class LostTalesQuestObjectiveSelectionTest {
                 .getProgressibleObjectives(quest, gone).isEmpty());
     }
 
+    /**
+     * A stage is found by its id in one place: where a quest stands and
+     * where a stage's {@code next} leads agree, and a stage the quest
+     * lacks, or {@code end}, is past the last.
+     */
+    @Test
+    public void aStageIsFoundByItsIdOneWay() {
+        LostTalesQuestDefinition quest = quest(objective("a", false),
+                objective("b", true), objective("c", false),
+                objective("d", true));
+        assertEquals(1, LostTalesQuestRules.stageIndexOf(quest, "second"));
+        assertEquals(LostTalesQuestRules.stageIndexOf(quest, "second"),
+                LostTalesQuestObjectiveSelection.getCurrentStageIndex(quest,
+                        progressAt(quest, 0, "second")));
+        assertEquals(2, LostTalesQuestRules.stageIndexOf(quest,
+                LostTalesQuestRules.END));
+        assertEquals(2, LostTalesQuestRules.stageIndexOf(quest, ""));
+        assertEquals(2, LostTalesQuestRules.stageIndexOf(quest, null));
+        assertEquals(-1, LostTalesQuestObjectiveSelection.getCurrentStageIndex(
+                quest, progressAt(quest, 0, "")));
+    }
+
     /** The quest at that stage, with no objective progress, no start and no deadline. */
     private static LostTalesQuestProgress progressAt(LostTalesQuestDefinition quest,
                                                      int stageIndex, String stageId) {

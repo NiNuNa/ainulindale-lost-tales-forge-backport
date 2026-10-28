@@ -35,7 +35,10 @@ import net.minecraft.util.IChatComponent;
  * cursor by that width. A <em>header</em> marker on every row of a
  * message's header and a <em>body</em> marker on every row of its body
  * say which rows name its speaker and which carry its words, so the
- * stack can lay each out, measure it and draw it at its own size.</p>
+ * stack can lay each out, measure it and draw it at its own size. A line
+ * heard nearby carries on its body break and its body rows the size step
+ * its reader's distance gave it (CHAT-37): one larger, one smaller, or
+ * none.</p>
  *
  * <p>An action names its speaker inside its words: a <em>span end</em>
  * after that name closes the speaker's span, which a header closes with
@@ -88,14 +91,19 @@ final class ChatLayoutMarker {
     }
 
     /**
-     * Marks a row carrying a message's own words, which the closed feed
+     * Marks a row carrying a message's own words, which the feed
      * may draw at a size of its own. The wrapper adds it to every row
      * from the body break down, a grouped continuation's included, since
      * those are the words of a run as much as the first message's are.
      * Draws and measures nothing itself.
      */
     static ChatComponentText bodyRow() {
-        return marker(PREFIX + BODY_ROW);
+        return bodyRow(0);
+    }
+
+    /** As above, for the words of a line its reader reads {@code step} sizes from the usual. */
+    static ChatComponentText bodyRow(int step) {
+        return marker(PREFIX + BODY_ROW + (step == 0 ? "" : ":" + step));
     }
 
     /** A body break for words said, behind the chevron. */
@@ -111,7 +119,64 @@ final class ChatLayoutMarker {
      * no head marker to read them from.
      */
     static ChatComponentText bodyBreak(int color, ChatLineMark mark) {
-        return marker(PREFIX + BODY + (color & 0xFFFFFF) + ':' + mark.symbol);
+        return bodyBreak(color, mark, 0);
+    }
+
+    /**
+     * As above, for the words of a line heard nearby that its reader reads
+     * {@code step} sizes from the usual, by how far its speaker stood.
+     */
+    static ChatComponentText bodyBreak(int color, ChatLineMark mark, int step) {
+        return marker(PREFIX + BODY + (color & 0xFFFFFF) + ':' + mark.symbol
+                + (step == 0 ? "" : ":" + step));
+    }
+
+    /** The size step a body break carries; zero for none and for anything else. */
+    static int bodyStep(IChatComponent component) {
+        String payload = payloadOf(component);
+        if (payload == null || !payload.startsWith(BODY)) {
+            return 0;
+        }
+        int mark = payload.indexOf(':', BODY.length());
+        int step = mark < 0 ? -1 : payload.indexOf(':', mark + 1);
+        return step < 0 ? 0 : stepOf(payload.substring(step + 1));
+    }
+
+    /** The size step the body break among a line's runs carries; zero for a line with none. */
+    static int bodyStepOf(IChatComponent line) {
+        if (line == null) {
+            return 0;
+        }
+        for (Object value : line) {
+            if (value instanceof IChatComponent
+                    && isBodyBreak((IChatComponent)value)) {
+                return bodyStep((IChatComponent)value);
+            }
+        }
+        return 0;
+    }
+
+    /** The size step a row of words carries; zero for none and for any other row. */
+    static int bodyRowStep(IChatComponent row) {
+        if (row == null) {
+            return 0;
+        }
+        for (Object value : row) {
+            String payload = value instanceof IChatComponent
+                    ? payloadOf((IChatComponent)value) : null;
+            if (payload != null && payload.startsWith(BODY_ROW + ":")) {
+                return stepOf(payload.substring(BODY_ROW.length() + 1));
+            }
+        }
+        return 0;
+    }
+
+    /** A step written on a marker: one larger, one smaller, else none. */
+    private static int stepOf(String written) {
+        if ("1".equals(written)) {
+            return 1;
+        }
+        return "-1".equals(written) ? -1 : 0;
     }
 
     /**
@@ -177,7 +242,7 @@ final class ChatLayoutMarker {
         if (HEADER.equals(payload)) {
             return Data.HEADER;
         }
-        if (BODY_ROW.equals(payload)) {
+        if (BODY_ROW.equals(payload) || payload.startsWith(BODY_ROW + ":")) {
             return Data.BODY_ROW;
         }
         if (SPAN_END.equals(payload)) {
@@ -242,7 +307,7 @@ final class ChatLayoutMarker {
         return marked(row, HEADER);
     }
 
-    /** Whether the row is one of those carrying a message's own words. */
+    /** Whether the row is one of those carrying a message's own words, at whatever size. */
     static boolean isBodyRow(IChatComponent row) {
         return marked(row, BODY_ROW);
     }
@@ -252,8 +317,10 @@ final class ChatLayoutMarker {
             return false;
         }
         for (Object value : row) {
-            if (value instanceof IChatComponent
-                    && kind.equals(payloadOf((IChatComponent)value))) {
+            String payload = value instanceof IChatComponent
+                    ? payloadOf((IChatComponent)value) : null;
+            if (payload != null && (kind.equals(payload)
+                    || payload.startsWith(kind + ":"))) {
                 return true;
             }
         }

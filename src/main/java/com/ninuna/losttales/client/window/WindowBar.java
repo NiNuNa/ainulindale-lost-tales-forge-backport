@@ -117,7 +117,7 @@ public final class WindowBar {
     List<BarItem> itemsOf(WindowPage tab, PageContent content) {
         List<BarItem> items = new ArrayList<BarItem>();
         items.add(BarItem.tabButton(tab, StatCollector.translateToLocal(
-                "gui.losttales.window.bar.tab")));
+                "gui.losttales.window.bar.page")));
         BarItem identity = BarItem.identityButton();
         if (this.voice == null || this.voice.faceFor(tab) == null) {
             identity.unavailable(StatCollector.translateToLocal(
@@ -818,11 +818,7 @@ public final class WindowBar {
             LostTalesUiCutName.drawText(font, "§o" + item.label, x,
                     textTop(top), fieldRight - x, WindowStyle.asideRgb(), ink);
         }
-        if (item.isAvailable()) {
-            item.field.drawTextBox();
-        } else {
-            WindowFields.draw(item.field, ink);
-        }
+        WindowFields.draw(item.field, ink);
     }
 
     /**

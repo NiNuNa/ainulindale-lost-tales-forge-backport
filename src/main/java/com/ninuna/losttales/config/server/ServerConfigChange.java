@@ -4,7 +4,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/** One key an operator wants set: a single value, or every item of a list. */
+/**
+ * One key someone holding {@code server.config} wants set: a single
+ * value, or every item of a list.
+ */
 public final class ServerConfigChange {
 
     private final String category;

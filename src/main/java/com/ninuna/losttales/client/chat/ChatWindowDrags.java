@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import com.ninuna.losttales.client.window.Window;
 import com.ninuna.losttales.client.window.WindowFrame;
 import com.ninuna.losttales.client.window.WindowGestures;
@@ -64,20 +64,20 @@ final class ChatWindowDrags {
 
     /** Takes hold of a window's member list by its edge; live at once. */
     static void armMembersResize(WindowGestures gestures,
-                                 ChatTabActions actions, ChatFrame frame,
+                                 ChatPageActions actions, ChatFrame frame,
                                  Window window, double mouseX) {
         if (frame == null || window == null) {
             return;
         }
         WindowLayout.raise(window.getId());
         actions.selectWindow(window);
-        ConversationPage tab = ConversationPage.frontOf(window);
-        if (tab == null) {
+        ConversationPage page = ConversationPage.frontOf(window);
+        if (page == null) {
             return;
         }
-        gestures.startContentDrag(new MembersResize(window.getId(), tab,
+        gestures.startContentDrag(new MembersResize(window.getId(), page,
                 mouseX - frame.members.screenLeft,
-                ChatLayout.getMembersWidth(tab)));
+                ChatLayout.getMembersWidth(page)));
     }
 
     /** A scrollbar being dragged: which window, and where it was grabbed. */
@@ -135,7 +135,7 @@ final class ChatWindowDrags {
         }
 
         @Override
-        public LostTalesMapCursor.Pose pose() {
+        public LostTalesPointer.Pose pose() {
             return null;
         }
     }
@@ -153,16 +153,16 @@ final class ChatWindowDrags {
             implements WindowGestures.ContentDrag {
         final String windowId;
         /** The conversation whose list it is. */
-        final ConversationPage tab;
+        final ConversationPage page;
         /** How far right of the list's edge the pointer took hold of it. */
         final double grabOffset;
         /** The width the conversation had stored, for Escape. */
         final double storedWidth;
 
-        MembersResize(String windowId, ConversationPage tab, double grabOffset,
+        MembersResize(String windowId, ConversationPage page, double grabOffset,
                       double storedWidth) {
             this.windowId = windowId;
-            this.tab = tab;
+            this.page = page;
             this.grabOffset = grabOffset;
             this.storedWidth = storedWidth;
         }
@@ -183,7 +183,7 @@ final class ChatWindowDrags {
             float width = ChatMemberList.clampWidth(
                     (float)((frame.members.screenRight - edge) / frame.scale),
                     frame.members.minWidth, frame.members.maxWidth);
-            ChatLayout.setMembersWidth(this.tab, width, false);
+            ChatLayout.setMembersWidth(this.page, width, false);
         }
 
         /** The width the edge was left at is written down, once. */
@@ -195,7 +195,7 @@ final class ChatWindowDrags {
         /** Escape means "as it was": the list takes back its width. */
         @Override
         public void cancel() {
-            ChatLayout.setMembersWidth(this.tab, this.storedWidth, false);
+            ChatLayout.setMembersWidth(this.page, this.storedWidth, false);
         }
 
         @Override
@@ -204,8 +204,8 @@ final class ChatWindowDrags {
         }
 
         @Override
-        public LostTalesMapCursor.Pose pose() {
-            return LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
+        public LostTalesPointer.Pose pose() {
+            return LostTalesPointer.Pose.RESIZE_HORIZONTAL;
         }
     }
 }

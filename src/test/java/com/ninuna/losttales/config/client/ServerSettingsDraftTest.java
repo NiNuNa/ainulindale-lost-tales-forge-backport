@@ -255,4 +255,37 @@ public final class ServerSettingsDraftTest {
         assertEquals(0.0D, ServerSettingsDraft.bounds(bounded)[0], 0.0D);
         assertEquals(10.0D, ServerSettingsDraft.bounds(bounded)[1], 0.0D);
     }
+
+    /** A setting too long for the page takes no change and is never part of a save (DATA-16). */
+    @Test
+    public void aSettingTooLongForThePageIsNeverSaved() {
+        ServerConfigEntry words = ServerConfigEntry.tooLongForThePage("chat", "profanityWords",
+                ServerConfigEntry.Type.STRING, true, "", "", false, null);
+        ServerConfigEntry address = ServerConfigEntry.tooLongForThePage("chat",
+                "serverAddress", ServerConfigEntry.Type.STRING, false, "", "", false, null);
+        ServerConfigEntry radius = single("chat", "proximityRadius",
+                ServerConfigEntry.Type.INTEGER, "64", "8", "512");
+        ServerSettingsDraft draft = loaded(words, address, radius);
+        assertFalse(draft.canAdd(words));
+        draft.addItem(words, "darn");
+        draft.setItem(words, 0, "darn");
+        draft.set(address, "play.example.net");
+        draft.set(radius, "80");
+        assertEquals(1, draft.count());
+        assertEquals(1, draft.changes().size());
+        assertEquals("proximityRadius", draft.changes().get(0).getKey());
+    }
+
+    /** A change that waits on a setting the server's file has since made too long goes. */
+    @Test
+    public void aWaitOnASettingNowTooLongGoes() {
+        ServerConfigEntry words = list("profanityWords", "darn");
+        ServerSettingsDraft draft = loaded(words);
+        draft.addItem(words, "drat");
+        assertEquals(1, draft.count());
+        draft.load(Collections.singletonList(ServerConfigEntry.tooLongForThePage("chat",
+                "profanityWords", ServerConfigEntry.Type.STRING, true, "", "", false, null)));
+        assertEquals(0, draft.count());
+        assertTrue(draft.changes().isEmpty());
+    }
 }

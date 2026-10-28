@@ -18,9 +18,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Synchronizes only the public fields required to render and describe the
- * identity a player is playing: the active character, or the account
- * itself with the arms its profile skin declares.
+ * Sends every client what each player looks like: only the public fields
+ * that draw and describe the identity they play, the character played or
+ * the account itself with the arms its skin declares.
  */
 public final class CharacterAppearanceSyncManager {
 
@@ -97,6 +97,49 @@ public final class CharacterAppearanceSyncManager {
         LostTalesNetworkHandler.CHANNEL.sendToAll(
                 new CharacterAppearanceSyncPacket(
                         false, Collections.singletonList(appearance)));
+    }
+
+    /**
+     * What the player looks like as their saved roster says now; null
+     * while it cannot be read. Taken before a request runs, so that only a
+     * look it changes goes to everyone.
+     */
+    public static CharacterAppearance appearanceOf(EntityPlayerMP player) {
+        if (player == null || player.getUniqueID() == null
+                || player.worldObj == null || player.worldObj.isRemote) {
+            return null;
+        }
+        try {
+            CharacterRoster roster = CharacterStorage.get(player.worldObj)
+                    .getRoster(player.getUniqueID());
+            return appearanceOf(player, roster);
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+    }
+
+    /**
+     * {@link #broadcastPlayer}, only where the player's look differs from
+     * {@code before}; always where {@code before} is unknown. Whether it
+     * was sent.
+     */
+    public static boolean broadcastIfChanged(EntityPlayerMP player,
+                                             CharacterAppearance before,
+                                             CharacterRoster roster) {
+        if (player == null || player.getUniqueID() == null) {
+            return false;
+        }
+        if (before != null && before.sameAs(appearanceOf(player, roster))) {
+            return false;
+        }
+        broadcastPlayer(player, roster);
+        return true;
+    }
+
+    private static CharacterAppearance appearanceOf(EntityPlayerMP player,
+                                                    CharacterRoster roster) {
+        return CharacterAppearance.fromRoster(player.getUniqueID(),
+                accountName(player), roster, accountArms(player));
     }
 
     public static void broadcastRemoval(UUID playerId) {

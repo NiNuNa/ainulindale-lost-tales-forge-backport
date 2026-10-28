@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * The perks one character took, by their effect (PROG-06): each one on
  * and known to the skills in force, with its rank. A switched-off perk
- * or one whose skill or tree no longer has it does nothing. An armour
+ * or one the skills in force do not hold does nothing. An armour
  * skill's perks work only as far as the armour worn lets them
  * ({@link #armoured}, PROG-17).
  */

@@ -68,13 +68,13 @@ final class ClientChatPendingEchoes {
     /** Remembers a line that is on screen but not yet confirmed. */
     static synchronized void remember(long nonce, int chatLineId,
                                       LostTalesChatMessagePacket packet,
-                                      ConversationPage tab, int[] showcaseIds,
+                                      ConversationPage page, int[] showcaseIds,
                                       long sentAtMillis) {
-        if (nonce == 0L || packet == null || tab == null) {
+        if (nonce == 0L || packet == null || page == null) {
             return;
         }
         BY_NONCE.put(Long.valueOf(nonce), new Pending(nonce, chatLineId,
-                packet, tab, showcaseIds, sentAtMillis));
+                packet, page, showcaseIds, sentAtMillis));
         BY_LINE.put(Integer.valueOf(chatLineId), Long.valueOf(nonce));
         while (BY_NONCE.size() > MAX_PENDING) {
             Iterator<Map.Entry<Long, Pending>> oldest =
@@ -148,17 +148,17 @@ final class ClientChatPendingEchoes {
         final long nonce;
         final int chatLineId;
         final LostTalesChatMessagePacket packet;
-        final ConversationPage tab;
+        final ConversationPage page;
         final int[] showcaseIds;
         final long sentAtMillis;
 
         private Pending(long nonce, int chatLineId,
-                        LostTalesChatMessagePacket packet, ConversationPage tab,
+                        LostTalesChatMessagePacket packet, ConversationPage page,
                         int[] showcaseIds, long sentAtMillis) {
             this.nonce = nonce;
             this.chatLineId = chatLineId;
             this.packet = packet;
-            this.tab = tab;
+            this.page = page;
             this.showcaseIds = showcaseIds;
             this.sentAtMillis = sentAtMillis;
         }

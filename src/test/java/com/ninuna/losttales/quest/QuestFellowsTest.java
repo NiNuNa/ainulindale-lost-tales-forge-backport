@@ -92,16 +92,25 @@ public final class QuestFellowsTest {
                 Collections.singletonMap("wheels", Integer.valueOf(1))));
         sent.add(new QuestFellowCount(QUEST, "Dior", true, true, null));
         ByteBuf buffer = Unpooled.buffer();
-        new LostTalesQuestFellowsPacket(sent).toBytes(buffer);
+        new LostTalesQuestFellowsPacket(sent, true).toBytes(buffer);
         LostTalesQuestFellowsPacket read = new LostTalesQuestFellowsPacket();
         read.fromBytes(buffer);
         assertFalse(read.isMalformed());
         assertFalse(read.getCounts().get(0).isTravelling());
         assertTrue(read.getCounts().get(1).isTravelling());
         assertEquals(sent, read.getCounts());
+        assertTrue(read.isShared());
+
+        ByteBuf off = Unpooled.buffer();
+        new LostTalesQuestFellowsPacket(sent, false).toBytes(off);
+        LostTalesQuestFellowsPacket sharingOff = new LostTalesQuestFellowsPacket();
+        sharingOff.fromBytes(off);
+        assertFalse(sharingOff.isMalformed());
+        assertFalse("the server's shared progress is off (QUEST-25)", sharingOff.isShared());
+        assertEquals(sent, sharingOff.getCounts());
 
         ByteBuf extra = Unpooled.buffer();
-        new LostTalesQuestFellowsPacket(sent).toBytes(extra);
+        new LostTalesQuestFellowsPacket(sent, true).toBytes(extra);
         extra.writeBoolean(true);
         LostTalesQuestFellowsPacket longer = new LostTalesQuestFellowsPacket();
         longer.fromBytes(extra);
@@ -116,14 +125,14 @@ public final class QuestFellowsTest {
                 Collections.singletonMap("wheels", Integer.valueOf(2))));
         sent.add(new QuestFellowCount(QUEST, "Dior", true, false, null));
         ByteBuf buffer = Unpooled.buffer();
-        new LostTalesQuestFellowsPacket(sent).toBytes(buffer);
+        new LostTalesQuestFellowsPacket(sent, true).toBytes(buffer);
         LostTalesQuestFellowsPacket read = new LostTalesQuestFellowsPacket();
         read.fromBytes(buffer);
         assertFalse(read.isMalformed());
         assertEquals(sent, read.getCounts());
 
         ByteBuf cut = Unpooled.buffer();
-        new LostTalesQuestFellowsPacket(sent).toBytes(cut);
+        new LostTalesQuestFellowsPacket(sent, true).toBytes(cut);
         cut.writerIndex(cut.writerIndex() - 3);
         LostTalesQuestFellowsPacket broken = new LostTalesQuestFellowsPacket();
         broken.fromBytes(cut);
@@ -131,6 +140,7 @@ public final class QuestFellowsTest {
         assertTrue(broken.getCounts().isEmpty());
 
         ByteBuf tooMany = Unpooled.buffer();
+        tooMany.writeBoolean(true);
         tooMany.writeInt(QuestFellows.MAX_COUNTS + 1);
         LostTalesQuestFellowsPacket refused = new LostTalesQuestFellowsPacket();
         refused.fromBytes(tooMany);

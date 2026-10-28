@@ -19,7 +19,7 @@ import net.minecraft.util.IChatComponent;
  * ({@link ChatBodyMarker}, {@link ChatLineMark}). Every continuation line
  * of the body opens with an {@link ChatLayoutMarker#indent indent marker}
  * of the mark's width, so a wrapped body reads as one block beside it. The
- * closed feed names the sender in brackets with the small head inside
+ * feed names the sender in brackets with the small head inside
  * them; an open window names them plainly, their head standing as the
  * avatar in the window's timestamp area ({@link ChatAvatar}) and taking
  * no room in the row, and their time standing behind the name
@@ -53,8 +53,11 @@ import net.minecraft.util.IChatComponent;
  * laid out against the room their size leaves them and marked for it
  * ({@link ChatLayoutMarker#header()},
  * {@link ChatLayoutMarker#bodyRow()}): the open window's speaker row is
- * larger and has less room, the closed feed's words are smaller and have
- * more.</p>
+ * larger and has less room, the feed's words are smaller and have
+ * more. A line heard nearby whose reader reads it a size larger or smaller
+ * (CHAT-37) is laid out by its caller against the room that size leaves,
+ * and its rows of words carry the step its body break does
+ * ({@link ChatLayoutMarker#bodyRow(int)}).</p>
  *
  * <p>Widths come from the same measure the renderer draws with (the
  * component's style formatting code plus its text), so inline formatting
@@ -66,7 +69,7 @@ import net.minecraft.util.IChatComponent;
  *
  * <p>A line is laid out for the state it will be drawn in: the closed
  * HUD shows the channel prefix and reserves its width, the open screen
- * hides it (the tabs already name the channel) and gives that width back
+ * hides it (the pages already name the channel) and gives that width back
  * to the message body. Either way the indent marker carries both
  * offsets, so the renderer can align continuation lines in both
  * states.</p>
@@ -186,7 +189,7 @@ final class ChatLineWrapper {
             return null;
         }
         // Each state pays only for the header runs it draws inline: the
-        // closed feed for the channel prefix, the open screen for none.
+        // feed for the channel prefix, the open screen for none.
         int closedPrefix = 0;
         int openPrefix = 0;
         for (int index = breakIndex + 1; index < bodyIndex; index++) {
@@ -276,6 +279,7 @@ final class ChatLineWrapper {
                 int senderColor = ChatLayoutMarker.bodyColor(part);
                 builder.beginBody(senderColor < 0 ? nameColor
                         : senderColor, ChatLayoutMarker.bodyMark(part));
+                builder.bodyStep = ChatLayoutMarker.bodyStep(part);
             } else if (isAtomic(part)) {
                 builder.appendAtomic(part);
             } else {
@@ -535,6 +539,8 @@ final class ChatLineWrapper {
         private int bodyFirstRow = -1;
         /** The first row under the words, or -1 while nothing stands there. */
         private int underFirstRow = -1;
+        /** The size step the body break carries: what every row of words is marked with. */
+        int bodyStep;
 
         Builder(TextMetrics metrics, int bodyWidth, int headerWidth,
                 int closedIndent, int openIndent, int maxIndent,
@@ -757,7 +763,7 @@ final class ChatLineWrapper {
             for (int row = Math.max(0, this.bodyFirstRow);
                  this.bodyFirstRow >= 0 && row < this.lines.size(); row++) {
                 this.lines.get(row).appendSibling(
-                        ChatLayoutMarker.bodyRow());
+                        ChatLayoutMarker.bodyRow(this.bodyStep));
             }
             return this.lines;
         }

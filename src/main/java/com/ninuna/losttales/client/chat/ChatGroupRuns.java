@@ -12,8 +12,8 @@ import net.minecraft.util.IChatComponent;
  *
  * <p>Grouping is presentation, and two views of the same history do not
  * see the same neighbours: a channel's own window sees only that
- * channel's messages, while the closed feed sees every unmuted channel
- * interleaved. One decision taken when the message was printed would be
+ * channel's messages, while the feed sees every conversation it
+ * carries interleaved. One decision taken when the message was printed would be
  * right in at most one of them, so none is taken there. Vanilla's
  * history keeps every message in full, header and all; this keeps the
  * sender identity each message was signed with and the grouped form of
@@ -24,7 +24,7 @@ import net.minecraft.util.IChatComponent;
  * speaker cannot extend a single run all evening, wherever it is
  * read.</p>
  *
- * <p>The closed feed also drops a run when it fades, and it fades a
+ * <p>The feed also drops a run when it fades, and it fades a
  * whole run at once on the clock of its newest message. A message there
  * can only continue a group still on screen, which is exactly while the
  * message <em>before</em> it is within the fade
@@ -35,13 +35,13 @@ import net.minecraft.util.IChatComponent;
  * <p>A message with no entry here — a line printed straight into
  * vanilla's chat — has no identity to continue, so it ends whatever run
  * it lands in, in every view alike.
- * Entries are bounded like the tab index and go with the rest of the
+ * Entries are bounded like the page index and go with the rest of the
  * client's chat state.</p>
  */
 final class ChatGroupRuns {
     /**
      * How long a sender keeps their run, in every view: a message from
-     * the same identity in the same tab no later than this after the one
+     * the same identity in the same page no later than this after the one
      * that opened the run drops the repeated head and name. Eight
      * minutes, as Discord ends a group eight minutes after its first
      * message.
@@ -54,7 +54,7 @@ final class ChatGroupRuns {
     static final UUID NARRATOR_VOICE = UUID.nameUUIDFromBytes(
             "losttales:narrator".getBytes(java.nio.charset.Charset.forName("UTF-8")));
     /**
-     * How long the closed feed keeps a line on screen, in milliseconds:
+     * How long the feed keeps a line on screen, in milliseconds:
      * its setting's time, in the units a message's timestamp is in. A
      * message there this long after the one before it finds the whole
      * group gone and opens one of its own.
@@ -74,22 +74,22 @@ final class ChatGroupRuns {
      * would not name — but still opens a run the messages after it may
      * join.
      */
-    static synchronized void remember(int chatLineId, ConversationPage tab,
+    static synchronized void remember(int chatLineId, ConversationPage page,
                                       UUID senderId, String identityName,
                                       boolean accountLine,
                                       long timestampMillis,
                                       boolean groupable,
                                       IChatComponent groupedLine) {
-        if (tab == null || senderId == null || identityName == null
+        if (page == null || senderId == null || identityName == null
                 || groupedLine == null) {
             return;
         }
         // Remembered under the conversation the line is read in: a
-        // scoped channel's row tab and its conversation tab are one
+        // scoped channel's row page and its conversation page are one
         // place to the reader, and a line filed under one — this
         // player's own echo, a command's echo — must run on with lines
         // filed under the other.
-        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ConversationPage.viewedConversation(tab),
+        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(ConversationPage.viewedConversation(page),
                 senderId, identityName, accountLine, timestampMillis,
                 groupable, groupedLine));
         while (ENTRIES.size() > ClientChatChannelViews.maxTrackedLines()) {
@@ -112,7 +112,7 @@ final class ChatGroupRuns {
         if (entry == null || groupedLine == null) {
             return;
         }
-        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(entry.tab,
+        ENTRIES.put(Integer.valueOf(chatLineId), new Entry(entry.page,
                 entry.senderId, entry.identityName, entry.accountLine,
                 entry.timestampMillis, entry.groupable, groupedLine));
     }
@@ -149,7 +149,7 @@ final class ChatGroupRuns {
     }
 
     /**
-     * As above for the closed feed, where a message also needs the one
+     * As above for the feed, where a message also needs the one
      * before it still on screen: the group fades with its newest line,
      * and a message after it has gone would stand headless.
      */
@@ -191,7 +191,7 @@ final class ChatGroupRuns {
 
     /**
      * Whether the two are the same voice speaking on: the same sender,
-     * as the same identity, in the same tab, in that order in time.
+     * as the same identity, in the same page, in that order in time.
      * {@code previous} is the message before this one <em>in the view
      * being laid out</em>, not in the history. How long a run may stay
      * open is not decided here.
@@ -199,7 +199,7 @@ final class ChatGroupRuns {
     private static boolean sameVoice(Entry previous, Entry next) {
         return LostTalesConfig.enableChatMessageGrouping
                 && previous != null && next != null
-                && previous.tab.equals(next.tab)
+                && previous.page.equals(next.page)
                 && previous.senderId.equals(next.senderId)
                 && previous.accountLine == next.accountLine
                 && previous.identityName.equalsIgnoreCase(next.identityName)
@@ -212,7 +212,7 @@ final class ChatGroupRuns {
 
     /** One printed message's sender identity and its grouped line. */
     static final class Entry {
-        final ConversationPage tab;
+        final ConversationPage page;
         final UUID senderId;
         final String identityName;
         final boolean accountLine;
@@ -222,11 +222,11 @@ final class ChatGroupRuns {
         /** The line without its repeated header; a view picks between the two. */
         final IChatComponent groupedLine;
 
-        private Entry(ConversationPage tab, UUID senderId, String identityName,
+        private Entry(ConversationPage page, UUID senderId, String identityName,
                       boolean accountLine, long timestampMillis,
                       boolean groupable, IChatComponent groupedLine) {
             this.groupable = groupable;
-            this.tab = tab;
+            this.page = page;
             this.senderId = senderId;
             this.identityName = identityName;
             this.accountLine = accountLine;

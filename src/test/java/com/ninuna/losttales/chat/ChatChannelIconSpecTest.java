@@ -60,7 +60,7 @@ public final class ChatChannelIconSpecTest {
     public void theTextParsesBackToItself() {
         for (String text : new String[] {"emoji:slight_smile",
                 "item:minecraft:diamond", "item:minecraft:wool@7",
-                "channel:client_console"}) {
+                "channel:console"}) {
             ChatChannelIconSpec icon = ChatChannelIconSpec.parse(text);
             assertNotNull(text, icon);
             assertEquals(text, icon.toText());

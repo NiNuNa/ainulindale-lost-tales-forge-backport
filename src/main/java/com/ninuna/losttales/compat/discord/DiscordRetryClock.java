@@ -8,7 +8,7 @@ import java.util.Map;
  * A failure holds the key back for a pause that doubles with each
  * failure in a row, from five seconds up to a minute; an answer forgets
  * the key. Not thread-safe: each belongs to one worker thread. The keys
- * are the bindings' own, so the map is as bounded as the config.
+ * are the links' own, so the map is as bounded as the config.
  */
 final class DiscordRetryClock {
     static final long MIN_WAIT_MILLIS = 5000L;

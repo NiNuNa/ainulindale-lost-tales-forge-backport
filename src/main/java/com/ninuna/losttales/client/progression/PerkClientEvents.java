@@ -27,8 +27,8 @@ import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 
 /**
  * The perks only the client shows (PROG-06): Eagle Eye's zoom while a
- * bow is drawn, Horse Sense's figures by the crosshair (Nils,
- * 2026-10-19), and the cook's name on marked food.
+ * bow is drawn, Horse Sense's figures by the crosshair (PROG-16), and
+ * the cook's name on marked food (PROG-15).
  */
 public final class PerkClientEvents {
     /** A horse's speed attribute in blocks a second. */

@@ -23,7 +23,7 @@ import com.ninuna.losttales.chat.profanity.ChatProfanityCatalog;
 import com.ninuna.losttales.chat.profanity.ChatProfanityMode;
 import com.ninuna.losttales.chat.profanity.ChatProfanityWords;
 import com.ninuna.losttales.chat.server.ChatWelcome;
-import com.ninuna.losttales.util.LostTalesServerLanguage;
+import com.ninuna.losttales.util.LostTalesLanguages;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
@@ -54,9 +54,9 @@ public final class LostTalesConfig {
     public static final String CATEGORY_CHANNELS = "channels";
 
     /** The panels where the player put them, in no layout. */
-    public static final String HUD_PRESET_CUSTOM = "custom";
+    public static final String HUD_LAYOUT_CUSTOM = "custom";
     /** The layout every panel starts in, and where Default Place puts one back. */
-    public static final String HUD_PRESET_DEFAULT = "default";
+    public static final String HUD_LAYOUT_DEFAULT = "default";
     /** What a HUD layout's id is made of: lower-case letters, digits, - and _, at most 64. */
     public static final String HUD_LAYOUT_ID = "[a-z0-9_-]{1,64}";
 
@@ -83,7 +83,7 @@ public final class LostTalesConfig {
 
     /** The HUD panels by the names the client file and the layout files keep their places under. */
     private static final List<String> HUD_ELEMENTS = Collections.unmodifiableList(
-            Arrays.asList("compass", "fellowship", "quickloot", "quest",
+            Arrays.asList("compass", "fellowship", "quick_loot", "quest",
                     "notifications"));
     /**
      * The HUD layouts that loaded (MAP-11), by id in the order the HUD
@@ -101,7 +101,7 @@ public final class LostTalesConfig {
     private static final double HUD_PANEL_UNPLACED = 50.0D;
 
     public static boolean showLostTalesHud = true;
-    public static String hudPlacementPreset = HUD_PRESET_DEFAULT;
+    public static String hudPanelLayout = HUD_LAYOUT_DEFAULT;
 
     public static boolean showCompassHud = true;
     public static double compassHudOffsetX = HUD_PANEL_UNPLACED;
@@ -142,12 +142,12 @@ public final class LostTalesConfig {
     public static double quickLootHudOffsetX = HUD_PANEL_UNPLACED;
     public static double quickLootHudOffsetY = HUD_PANEL_UNPLACED;
 
-    public static boolean showQuestHud = true;
-    public static double questHudOffsetX = HUD_PANEL_UNPLACED;
-    public static double questHudOffsetY = HUD_PANEL_UNPLACED;
-    public static int questHudMaxTrackedQuests = 4;
-    public static int questHudObjectiveLineCount = 2;
-    public static boolean showQuestHudNotifications = true;
+    public static boolean showQuestTracker = true;
+    public static double questTrackerHudOffsetX = HUD_PANEL_UNPLACED;
+    public static double questTrackerHudOffsetY = HUD_PANEL_UNPLACED;
+    public static int questTrackerMaxQuests = 4;
+    public static int questTrackerObjectiveLineCount = 2;
+    public static boolean showQuestBanners = true;
     public static boolean showNativeLotrQuestTracker = false;
     /**
      * Whether a quest offered by somebody is talked about in the Lost
@@ -155,19 +155,39 @@ public final class LostTalesConfig {
      * LOTR's own screen, and a Lost Tales quest giver's words go to the
      * chat while their quest is taken or handed in on touch.
      */
-    public static boolean enableQuestDialogue = true;
+    public static boolean enableQuestConversation = true;
     /** The one slot every passing notice shares: quest banners, discoveries, area names. */
     public static double notificationHudOffsetX = HUD_PANEL_UNPLACED;
     public static double notificationHudOffsetY = HUD_PANEL_UNPLACED;
-    public static boolean showWorldQuestMarkers = true;
+    public static boolean showWorldLabels = true;
     public static boolean showDiscoveredWorldMapMarkers = true;
     public static int worldQuestMarkerMaxDistance = 256;
 
     public static boolean showQuestChatFeedback = true;
     public static boolean playQuestSounds = true;
 
-    /** Server-authoritative recipient radius for the Proximity channel. */
-    public static int chatProximityRadius = 64;
+    /**
+     * How far a line said nearby carries, in blocks, by its range
+     * (CHAT-37, {@code ChatSpeechRange}): whispered, talked, shouted.
+     */
+    public static int chatProximityWhisperRange = 8;
+    public static int chatProximityTalkRange = 32;
+    public static int chatProximityShoutRange = 96;
+    /** The range a Proximity copy speaks at until its button picks another. */
+    public static String chatSpeechRange = "talk";
+    /** The words a size step by distance may take: three sizes, sizes and fainter, or off. */
+    public static final String CHAT_DISTANCE_THREE_SIZES = "three_sizes";
+    public static final String CHAT_DISTANCE_SIZES_AND_FAINTER = "sizes_and_fainter";
+    public static final String CHAT_DISTANCE_OFF = "off";
+    static final String[] CHAT_DISTANCE_SIZES = {CHAT_DISTANCE_THREE_SIZES,
+            CHAT_DISTANCE_SIZES_AND_FAINTER, CHAT_DISTANCE_OFF};
+    /** How a line said nearby shows how far its speaker stood. */
+    public static String chatDistanceSizes = CHAT_DISTANCE_THREE_SIZES;
+    /** The lines each whisper pair keeps past the history's total, as a channel keeps its floor. */
+    public static int chatWhisperHistoryFloor = 50;
+    /** The commands a mute holds besides the game's own, one name per line. */
+    public static String[] chatMutedCommands = {"r", "reply", "pm", "m",
+            "message", "whisper", "mail"};
     /** Client-only presentation preferences; neither affects recipients. */
     public static boolean enableChatEmojis = true;
     public static boolean convertChatEmoticons = true;
@@ -218,7 +238,7 @@ public final class LostTalesConfig {
     public static String chatSelectedMentionColor = CHAT_COLOR_AUTOMATIC;
     /** The line a reply's quote jumps to, lit while the eye finds it. */
     public static String chatReplyHighlightColor = DEFAULT_CHAT_REPLY_HIGHLIGHT_COLOR;
-    /** The edges the closed-chat feed's lines may stand against. */
+    /** The edges the feed's lines may stand against. */
     static final String[] CHAT_FEED_ALIGNMENTS = {"LEFT", "CENTRE", "RIGHT"};
     /** Where the feed's lines stand until chosen: the middle. */
     static final String DEFAULT_CHAT_FEED_ALIGNMENT = "CENTRE";
@@ -238,13 +258,13 @@ public final class LostTalesConfig {
             CHAT_SIZE_SMALLER, CHAT_SIZE_SAME, CHAT_SIZE_LARGER};
     /** The row a message names its speaker on, in the open window. */
     public static String chatSpeakerSize = CHAT_SIZE_LARGER;
-    /** The same row in the closed feed, a step over the feed's own words. */
+    /** The same row in the feed, a step over the feed's own words. */
     public static String chatFeedSpeakerSize = CHAT_SIZE_LARGER;
-    /** What a message says, in the closed feed. */
+    /** What a message says, in the feed. */
     public static String chatFeedMessageSize = CHAT_SIZE_SMALLER;
     /** The row a reply opens with, in the open window. */
     public static String chatQuoteSize = CHAT_SIZE_SMALLER;
-    /** The same row in the closed feed, as large as the feed's words. */
+    /** The same row in the feed, as large as the feed's words. */
     public static String chatFeedQuoteSize = CHAT_SIZE_SAME;
     /** How wide the chat feed stands, in GUI pixels. */
     public static int chatFeedWidth = 320;
@@ -314,12 +334,6 @@ public final class LostTalesConfig {
     public static String[] chatWelcomeLines = new String[0];
     /** The address players join by, in the Server's status line and Discord's topics; empty for none. */
     public static String serverAddress = "";
-    /**
-     * The language a dedicated server writes in, one the mod has a lang
-     * file for ({@link LostTalesServerLanguage}, LANG-08); an unknown one
-     * reads as English.
-     */
-    public static String serverLanguage = LostTalesServerLanguage.ENGLISH;
     /** The config-defined permissions a role may grant; see {@code ChatRoleConfig}. */
     public static String[] chatPermissions = new String[0];
     /** The config-defined chat roles; see {@code ChatRoleConfig}. */
@@ -341,10 +355,10 @@ public final class LostTalesConfig {
     public static int discordPollIntervalSeconds = 3;
     /**
      * The links, one entry per Discord channel a game channel goes to
-     * ({@code DiscordChannelBindings}); none in a fresh file, since a
+     * ({@code DiscordChannelLinks}); none in a fresh file, since a
      * link is made by a code with {@code /losttales discord link}.
      */
-    public static String[] discordChannelBindings = new String[0];
+    public static String[] discordChannelLinks = new String[0];
     /** The picture a post carries: {name}/{uuid} of the sender's account. */
     public static String discordAvatarUrlTemplate =
             "https://mc-heads.net/head/{name}/64";
@@ -367,6 +381,14 @@ public final class LostTalesConfig {
     public static boolean discordPingMembers = true;
     /** How the profanity list's words read in what the bridge posts: a {@link ChatProfanityMode} name. */
     public static String discordProfanityFilter = ChatProfanityMode.OFF.name();
+    /**
+     * The language a link writes in on Discord unless one was chosen for
+     * it, one the mod ships a lang file for ({@link LostTalesLanguages},
+     * DISC-30); an unknown one reads as English.
+     */
+    public static String discordLanguage = LostTalesLanguages.ENGLISH;
+    /** The most lines each linked Discord channel sends into the game in five seconds (DISC-31). */
+    public static int discordLinesPerChannel = 40;
 
     /** Client-only screen background preferences. */
     public static boolean enableGuiBackground = true;
@@ -380,7 +402,9 @@ public final class LostTalesConfig {
     public static boolean allowQuestItemStarts = true;
     public static boolean allowQuestInteractionStarts = true;
     public static boolean autoRevealQuestMarkersOnStart = true;
-    public static boolean autoPinQuestOnStart = true;
+    /** Whether a rumour whose file names no marker points to the first place its quest names (QUEST-20). */
+    public static boolean rumoursPointToQuestPlaces = true;
+    public static boolean autoTrackQuestOnStart = true;
     public static boolean autoDiscoverNearbyMapMarkers = true;
     public static int mapMarkerDiscoveryScanIntervalTicks = 40;
     /**
@@ -422,6 +446,12 @@ public final class LostTalesConfig {
     public static int repeatRecoverySeconds = 60;
     /** The most experience one skill gains in an hour; 0 for no cap (PROG-08). */
     public static int skillHourlyCap = 0;
+    /** Whether what a finished quest earns by its size goes past the hourly cap (PROG-08). */
+    public static boolean finishedQuestsPassHourlyCap = true;
+    /** Whether what a first find earns goes past the hourly cap (PROG-08). */
+    public static boolean firstFindsPassHourlyCap = true;
+    /** Whether a foe a Soft Step wearer strikes picks them whatever the range (PROG-17). */
+    public static boolean softStepEndsOnStrike = true;
     /** LOTR coins the first reset at a statue costs a character (PROG-12). */
     public static int statueFirstPrice = 100;
     /** What each later reset of the same character costs, times the one before (PROG-12). */
@@ -442,14 +472,14 @@ public final class LostTalesConfig {
     public static String missiveBoardRecipeEdgeIngredient = "ore:stickWood";
     public static String missiveBoardRecipeCenterIngredient = "minecraft:paper";
 
-    public static boolean enableDynamicMissiveBoards = true;
+    public static boolean enableMissiveBoards = true;
     /** Whether boards post from the bundled missive templates beside a server's own (QUEST-42). */
     public static boolean bundledMissiveTemplates = true;
     public static int missiveBoardMinAvailable = 5;
     public static int missiveBoardMaxAvailable = 9;
     public static int missiveBoardGenerationIntervalTicks = 36000;
-    public static int missiveBoardMinGeneratedPerCycle = 1;
-    public static int missiveBoardMaxGeneratedPerCycle = 3;
+    public static int missiveBoardMinPostedPerCycle = 1;
+    public static int missiveBoardMaxPostedPerCycle = 3;
     public static boolean expireMissiveBoardNotices = true;
     public static int missiveBoardNoticeExpirationDays = 7;
     public static boolean enableTimedMissives = true;
@@ -476,6 +506,8 @@ public final class LostTalesConfig {
     public static int characterStateCheckpointIntervalSeconds = 300;
     public static int characterStateCheckpointPlayersPerTick = 1;
     public static int characterDeletionRetentionDays = 30;
+    /** Whether a worn ring drops at death with the player's things (ACC-05). */
+    public static boolean ringDropsAtDeath = true;
     public static long characterSwitchCombatGraceMillis = 20000L;
     public static long characterSwitchTeleportGraceMillis = 5000L;
 
@@ -681,6 +713,12 @@ public final class LostTalesConfig {
                     3650,
                     TIP
             );
+            ringDropsAtDeath = config.getBoolean(
+                    "ringDropsAtDeath",
+                    CATEGORY_CHARACTERS,
+                    ringDropsAtDeath,
+                    TIP
+            );
             sanitizeCharacterSwitchOptions();
 
             showLostTalesHud = config.getBoolean(
@@ -689,18 +727,18 @@ public final class LostTalesConfig {
                     showLostTalesHud,
                     TIP
             );
-            Property hudPresetProperty = config.get(
+            Property hudLayoutProperty = config.get(
                     CATEGORY_CLIENT,
-                    "hudPlacementPreset",
-                    hudPlacementPreset,
+                    "hudPanelLayout",
+                    hudPanelLayout,
                     TIP
             );
             if (hudLayoutsRead) {
-                hudPresetProperty.setValidValues(hudPresetValues());
+                hudLayoutProperty.setValidValues(hudPresetValues());
             }
             // Kept as written until the layout files are read: whether it
             // names one that loads is told then (useHudLayouts).
-            hudPlacementPreset = normalizeHudPreset(hudPresetProperty.getString());
+            hudPanelLayout = normalizeHudLayout(hudLayoutProperty.getString());
 
             showCompassHud = config.getBoolean(
                     "showCompassHud",
@@ -925,38 +963,38 @@ public final class LostTalesConfig {
                     TIP
             );
 
-            showQuestHud = config.getBoolean(
-                    "showQuestHud",
+            showQuestTracker = config.getBoolean(
+                    "showQuestTracker",
                     CATEGORY_CLIENT,
-                    showQuestHud,
+                    showQuestTracker,
                     TIP
             );
-            questHudOffsetX = getHudPercent(
-                    config, "questHudOffsetX",
-                    questHudOffsetX, 0.0D, 100.0D);
-            questHudOffsetY = getHudPercent(
-                    config, "questHudOffsetY",
-                    questHudOffsetY, 0.0D, 100.0D);
-            questHudMaxTrackedQuests = config.getInt(
-                    "questHudMaxTrackedQuests",
+            questTrackerHudOffsetX = getHudPercent(
+                    config, "questTrackerHudOffsetX",
+                    questTrackerHudOffsetX, 0.0D, 100.0D);
+            questTrackerHudOffsetY = getHudPercent(
+                    config, "questTrackerHudOffsetY",
+                    questTrackerHudOffsetY, 0.0D, 100.0D);
+            questTrackerMaxQuests = config.getInt(
+                    "questTrackerMaxQuests",
                     CATEGORY_CLIENT,
-                    questHudMaxTrackedQuests,
+                    questTrackerMaxQuests,
                     1,
                     8,
                     TIP
             );
-            questHudObjectiveLineCount = config.getInt(
-                    "questHudObjectiveLineCount",
+            questTrackerObjectiveLineCount = config.getInt(
+                    "questTrackerObjectiveLineCount",
                     CATEGORY_CLIENT,
-                    questHudObjectiveLineCount,
+                    questTrackerObjectiveLineCount,
                     1,
                     3,
                     TIP
             );
-            showQuestHudNotifications = config.getBoolean(
-                    "showQuestHudNotifications",
+            showQuestBanners = config.getBoolean(
+                    "showQuestBanners",
                     CATEGORY_CLIENT,
-                    showQuestHudNotifications,
+                    showQuestBanners,
                     TIP
             );
             showNativeLotrQuestTracker = config.getBoolean(
@@ -965,10 +1003,10 @@ public final class LostTalesConfig {
                     showNativeLotrQuestTracker,
                     TIP
             );
-            enableQuestDialogue = config.getBoolean(
-                    "enableQuestDialogue",
+            enableQuestConversation = config.getBoolean(
+                    "enableQuestConversation",
                     CATEGORY_CLIENT,
-                    enableQuestDialogue,
+                    enableQuestConversation,
                     TIP
             );
             notificationHudOffsetX = getHudPercent(
@@ -977,10 +1015,10 @@ public final class LostTalesConfig {
             notificationHudOffsetY = getHudPercent(
                     config, "notificationHudOffsetY",
                     notificationHudOffsetY, 0.0D, 100.0D);
-            showWorldQuestMarkers = config.getBoolean(
-                    "showWorldQuestMarkers",
+            showWorldLabels = config.getBoolean(
+                    "showWorldLabels",
                     CATEGORY_CLIENT,
-                    showWorldQuestMarkers,
+                    showWorldLabels,
                     TIP
             );
             showDiscoveredWorldMapMarkers = config.getBoolean(
@@ -1003,14 +1041,56 @@ public final class LostTalesConfig {
                     showQuestChatFeedback,
                     TIP
             );
-            chatProximityRadius = config.getInt(
-                    "proximityRadius",
+            chatProximityWhisperRange = config.getInt(
+                    "proximityWhisperRange",
                     CATEGORY_CHAT,
-                    chatProximityRadius,
+                    chatProximityWhisperRange,
                     1,
                     512,
                     TIP
             );
+            chatProximityTalkRange = config.getInt(
+                    "proximityTalkRange",
+                    CATEGORY_CHAT,
+                    chatProximityTalkRange,
+                    1,
+                    512,
+                    TIP
+            );
+            chatProximityShoutRange = config.getInt(
+                    "proximityShoutRange",
+                    CATEGORY_CHAT,
+                    chatProximityShoutRange,
+                    1,
+                    512,
+                    TIP
+            );
+            sanitizeSpeechRanges(config);
+            chatWhisperHistoryFloor = config.getInt(
+                    "whisperHistoryFloor",
+                    CATEGORY_CHAT,
+                    chatWhisperHistoryFloor,
+                    0,
+                    200,
+                    TIP
+            );
+            chatMutedCommands = config.getStringList(
+                    "mutedCommands",
+                    CATEGORY_CHAT,
+                    chatMutedCommands,
+                    TIP
+            );
+            Property speechRangeProperty = config.get(
+                    CATEGORY_CLIENT, "chatSpeechRange", chatSpeechRange, TIP);
+            speechRangeProperty.setValidValues(
+                    com.ninuna.losttales.chat.ChatSpeechRange.ids());
+            chatSpeechRange = com.ninuna.losttales.chat.ChatSpeechRange.of(
+                    speechRangeProperty.getString(),
+                    com.ninuna.losttales.chat.ChatSpeechRange.TALK).id;
+            Property distanceProperty = config.get(
+                    CATEGORY_CLIENT, "chatDistanceSizes", chatDistanceSizes, TIP);
+            distanceProperty.setValidValues(CHAT_DISTANCE_SIZES);
+            chatDistanceSizes = normalizeDistanceSizes(distanceProperty.getString());
             chatTypingIndicators = config.getBoolean(
                     "typingIndicators",
                     CATEGORY_CHAT,
@@ -1041,12 +1121,6 @@ public final class LostTalesConfig {
                     serverAddress,
                     TIP
             );
-            serverLanguage = LostTalesServerLanguage.resolve(config.getString(
-                    "serverLanguage",
-                    CATEGORY_CHAT,
-                    serverLanguage,
-                    TIP
-            ));
             chatAuditLogEnabled = config.getBoolean(
                     "auditLog",
                     CATEGORY_CHAT,
@@ -1132,13 +1206,13 @@ public final class LostTalesConfig {
                     60,
                     TIP
             );
-            Property bindingsProperty = config.get(
+            Property linksProperty = config.get(
                     CATEGORY_DISCORD,
-                    "channelBindings",
+                    "channelLinks",
                     new String[0],
                     TIP
             );
-            discordChannelBindings = bindingsProperty.getStringList();
+            discordChannelLinks = linksProperty.getStringList();
             discordAvatarUrlTemplate = config.getString(
                     "avatarUrlTemplate",
                     CATEGORY_DISCORD,
@@ -1206,6 +1280,27 @@ public final class LostTalesConfig {
             discordProfanityProperty.setValidValues(ChatProfanityMode.names());
             discordProfanityFilter = ChatProfanityMode.of(
                     discordProfanityProperty.getString(), ChatProfanityMode.OFF).name();
+            String discordLanguageRead = config.getString(
+                    "language",
+                    CATEGORY_DISCORD,
+                    discordLanguage,
+                    TIP
+            );
+            discordLanguage = LostTalesLanguages.resolve(discordLanguageRead,
+                    CATEGORY_DISCORD + ".language");
+            if (!discordLanguage.equals(discordLanguageRead)) {
+                // Spelled the game's way, or English for a language the
+                // mod ships no file for; the file is put right.
+                config.getCategory(CATEGORY_DISCORD).get("language").set(discordLanguage);
+            }
+            discordLinesPerChannel = config.getInt(
+                    "linesPerChannel",
+                    CATEGORY_DISCORD,
+                    discordLinesPerChannel,
+                    1,
+                    256,
+                    TIP
+            );
             enableChatEmojis = config.getBoolean(
                     "enableChatEmojis",
                     CATEGORY_CLIENT,
@@ -1470,10 +1565,16 @@ public final class LostTalesConfig {
                     autoRevealQuestMarkersOnStart,
                     TIP
             );
-            autoPinQuestOnStart = config.getBoolean(
-                    "autoPinQuestOnStart",
+            rumoursPointToQuestPlaces = config.getBoolean(
+                    "rumoursPointToQuestPlaces",
                     CATEGORY_QUESTS,
-                    autoPinQuestOnStart,
+                    rumoursPointToQuestPlaces,
+                    TIP
+            );
+            autoTrackQuestOnStart = config.getBoolean(
+                    "autoTrackQuestOnStart",
+                    CATEGORY_QUESTS,
+                    autoTrackQuestOnStart,
                     TIP
             );
             autoDiscoverNearbyMapMarkers = config.getBoolean(
@@ -1554,6 +1655,12 @@ public final class LostTalesConfig {
                     CATEGORY_PROGRESSION, repeatRecoverySeconds, 1, 86400, TIP);
             skillHourlyCap = config.getInt("skillHourlyCap",
                     CATEGORY_PROGRESSION, skillHourlyCap, 0, 1000000, TIP);
+            finishedQuestsPassHourlyCap = config.getBoolean("finishedQuestsPassHourlyCap",
+                    CATEGORY_PROGRESSION, finishedQuestsPassHourlyCap, TIP);
+            firstFindsPassHourlyCap = config.getBoolean("firstFindsPassHourlyCap",
+                    CATEGORY_PROGRESSION, firstFindsPassHourlyCap, TIP);
+            softStepEndsOnStrike = config.getBoolean("softStepEndsOnStrike",
+                    CATEGORY_PROGRESSION, softStepEndsOnStrike, TIP);
             statueFirstPrice = config.getInt("statueFirstPrice",
                     CATEGORY_PROGRESSION, statueFirstPrice, 0, 1000000, TIP);
             statuePriceFactor = getBoundedDouble(config,
@@ -1599,10 +1706,10 @@ public final class LostTalesConfig {
                     TIP
             );
 
-            enableDynamicMissiveBoards = config.getBoolean(
-                    "enableDynamicMissiveBoards",
+            enableMissiveBoards = config.getBoolean(
+                    "enableMissiveBoards",
                     CATEGORY_MISSIVES,
-                    enableDynamicMissiveBoards,
+                    enableMissiveBoards,
                     TIP
             );
             bundledMissiveTemplates = config.getBoolean(
@@ -1635,18 +1742,18 @@ public final class LostTalesConfig {
                     240000,
                     TIP
             );
-            missiveBoardMinGeneratedPerCycle = config.getInt(
-                    "missiveBoardMinGeneratedPerCycle",
+            missiveBoardMinPostedPerCycle = config.getInt(
+                    "missiveBoardMinPostedPerCycle",
                     CATEGORY_MISSIVES,
-                    missiveBoardMinGeneratedPerCycle,
+                    missiveBoardMinPostedPerCycle,
                     1,
                     9,
                     TIP
             );
-            missiveBoardMaxGeneratedPerCycle = config.getInt(
-                    "missiveBoardMaxGeneratedPerCycle",
+            missiveBoardMaxPostedPerCycle = config.getInt(
+                    "missiveBoardMaxPostedPerCycle",
                     CATEGORY_MISSIVES,
-                    missiveBoardMaxGeneratedPerCycle,
+                    missiveBoardMaxPostedPerCycle,
                     1,
                     9,
                     TIP
@@ -1702,9 +1809,6 @@ public final class LostTalesConfig {
             if (fromFiles) {
                 writeCurrentValues(config);
                 applyShippedDefinitions(config);
-                // A dedicated server's lines in the language it writes in;
-                // nothing anywhere else.
-                LostTalesServerLanguage.apply(serverLanguage);
             }
         } finally {
             if (fromFiles && config.hasChanged()) {
@@ -1800,6 +1904,10 @@ public final class LostTalesConfig {
         List<String> commandWarnings = new ArrayList<String>();
         ChatCommandText.installServerNames(ChatCommandText.parseNames(
                 chatPrivateCommands, commandWarnings));
+        // The commands a mute holds besides the game's own; a login or a
+        // password command never stands on that list.
+        ChatCommandText.installMutedNames(ChatCommandText.parseMutedNames(
+                chatMutedCommands, commandWarnings));
         for (String warning : commandWarnings) {
             warnings.warn(warning);
         }
@@ -1844,23 +1952,23 @@ public final class LostTalesConfig {
         save();
     }
 
-    public static boolean applyHudPreset(String preset) {
-        String key = normalizeHudPreset(preset);
-        if (HUD_PRESET_CUSTOM.equals(key)) {
+    public static boolean applyHudLayout(String preset) {
+        String key = normalizeHudLayout(preset);
+        if (HUD_LAYOUT_CUSTOM.equals(key)) {
             if (!isCustomHudPreset(preset)) {
                 return false;
             }
-            hudPlacementPreset = HUD_PRESET_CUSTOM;
+            hudPanelLayout = HUD_LAYOUT_CUSTOM;
             save();
             return true;
         }
 
-        if (!isKnownHudPreset(key)) {
+        if (!isKnownHudLayout(key)) {
             return false;
         }
 
-        hudPlacementPreset = key;
-        applyHudPresetValues(key);
+        hudPanelLayout = key;
+        applyHudLayoutValues(key);
         clampHudOffsets();
         save();
         return true;
@@ -1910,7 +2018,7 @@ public final class LostTalesConfig {
     /** What the layout option takes: custom, then every layout that loaded. */
     private static String[] hudPresetValues() {
         List<String> values = new ArrayList<String>();
-        values.add(HUD_PRESET_CUSTOM);
+        values.add(HUD_LAYOUT_CUSTOM);
         values.addAll(hudLayouts.keySet());
         return values.toArray(new String[values.size()]);
     }
@@ -1922,16 +2030,16 @@ public final class LostTalesConfig {
      * whether anything changed.
      */
     private static boolean followHudLayout() {
-        if (HUD_PRESET_CUSTOM.equals(hudPlacementPreset) || !hudLayoutsRead) {
+        if (HUD_LAYOUT_CUSTOM.equals(hudPanelLayout) || !hudLayoutsRead) {
             return false;
         }
-        double[][] places = hudLayouts.get(hudPlacementPreset);
+        double[][] places = hudLayouts.get(hudPanelLayout);
         if (places == null) {
             com.ninuna.losttales.util.LostTalesLog.warning(
                     "The HUD layout %s the client file chooses did not load;"
                             + " the panels stay where they stand, as custom",
-                    hudPlacementPreset);
-            hudPlacementPreset = HUD_PRESET_CUSTOM;
+                    hudPanelLayout);
+            hudPanelLayout = HUD_LAYOUT_CUSTOM;
             return true;
         }
         boolean moved = false;
@@ -1939,7 +2047,7 @@ public final class LostTalesConfig {
             double[] now = hudPlace(HUD_ELEMENTS.get(panel));
             moved |= now[0] != places[panel][0] || now[1] != places[panel][1];
         }
-        applyHudPresetValues(hudPlacementPreset);
+        applyHudLayoutValues(hudPanelLayout);
         return moved;
     }
 
@@ -1966,7 +2074,7 @@ public final class LostTalesConfig {
      */
     public static double[] defaultHudOffset(String element) {
         int panel = HUD_ELEMENTS.indexOf(normalizeHudElement(element));
-        double[][] places = hudLayouts.get(HUD_PRESET_DEFAULT);
+        double[][] places = hudLayouts.get(HUD_LAYOUT_DEFAULT);
         return panel < 0 || places == null ? null : places[panel].clone();
     }
 
@@ -1976,11 +2084,11 @@ public final class LostTalesConfig {
      * not load.
      */
     public static double[][] hudLayoutPlaces(String preset) {
-        double[][] places = hudLayouts.get(normalizeHudPreset(preset));
+        double[][] places = hudLayouts.get(normalizeHudLayout(preset));
         return places == null ? null : copyHudPlaces(places);
     }
 
-    private static void applyHudPresetValues(String preset) {
+    private static void applyHudLayoutValues(String preset) {
         double[][] places = hudLayoutPlaces(preset);
         if (places == null) {
             return;
@@ -1995,24 +2103,24 @@ public final class LostTalesConfig {
      * A layout's name as the client file keeps it, trimmed and in lower
      * case; custom for anything no layout file could take as its id.
      */
-    public static String normalizeHudPreset(String preset) {
+    public static String normalizeHudLayout(String preset) {
         if (preset == null) {
-            return HUD_PRESET_CUSTOM;
+            return HUD_LAYOUT_CUSTOM;
         }
         String key = preset.trim().toLowerCase(java.util.Locale.ROOT);
-        return key.matches(HUD_LAYOUT_ID) ? key : HUD_PRESET_CUSTOM;
+        return key.matches(HUD_LAYOUT_ID) ? key : HUD_LAYOUT_CUSTOM;
     }
 
     public static boolean isCustomHudPreset(String preset) {
         if (preset == null) {
             return false;
         }
-        return HUD_PRESET_CUSTOM.equals(preset.trim().toLowerCase(java.util.Locale.ROOT));
+        return HUD_LAYOUT_CUSTOM.equals(preset.trim().toLowerCase(java.util.Locale.ROOT));
     }
 
     /** Whether a layout of that name loaded. */
-    public static boolean isKnownHudPreset(String preset) {
-        return hudLayouts.containsKey(normalizeHudPreset(preset));
+    public static boolean isKnownHudLayout(String preset) {
+        return hudLayouts.containsKey(normalizeHudLayout(preset));
     }
 
     public static boolean setHudOffset(String element,
@@ -2034,7 +2142,7 @@ public final class LostTalesConfig {
         if (key.length() == 0) {
             return false;
         }
-        hudPlacementPreset = HUD_PRESET_CUSTOM;
+        hudPanelLayout = HUD_LAYOUT_CUSTOM;
         setHudPlace(key, x, y);
         return true;
     }
@@ -2049,12 +2157,12 @@ public final class LostTalesConfig {
         } else if ("fellowship".equals(key)) {
             fellowshipHudOffsetX = x;
             fellowshipHudOffsetY = y;
-        } else if ("quickloot".equals(key)) {
+        } else if ("quick_loot".equals(key)) {
             quickLootHudOffsetX = x;
             quickLootHudOffsetY = y;
         } else if ("quest".equals(key)) {
-            questHudOffsetX = x;
-            questHudOffsetY = y;
+            questTrackerHudOffsetX = x;
+            questTrackerHudOffsetY = y;
         } else if ("notifications".equals(key)) {
             notificationHudOffsetX = x;
             notificationHudOffsetY = y;
@@ -2069,11 +2177,11 @@ public final class LostTalesConfig {
         if ("fellowship".equals(key)) {
             return new double[] {fellowshipHudOffsetX, fellowshipHudOffsetY};
         }
-        if ("quickloot".equals(key)) {
+        if ("quick_loot".equals(key)) {
             return new double[] {quickLootHudOffsetX, quickLootHudOffsetY};
         }
         if ("quest".equals(key)) {
-            return new double[] {questHudOffsetX, questHudOffsetY};
+            return new double[] {questTrackerHudOffsetX, questTrackerHudOffsetY};
         }
         return new double[] {notificationHudOffsetX, notificationHudOffsetY};
     }
@@ -2091,8 +2199,8 @@ public final class LostTalesConfig {
         fellowshipHudOffsetY = clampPercent(fellowshipHudOffsetY);
         quickLootHudOffsetX = clampPercent(quickLootHudOffsetX);
         quickLootHudOffsetY = clampPercent(quickLootHudOffsetY);
-        questHudOffsetX = clampPercent(questHudOffsetX);
-        questHudOffsetY = clampPercent(questHudOffsetY);
+        questTrackerHudOffsetX = clampPercent(questTrackerHudOffsetX);
+        questTrackerHudOffsetY = clampPercent(questTrackerHudOffsetY);
         notificationHudOffsetX = clampPercent(notificationHudOffsetX);
         notificationHudOffsetY = clampPercent(notificationHudOffsetY);
     }
@@ -2228,8 +2336,25 @@ public final class LostTalesConfig {
 
         config.get(CATEGORY_RANGED_COMBAT, "enableChargeTiers",
                 enableChargeTiers).set(enableChargeTiers);
-        config.get(CATEGORY_CHAT, "proximityRadius",
-                chatProximityRadius).set(chatProximityRadius);
+        config.get(CATEGORY_CHAT, "proximityWhisperRange",
+                chatProximityWhisperRange).set(chatProximityWhisperRange);
+        config.get(CATEGORY_CHAT, "proximityTalkRange",
+                chatProximityTalkRange).set(chatProximityTalkRange);
+        config.get(CATEGORY_CHAT, "proximityShoutRange",
+                chatProximityShoutRange).set(chatProximityShoutRange);
+        config.get(CATEGORY_CHAT, "whisperHistoryFloor",
+                chatWhisperHistoryFloor).set(chatWhisperHistoryFloor);
+        config.get(CATEGORY_CHAT, "mutedCommands", chatMutedCommands)
+                .set(chatMutedCommands);
+        Property speechRangeProperty = config.get(
+                CATEGORY_CLIENT, "chatSpeechRange", chatSpeechRange);
+        speechRangeProperty.set(chatSpeechRange);
+        speechRangeProperty.setValidValues(
+                com.ninuna.losttales.chat.ChatSpeechRange.ids());
+        Property distanceProperty = config.get(
+                CATEGORY_CLIENT, "chatDistanceSizes", chatDistanceSizes);
+        distanceProperty.set(chatDistanceSizes);
+        distanceProperty.setValidValues(CHAT_DISTANCE_SIZES);
         config.get(CATEGORY_CHAT, "historyPersisted",
                 chatHistoryPersisted).set(chatHistoryPersisted);
         config.get(CATEGORY_CHAT, "historyPerChannel",
@@ -2249,8 +2374,6 @@ public final class LostTalesConfig {
                 .set(chatWelcomeLines);
         config.get(CATEGORY_CHAT, "serverAddress", serverAddress)
                 .set(serverAddress);
-        config.get(CATEGORY_CHAT, "serverLanguage", serverLanguage)
-                .set(serverLanguage);
         config.get(CATEGORY_CLIENT, "enableChatEmojis",
                 enableChatEmojis).set(enableChatEmojis);
         config.get(CATEGORY_CLIENT, "convertChatEmoticons",
@@ -2390,11 +2513,13 @@ public final class LostTalesConfig {
                 characterStateCheckpointPlayersPerTick);
         config.get(CATEGORY_CHARACTERS, "characterDeletionRetentionDays",
                 characterDeletionRetentionDays).set(characterDeletionRetentionDays);
+        config.get(CATEGORY_CHARACTERS, "ringDropsAtDeath",
+                ringDropsAtDeath).set(ringDropsAtDeath);
         config.get(CATEGORY_CLIENT, "showLostTalesHud", showLostTalesHud).set(showLostTalesHud);
-        Property hudPresetProperty = config.get(CATEGORY_CLIENT, "hudPlacementPreset", hudPlacementPreset);
-        hudPresetProperty.set(hudPlacementPreset);
+        Property hudLayoutProperty = config.get(CATEGORY_CLIENT, "hudPanelLayout", hudPanelLayout);
+        hudLayoutProperty.set(hudPanelLayout);
         if (hudLayoutsRead) {
-            hudPresetProperty.setValidValues(hudPresetValues());
+            hudLayoutProperty.setValidValues(hudPresetValues());
         }
         config.get(CATEGORY_CLIENT, "showCompassHud", showCompassHud).set(showCompassHud);
         config.get(CATEGORY_CLIENT, "compassHudOffsetX", compassHudOffsetX).set(compassHudOffsetX);
@@ -2436,23 +2561,23 @@ public final class LostTalesConfig {
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetX", quickLootHudOffsetX).set(quickLootHudOffsetX);
         config.get(CATEGORY_CLIENT, "quickLootHudOffsetY", quickLootHudOffsetY).set(quickLootHudOffsetY);
         config.get(CATEGORY_CLIENT, "quickLootHudMaxRows", quickLootHudMaxRows).set(quickLootHudMaxRows);
-        config.get(CATEGORY_CLIENT, "showQuestHud", showQuestHud).set(showQuestHud);
-        config.get(CATEGORY_CLIENT, "questHudOffsetX", questHudOffsetX).set(questHudOffsetX);
-        config.get(CATEGORY_CLIENT, "questHudOffsetY", questHudOffsetY).set(questHudOffsetY);
-        config.get(CATEGORY_CLIENT, "questHudMaxTrackedQuests", questHudMaxTrackedQuests).set(questHudMaxTrackedQuests);
-        config.get(CATEGORY_CLIENT, "questHudObjectiveLineCount", questHudObjectiveLineCount).set(questHudObjectiveLineCount);
-        config.get(CATEGORY_CLIENT, "showQuestHudNotifications", showQuestHudNotifications).set(showQuestHudNotifications);
+        config.get(CATEGORY_CLIENT, "showQuestTracker", showQuestTracker).set(showQuestTracker);
+        config.get(CATEGORY_CLIENT, "questTrackerHudOffsetX", questTrackerHudOffsetX).set(questTrackerHudOffsetX);
+        config.get(CATEGORY_CLIENT, "questTrackerHudOffsetY", questTrackerHudOffsetY).set(questTrackerHudOffsetY);
+        config.get(CATEGORY_CLIENT, "questTrackerMaxQuests", questTrackerMaxQuests).set(questTrackerMaxQuests);
+        config.get(CATEGORY_CLIENT, "questTrackerObjectiveLineCount", questTrackerObjectiveLineCount).set(questTrackerObjectiveLineCount);
+        config.get(CATEGORY_CLIENT, "showQuestBanners", showQuestBanners).set(showQuestBanners);
         config.get(CATEGORY_CLIENT, "showNativeLotrQuestTracker", showNativeLotrQuestTracker).set(showNativeLotrQuestTracker);
         config.get(CATEGORY_CLIENT, "notificationHudOffsetX",
                 notificationHudOffsetX).set(notificationHudOffsetX);
         config.get(CATEGORY_CLIENT, "notificationHudOffsetY",
                 notificationHudOffsetY).set(notificationHudOffsetY);
-        config.get(CATEGORY_CLIENT, "showWorldQuestMarkers", showWorldQuestMarkers).set(showWorldQuestMarkers);
+        config.get(CATEGORY_CLIENT, "showWorldLabels", showWorldLabels).set(showWorldLabels);
         config.get(CATEGORY_CLIENT, "showDiscoveredWorldMapMarkers", showDiscoveredWorldMapMarkers).set(showDiscoveredWorldMapMarkers);
         config.get(CATEGORY_CLIENT, "worldQuestMarkerMaxDistance", worldQuestMarkerMaxDistance).set(worldQuestMarkerMaxDistance);
         config.get(CATEGORY_CLIENT, "showQuestChatFeedback", showQuestChatFeedback).set(showQuestChatFeedback);
         config.get(CATEGORY_CLIENT, "playQuestSounds", playQuestSounds).set(playQuestSounds);
-        config.get(CATEGORY_CLIENT, "enableQuestDialogue", enableQuestDialogue).set(enableQuestDialogue);
+        config.get(CATEGORY_CLIENT, "enableQuestConversation", enableQuestConversation).set(enableQuestConversation);
         config.get(CATEGORY_CLIENT, "fellowshipCompassMarkerFadeRadius",
                 fellowshipCompassMarkerFadeRadius).set(fellowshipCompassMarkerFadeRadius);
         config.get(CATEGORY_CLIENT, "chatHistoryLines", chatHistoryLines).set(chatHistoryLines);
@@ -2472,7 +2597,8 @@ public final class LostTalesConfig {
         config.get(CATEGORY_QUESTS, "allowQuestItemStarts", allowQuestItemStarts).set(allowQuestItemStarts);
         config.get(CATEGORY_QUESTS, "allowQuestInteractionStarts", allowQuestInteractionStarts).set(allowQuestInteractionStarts);
         config.get(CATEGORY_QUESTS, "autoRevealQuestMarkersOnStart", autoRevealQuestMarkersOnStart).set(autoRevealQuestMarkersOnStart);
-        config.get(CATEGORY_QUESTS, "autoPinQuestOnStart", autoPinQuestOnStart).set(autoPinQuestOnStart);
+        config.get(CATEGORY_QUESTS, "rumoursPointToQuestPlaces", rumoursPointToQuestPlaces).set(rumoursPointToQuestPlaces);
+        config.get(CATEGORY_QUESTS, "autoTrackQuestOnStart", autoTrackQuestOnStart).set(autoTrackQuestOnStart);
         config.get(CATEGORY_QUESTS, "autoDiscoverNearbyMapMarkers", autoDiscoverNearbyMapMarkers).set(autoDiscoverNearbyMapMarkers);
         config.get(CATEGORY_QUESTS, "mapMarkerDiscoveryScanIntervalTicks", mapMarkerDiscoveryScanIntervalTicks).set(mapMarkerDiscoveryScanIntervalTicks);
         config.get(CATEGORY_QUESTS, "newCharacterStarterQuests", newCharacterStarterQuests).set(newCharacterStarterQuests);
@@ -2492,6 +2618,12 @@ public final class LostTalesConfig {
         config.get(CATEGORY_PROGRESSION, "repeatFloorPercent", repeatFloorPercent).set(repeatFloorPercent);
         config.get(CATEGORY_PROGRESSION, "repeatRecoverySeconds", repeatRecoverySeconds).set(repeatRecoverySeconds);
         config.get(CATEGORY_PROGRESSION, "skillHourlyCap", skillHourlyCap).set(skillHourlyCap);
+        config.get(CATEGORY_PROGRESSION, "finishedQuestsPassHourlyCap",
+                finishedQuestsPassHourlyCap).set(finishedQuestsPassHourlyCap);
+        config.get(CATEGORY_PROGRESSION, "firstFindsPassHourlyCap",
+                firstFindsPassHourlyCap).set(firstFindsPassHourlyCap);
+        config.get(CATEGORY_PROGRESSION, "softStepEndsOnStrike",
+                softStepEndsOnStrike).set(softStepEndsOnStrike);
         config.get(CATEGORY_PROGRESSION, "statueFirstPrice", statueFirstPrice).set(statueFirstPrice);
         config.get(CATEGORY_PROGRESSION, "statuePriceFactor", statuePriceFactor).set(statuePriceFactor);
         config.get(CATEGORY_PROGRESSION, "statueItem", statueItem).set(statueItem);
@@ -2503,13 +2635,13 @@ public final class LostTalesConfig {
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeCornerIngredient", missiveBoardRecipeCornerIngredient).set(missiveBoardRecipeCornerIngredient);
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeEdgeIngredient", missiveBoardRecipeEdgeIngredient).set(missiveBoardRecipeEdgeIngredient);
         config.get(CATEGORY_MISSIVES, "missiveBoardRecipeCenterIngredient", missiveBoardRecipeCenterIngredient).set(missiveBoardRecipeCenterIngredient);
-        config.get(CATEGORY_MISSIVES, "enableDynamicMissiveBoards", enableDynamicMissiveBoards).set(enableDynamicMissiveBoards);
+        config.get(CATEGORY_MISSIVES, "enableMissiveBoards", enableMissiveBoards).set(enableMissiveBoards);
         config.get(CATEGORY_MISSIVES, "bundledMissiveTemplates", bundledMissiveTemplates).set(bundledMissiveTemplates);
         config.get(CATEGORY_MISSIVES, "missiveBoardMinAvailable", missiveBoardMinAvailable).set(missiveBoardMinAvailable);
         config.get(CATEGORY_MISSIVES, "missiveBoardMaxAvailable", missiveBoardMaxAvailable).set(missiveBoardMaxAvailable);
         config.get(CATEGORY_MISSIVES, "missiveBoardGenerationIntervalTicks", missiveBoardGenerationIntervalTicks).set(missiveBoardGenerationIntervalTicks);
-        config.get(CATEGORY_MISSIVES, "missiveBoardMinGeneratedPerCycle", missiveBoardMinGeneratedPerCycle).set(missiveBoardMinGeneratedPerCycle);
-        config.get(CATEGORY_MISSIVES, "missiveBoardMaxGeneratedPerCycle", missiveBoardMaxGeneratedPerCycle).set(missiveBoardMaxGeneratedPerCycle);
+        config.get(CATEGORY_MISSIVES, "missiveBoardMinPostedPerCycle", missiveBoardMinPostedPerCycle).set(missiveBoardMinPostedPerCycle);
+        config.get(CATEGORY_MISSIVES, "missiveBoardMaxPostedPerCycle", missiveBoardMaxPostedPerCycle).set(missiveBoardMaxPostedPerCycle);
         config.get(CATEGORY_MISSIVES, "expireMissiveBoardNotices", expireMissiveBoardNotices).set(expireMissiveBoardNotices);
         config.get(CATEGORY_MISSIVES, "missiveBoardNoticeExpirationDays", missiveBoardNoticeExpirationDays).set(missiveBoardNoticeExpirationDays);
         config.get(CATEGORY_MISSIVES, "enableTimedMissives", enableTimedMissives).set(enableTimedMissives);
@@ -2525,10 +2657,10 @@ public final class LostTalesConfig {
             missiveBoardMaxAvailable = missiveBoardMinAvailable;
         }
         missiveBoardGenerationIntervalTicks = clampInt(missiveBoardGenerationIntervalTicks, 1200, 240000);
-        missiveBoardMinGeneratedPerCycle = clampInt(missiveBoardMinGeneratedPerCycle, 1, 9);
-        missiveBoardMaxGeneratedPerCycle = clampInt(missiveBoardMaxGeneratedPerCycle, 1, 9);
-        if (missiveBoardMaxGeneratedPerCycle < missiveBoardMinGeneratedPerCycle) {
-            missiveBoardMaxGeneratedPerCycle = missiveBoardMinGeneratedPerCycle;
+        missiveBoardMinPostedPerCycle = clampInt(missiveBoardMinPostedPerCycle, 1, 9);
+        missiveBoardMaxPostedPerCycle = clampInt(missiveBoardMaxPostedPerCycle, 1, 9);
+        if (missiveBoardMaxPostedPerCycle < missiveBoardMinPostedPerCycle) {
+            missiveBoardMaxPostedPerCycle = missiveBoardMinPostedPerCycle;
         }
         missiveBoardNoticeExpirationDays = clampInt(missiveBoardNoticeExpirationDays, 1, 30);
         timedMissiveChancePercent = clampInt(timedMissiveChancePercent, 0, 100);
@@ -2639,6 +2771,44 @@ public final class LostTalesConfig {
             }
         }
         return shipped;
+    }
+
+    /** The named way of showing distance, or three sizes when the file names none. */
+    public static String normalizeDistanceSizes(String value) {
+        String normalized = value == null
+                ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
+        for (int index = 0; index < CHAT_DISTANCE_SIZES.length; index++) {
+            if (CHAT_DISTANCE_SIZES[index].equals(normalized)) {
+                return CHAT_DISTANCE_SIZES[index];
+            }
+        }
+        return CHAT_DISTANCE_THREE_SIZES;
+    }
+
+    /**
+     * Puts the speech ranges in order: talk carries at least as far as a
+     * whisper and a shout at least as far as talk. A range raised here is
+     * written back, so the file says what is in force.
+     */
+    private static void sanitizeSpeechRanges(Configuration config) {
+        int[] ranges = orderedSpeechRanges(chatProximityWhisperRange,
+                chatProximityTalkRange, chatProximityShoutRange);
+        if (ranges[1] != chatProximityTalkRange) {
+            chatProximityTalkRange = ranges[1];
+            config.getCategory(CATEGORY_CHAT).get("proximityTalkRange")
+                    .set(chatProximityTalkRange);
+        }
+        if (ranges[2] != chatProximityShoutRange) {
+            chatProximityShoutRange = ranges[2];
+            config.getCategory(CATEGORY_CHAT).get("proximityShoutRange")
+                    .set(chatProximityShoutRange);
+        }
+    }
+
+    /** Whisper, talk and shout ranges with each at least the one before it. */
+    static int[] orderedSpeechRanges(int whisper, int talk, int shout) {
+        int talked = Math.max(whisper, talk);
+        return new int[] {whisper, talked, Math.max(talked, shout)};
     }
 
     /**

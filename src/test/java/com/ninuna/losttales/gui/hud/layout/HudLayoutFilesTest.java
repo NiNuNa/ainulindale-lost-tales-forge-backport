@@ -29,7 +29,7 @@ public final class HudLayoutFilesTest {
     private static final String PANELS =
             "\"compass\": {\"across\": 50, \"down\": 90},"
                     + " \"fellowship\": {\"across\": 0, \"down\": 0},"
-                    + " \"quickloot\": {\"across\": 100, \"down\": 100},"
+                    + " \"quick_loot\": {\"across\": 100, \"down\": 100},"
                     + " \"quest\": {\"across\": 0, \"down\": 100},"
                     + " \"notifications\": {\"across\": 50, \"down\": 50}";
 
@@ -185,7 +185,7 @@ public final class HudLayoutFilesTest {
     public void thePlacesFollowThePanelsOrder() {
         HudLayout layout = HudLayoutFiles.parse(new StringReader("{\"id\": \"low\","
                 + " \"name\": \"Low\", \"panels\": {\"notifications\": {\"across\": 1, \"down\": 2},"
-                + " \"quest\": {\"across\": 3, \"down\": 4}, \"quickloot\": {\"across\": 5, \"down\": 6},"
+                + " \"quest\": {\"across\": 3, \"down\": 4}, \"quick_loot\": {\"across\": 5, \"down\": 6},"
                 + " \"fellowship\": {\"across\": 7, \"down\": 8},"
                 + " \"compass\": {\"across\": 9, \"down\": 10}}}"), "low.json",
                 new ArrayList<String>());

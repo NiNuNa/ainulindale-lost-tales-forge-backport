@@ -4,8 +4,9 @@ package com.ninuna.losttales.chat;
  * A status line: a few words a player sets for one of their identities —
  * the account, or a character — as a messenger's custom status is, shown
  * under the identity's name in member lists and on its card while the
- * identity is shown online. Kept short, and plain: formatting codes and
- * control characters are no part of it, and a run of spaces is one.
+ * identity is shown online. Kept short, and plain: formatting codes,
+ * control characters and direction marks are no part of it, and a run of
+ * spaces is one.
  */
 public final class ChatStatusLine {
     /** The longest line, in characters. */
@@ -17,7 +18,7 @@ public final class ChatStatusLine {
 
     /**
      * A line as it may be kept and shown: formatting codes, control
-     * characters and the space round it gone, every run of spaces one
+     * characters, direction marks and the space round it gone, every run of spaces one
      * space, cut to {@link #MAX_CHARACTERS} without splitting a character.
      * Empty for nothing, or nothing left.
      */
@@ -40,7 +41,8 @@ public final class ChatStatusLine {
                 space = kept.length() > 0;
                 continue;
             }
-            if (Character.isISOControl(character)) {
+            if (Character.isISOControl(character)
+                    || ChatMessageValidator.isDirectionMark(character)) {
                 continue;
             }
             if (space) {

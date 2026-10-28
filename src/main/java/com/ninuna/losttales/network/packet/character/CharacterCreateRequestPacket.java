@@ -15,7 +15,7 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Narrow client request to create one character in one unlocked slot. */
+/** Asks to make one character in an open slot of the player's roster; the server checks every field. */
 public final class CharacterCreateRequestPacket implements IMessage {
 
     private static final int HISTORY_BYTES = CharacterPacketCodec.maxSectionBytes(

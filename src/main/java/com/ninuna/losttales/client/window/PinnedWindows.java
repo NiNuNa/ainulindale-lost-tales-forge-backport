@@ -19,7 +19,7 @@ import org.lwjgl.opengl.GL11;
 /**
  * The windows pinned to the HUD, which stay on screen while playing. Each
  * stands where it stands on the window screen, in the same place and size,
- * with the page in front filling it ({@link ContentView}), a little
+ * with the page in front filling it ({@link Borderless}), a little
  * fainter than on the window screen ({@code pinnedWindowOpacity}): nothing
  * on its row, strip or bar can be pressed while playing, so they slide
  * out past its edges as the screen closes and back in as it opens. A
@@ -289,7 +289,7 @@ public final class PinnedWindows {
         // The page fills the window, cut to what it shows, its row, strip
         // and bar sliding out past the edges as the screen closes; once
         // they are out they are not drawn at all.
-        frame.advanceFill(ContentView.fillOf(window));
+        frame.advanceFill(Borderless.fillOf(window));
         frame.fillWithPage(WindowPlacement.filledBox(window, minecraft,
                 screenWidth, screenHeight));
         boolean cut = false;

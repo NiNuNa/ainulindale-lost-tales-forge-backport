@@ -56,7 +56,7 @@ public final class LostTalesMapLegendRegistryTest {
         assertEquals(LostTalesMapLegendRegistry.QUESTS,
                 LostTalesMapLegendRegistry.categoryFor(marker(
                         "quest", "Quest",
-                        LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                        LostTalesMapMarkerSource.QUEST_GIVER,
                         false, false)));
         assertEquals(LostTalesMapLegendRegistry.FELLOWSHIP,
                 LostTalesMapLegendRegistry.categoryFor(marker(

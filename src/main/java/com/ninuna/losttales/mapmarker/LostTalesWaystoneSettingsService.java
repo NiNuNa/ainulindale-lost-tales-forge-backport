@@ -10,6 +10,7 @@ import com.ninuna.losttales.character.server.CharacterActiveResolver;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.validation.CharacterNames;
+import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.compat.lotr.LostTalesLotrWaystoneTravelAdapter;
 import com.ninuna.losttales.compat.lotr.LostTalesWaystonePermissionPolicy;
 import com.ninuna.losttales.fellowship.model.Fellowship;
@@ -369,14 +370,14 @@ public final class LostTalesWaystoneSettingsService {
         // An empty name gives a waystone back to what it is called after;
         // one called after nothing must keep a name.
         if (name.length() == 0 && record.getNamedAfter().length() == 0
-                || name.length()
-                        > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
+                || !isPlainLine(name,
+                        LostTalesMapMarkerRecord.MAX_NAME_LENGTH)
                 || !isIconName(icon)
                 || color == null
-                || category.length()
-                        > LostTalesMapMarkerRecord.MAX_NAME_LENGTH
-                || description.length()
-                        > LostTalesMapMarkerRecord.MAX_TEXT_LENGTH
+                || !isPlainLine(category,
+                        LostTalesMapMarkerRecord.MAX_NAME_LENGTH)
+                || !isPlainLine(description,
+                        LostTalesMapMarkerRecord.MAX_TEXT_LENGTH)
                 || !validRadius(compassRadius, 0.0D,
                         LostTalesMapMarkerRecord.MAX_RADIUS)
                 || !validRadius(discoveryRadius, MIN_DISCOVERY_RADIUS,
@@ -423,6 +424,18 @@ public final class LostTalesWaystoneSettingsService {
 
     private static String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    /**
+     * Whether a waystone's words are one plain line of at most
+     * {@code maxLength} characters: no formatting code, no control
+     * character and no invisible mark, as a character's profile keeps
+     * them. The page's fields type none of these, and the words reach
+     * every map that shows the waystone.
+     */
+    static boolean isPlainLine(String words, int maxLength) {
+        return words != null && words.length() <= maxLength
+                && CharacterValidator.isValidLine(words, maxLength);
     }
 
     /**
@@ -802,29 +815,16 @@ public final class LostTalesWaystoneSettingsService {
         return null;
     }
 
-    private static String normalizeColor(String value) {
+    /**
+     * The colour a Save names, as a marker file writes it: one of the
+     * twelve the page offers ({@link LostTalesMapMarkerFiles#COLORS}) or
+     * {@code #rrggbb}; null for any other.
+     */
+    static String normalizeColor(String value) {
         String color = value == null ? ""
-                : value.trim().toLowerCase(Locale.ROOT)
-                        .replace(' ', '_').replace('-', '_');
-        if ("white".equals(color) || "red".equals(color)
-                || "green".equals(color) || "blue".equals(color)
-                || "yellow".equals(color) || "gold".equals(color)
-                || "orange".equals(color) || "purple".equals(color)
-                || "violet".equals(color) || "gray".equals(color)
-                || "grey".equals(color) || "dark_gray".equals(color)
-                || "dark_grey".equals(color) || "black".equals(color)) {
-            return color;
-        }
-        String hex = color;
-        if (hex.startsWith("#")) {
-            hex = hex.substring(1);
-        } else if (hex.startsWith("0x")) {
-            hex = hex.substring(2);
-        }
-        if (hex.matches("[0-9a-f]{6}")) {
-            return "#" + hex;
-        }
-        return null;
+                : value.trim().toLowerCase(Locale.ROOT);
+        return LostTalesMapMarkerFiles.COLORS.contains(color)
+                || color.matches("#[0-9a-f]{6}") ? color : null;
     }
 
     private static void deny(EntityPlayerMP player, String key) {

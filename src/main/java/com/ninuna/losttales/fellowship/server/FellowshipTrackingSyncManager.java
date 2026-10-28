@@ -31,8 +31,8 @@ import java.util.UUID;
  * fellowship they travel with, and nothing else; the marks ride in the
  * fellowship state. A member's position goes only while the fellowship
  * shows members on the map and the member is neither concealed nor hidden
- * on LOTR's map ({@link FellowshipPlaces}). No client-reported coordinates
- * are accepted by this subsystem.
+ * on LOTR's map ({@link FellowshipPlaces}). Every position is the
+ * server's own; none comes from a client.
  */
 public final class FellowshipTrackingSyncManager {
 
@@ -50,7 +50,7 @@ public final class FellowshipTrackingSyncManager {
         if (serverTicks % interval != 0L) {
             return;
         }
-        synchronizeOnlinePlayers(false);
+        synchronizeOnlinePlayers();
     }
 
     /** Sends each recipient a fresh snapshot, all read from one view of the server. */
@@ -77,19 +77,14 @@ public final class FellowshipTrackingSyncManager {
         serverTicks = 0L;
     }
 
-    /** Immediately removes or restores live coordinates after concealment changes. */
-    public static synchronized void refreshAll() {
-        synchronizeOnlinePlayers(true);
-    }
-
-    private static void synchronizeOnlinePlayers(boolean force) {
+    private static void synchronizeOnlinePlayers() {
         ServerView view = collectServerView();
         if (view == null) {
             return;
         }
         for (OnlinePlayerContext context : view.onlineByOwner.values()) {
             if (context != null && context.player != null) {
-                sendForPlayer(context.player, view, force);
+                sendForPlayer(context.player, view, false);
             }
         }
     }

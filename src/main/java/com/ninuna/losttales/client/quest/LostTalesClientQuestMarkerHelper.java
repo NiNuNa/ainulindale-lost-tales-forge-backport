@@ -27,10 +27,10 @@ import net.minecraft.client.Minecraft;
 public final class LostTalesClientQuestMarkerHelper {
     private LostTalesClientQuestMarkerHelper() {}
 
-    /** Returns canonical marker identity -> label for tracked quests. */
+    /** The tracked quests' markers by canonical id, each with its quest's title. */
     public static Map<String, String> collectActiveQuestMarkerLabels() {
         Map<String, String> labels = new LinkedHashMap<String, String>();
-        for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getPinnedQuests()) {
+        for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getTrackedQuests()) {
             LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(progress.getQuestId());
             if (quest == null) {
                 continue;
@@ -43,10 +43,10 @@ public final class LostTalesClientQuestMarkerHelper {
         return labels;
     }
 
-    /** Returns temporary coordinate markers produced by current-stage goto objectives for tracked quests. */
+    /** The places the tracked quests' open go-to objectives point at. */
     public static Set<ActiveCoordinateMarker> collectActiveCoordinateMarkers() {
         Set<ActiveCoordinateMarker> markers = new LinkedHashSet<ActiveCoordinateMarker>();
-        for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getPinnedQuests()) {
+        for (LostTalesQuestProgress progress : LostTalesClientQuestProgressStore.getTrackedQuests()) {
             LostTalesQuestDefinition quest = LostTalesClientQuestDefinitionStore.getQuest(progress.getQuestId());
             if (quest == null) {
                 continue;
@@ -99,7 +99,7 @@ public final class LostTalesClientQuestMarkerHelper {
         for (String markerId : LostTalesQuestMarkerHelper.collectStaticQuestMarkerIds(quest)) {
             putMarkerLabel(labels, markerId, label);
         }
-        for (String markerId : LostTalesQuestMarkerHelper.collectDynamicQuestGiverMarkerIds(quest)) {
+        for (String markerId : LostTalesQuestMarkerHelper.collectQuestGiverMarkerIds(quest)) {
             putMarkerLabel(labels, markerId, label);
         }
     }

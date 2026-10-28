@@ -1,5 +1,7 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.util.LostTalesWords;
+
 /**
  * One of the server's own posts to Discord — a player joined, left,
  * died, or earned an achievement — as
@@ -8,6 +10,9 @@ package com.ninuna.losttales.compat.discord;
  * notice is about a player. The kind is what the config switches on and
  * off; the words, colour and icon are decided once, in
  * {@link DiscordServerNotices}, so every notice of a kind looks the same.
+ * A join or a leave is the lang file's line, worded for each linked
+ * channel in its own language ({@link #getText}); a death or an
+ * achievement is the game's own line as it was broadcast.
  *
  * <p>The text is shown as Discord's embed author name, which renders no
  * markdown and can ping nobody, so it is carried as plain text and never
@@ -25,13 +30,21 @@ public final class DiscordNotice {
     private static final String ELLIPSIS = "...";
 
     private final Kind kind;
-    private final String text;
+    /** The icon the line opens with. */
+    private final String mark;
+    /** The lang key the line is worded by; null for the game's own line. */
+    private final String key;
+    /** The key's one argument, or the game's own line. */
+    private final String said;
     private final String iconUrl;
     private final int color;
 
-    DiscordNotice(Kind kind, String text, String iconUrl, int color) {
+    DiscordNotice(Kind kind, String mark, String key, String said, String iconUrl,
+                  int color) {
         this.kind = kind;
-        this.text = bound(text);
+        this.mark = mark == null ? "" : mark;
+        this.key = key;
+        this.said = said == null ? "" : said;
         this.iconUrl = iconUrl == null ? "" : iconUrl;
         this.color = color & 0xFFFFFF;
     }
@@ -40,9 +53,15 @@ public final class DiscordNotice {
         return this.kind;
     }
 
-    /** The one line the notice says, plain text. */
-    public String getText() {
-        return this.text;
+    /** Whether the notice has nothing to say: no name, no line of the game's. */
+    public boolean isEmpty() {
+        return this.said.length() == 0;
+    }
+
+    /** The one line the notice says in {@code words}, plain text. */
+    public String getText(LostTalesWords words) {
+        String line = this.key == null ? this.said : words.format(this.key, this.said);
+        return bound(this.mark.length() == 0 ? line : this.mark + " " + line);
     }
 
     /** The https picture beside the text; empty for none. */

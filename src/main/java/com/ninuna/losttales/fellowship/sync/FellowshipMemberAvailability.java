@@ -1,6 +1,10 @@
 package com.ninuna.losttales.fellowship.sync;
 
-/** Server-authoritative runtime availability of one fellowship member. */
+/**
+ * How a member is: offline, playing another character or making one,
+ * online with a health the server could not read, or online as the
+ * member, alive or dead. Only the last two carry health and gear.
+ */
 public enum FellowshipMemberAvailability {
     OFFLINE(0),
     INACTIVE_CHARACTER(1),

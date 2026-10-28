@@ -13,10 +13,11 @@ import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType;
 
 /**
- * The HUD stepping aside while the chat is open: the game's own
+ * The HUD stepping aside while the windows are open: the game's own
  * elements — the crosshair, the boss bar, health, armour, food, air,
- * the hotbar, experience — and the mod's panels fade out as the chat
- * opens and back in once it closes, leaving the world and the chat.
+ * the hotbar, experience — and the mod's panels fade out as the window
+ * screen opens and back in once it closes, leaving the world and the
+ * windows.
  *
  * <p>Nothing here knows how any element draws. The frame is copied as it
  * stands just before the first of them draws, they all draw as they
@@ -25,11 +26,11 @@ import net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType;
  * states each sets for itself. Fully out, they are not drawn at all, and
  * fully in, nothing is copied. The game's debug text, the player list and
  * the chat are never touched, nor is the overlay as a whole, which Forge
- * answers by leaving the screen's projection unset. The bed's chat is not
- * the chat: lying down keeps the HUD and the sleep fade.</p>
+ * answers by leaving the screen's projection unset. The bed's chat screen
+ * opens no windows: lying down keeps the HUD and the sleep fade.</p>
  */
 public final class LostTalesHudFade {
-    /** The game's elements that fade: the HUD the chat takes the place of. */
+    /** The game's elements that fade: the HUD the windows take the place of. */
     private static final Set<ElementType> FADED = EnumSet.of(
             ElementType.CROSSHAIRS, ElementType.BOSSHEALTH,
             ElementType.HEALTH, ElementType.ARMOR, ElementType.FOOD,
@@ -67,11 +68,11 @@ public final class LostTalesHudFade {
     }
 
     /**
-     * Whether the chat asks the HUD to step aside: a chat screen is open
-     * — the mod's or the game's own — other than the bed's, and the
+     * Whether the windows ask the HUD to step aside: the window screen or
+     * the game's own chat screen is open, other than the bed's, and the
      * client has not turned this off.
      */
-    static boolean chatWantsWorld(Minecraft minecraft) {
+    static boolean windowsWantWorld(Minecraft minecraft) {
         return LostTalesConfig.hideHudWithWindows && minecraft != null
                 && minecraft.currentScreen instanceof GuiChat
                 && !(minecraft.currentScreen instanceof GuiSleepMP);
@@ -165,14 +166,14 @@ public final class LostTalesHudFade {
     }
 
     /**
-     * Advances the fade for this frame: out while the chat is open, on
-     * the chat's own bar entrance, and back in once it closes. With the
-     * chat's animations off it simply cuts.
+     * Advances the fade for this frame: out while the windows are open, on
+     * the window screen's own bar entrance, and back in once it closes.
+     * With the windows' animations off it simply cuts.
      */
     private static void beginFrame(Minecraft minecraft) {
         captured = false;
         captureFailed = false;
-        TRANSITION.advance(System.nanoTime(), !chatWantsWorld(minecraft));
+        TRANSITION.advance(System.nanoTime(), !windowsWantWorld(minecraft));
         shown = TRANSITION.clamped();
     }
 

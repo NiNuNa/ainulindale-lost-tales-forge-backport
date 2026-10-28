@@ -1636,7 +1636,7 @@ public final class WindowLayout {
      * view's file names a part of the screen; pinned nowhere, its splits parted, its page no longer held filling
      * it, and locked again. Its
      * pages stay; what each lays out is put back by the page
-     * ({@link WindowPage#resetView}), and the settings keep their own
+     * ({@link WindowPage#resetPanels}), and the settings keep their own
      * reset. A locked window stays where it is, so only an unlocked one
      * resets.
      */

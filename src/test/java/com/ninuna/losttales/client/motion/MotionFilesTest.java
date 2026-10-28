@@ -28,7 +28,7 @@ public final class MotionFilesTest {
     private static final List<String> FOLLOWERS = Arrays.asList(
             MotionIds.UI_BUTTON_LIT, MotionIds.WINDOW_SCROLL,
             MotionIds.WINDOW_HOVER_FADE, MotionIds.CHAT_SCROLLBAR_FADE,
-            MotionIds.WINDOW_MARQUEE_RETURN, MotionIds.SCREEN_JOURNAL_SCROLL, MotionIds.SCREEN_DIALOGUE_GLIDE,
+            MotionIds.WINDOW_MARQUEE_RETURN, MotionIds.SCREEN_JOURNAL_SCROLL, MotionIds.SCREEN_CONVERSATION_GLIDE,
             MotionIds.SCREEN_CHARACTERS_GLIDE, MotionIds.WINDOW_BAR_GROW,
             MotionIds.WINDOW_STACK_FADE, MotionIds.HUD_FEED_RISE);
     private static final List<String> BUTTONS = Arrays.asList(

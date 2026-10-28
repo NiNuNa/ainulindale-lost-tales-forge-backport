@@ -61,7 +61,7 @@ import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerNotificatio
 import com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerStore;
 import com.ninuna.losttales.client.mapmarker.LostTalesClientWaystoneTravelContext;
 import com.ninuna.losttales.client.mapmarker.LostTalesLotrMapGui;
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapDecorationRenderer;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainCache;
 import com.ninuna.losttales.client.mapmarker.LostTalesMapTerrainRenderer;
@@ -75,9 +75,9 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.quest.ClientQuestCatalog;
 import com.ninuna.losttales.client.quest.ClientWorldQuests;
-import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
+import com.ninuna.losttales.client.quest.LostTalesQuestConversationHooks;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
-import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestBannerStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
 import com.ninuna.losttales.client.render.player.LostTalesPlayerCapeRenderHook;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
@@ -90,8 +90,8 @@ import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
 import com.ninuna.losttales.gui.hud.fellowship.LostTalesFellowshipHudRenderer;
-import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
-import com.ninuna.losttales.gui.hud.quest.LostTalesWorldQuestMarkerRenderer;
+import com.ninuna.losttales.gui.hud.quest.LostTalesQuestTrackerRenderer;
+import com.ninuna.losttales.gui.hud.quest.LostTalesWorldLabelRenderer;
 import com.ninuna.losttales.gui.screen.quest.QuestJournalPage;
 import com.ninuna.losttales.gui.style.LostTalesUiThemedSheet;
 import com.ninuna.losttales.item.ELostTalesItem;
@@ -181,7 +181,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         WindowSession.clear();
         LostTalesClientQuestProgressStore.clear();
         com.ninuna.losttales.client.quest.ClientQuestFellows.clear();
-        LostTalesClientQuestNotificationStore.clear();
+        LostTalesClientQuestBannerStore.clear();
         ClientQuestNews.clear();
         LostTalesClientQuestDefinitionStore.clearServerSentDefinitions();
         ClientWorldQuests.clear();
@@ -189,10 +189,11 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         ClientProgression.clear();
         PerkRuntime.clearClient();
         LostTalesClientMapMarkerNotificationStore.clear();
-        LostTalesClientMapMarkerStore.clearDynamicMarkers();
+        LostTalesClientMapMarkerStore.clearGiverMarkers();
         // The next server numbers its snapshots afresh.
         LostTalesClientMapMarkerStore.forgetServerParts();
         LostTalesLotrMapMarkerIconOverlay.clearClientState();
+        com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerVisibility.clear();
         // The map image is per-world, so what was learned about where its
         // water is cannot be carried into the next one — nor may a view of
         // one world's map be restored over another's.
@@ -205,6 +206,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         LostTalesClientMobAggroCache.clear();
         LostTalesClientQuickLootCache.clear();
         LostTalesTooltipSlots.clear();
+        com.ninuna.losttales.client.gui.inventory.LostTalesSmoothInventoryHooks.clear();
         ClientCharacterRosterCache.clear();
         FirstVisit.clear();
         // A roster sync still queued from this world must not be applied
@@ -319,6 +321,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
         if (event != null && event.world != null && event.world.isRemote) {
             LostTalesMapTerrainCache.clear();
             LostTalesMapTerrainRenderer.clear();
+            com.ninuna.losttales.client.mapmarker.LostTalesClientMapMarkerVisibility.clear();
             LostTalesClientMobAggroCache.clear();
             ClientFellowshipTrackingCache.clear();
             ThirdPersonCameraRuntime.resetSession();
@@ -363,7 +366,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent
     public void releaseGuiCursorWhenUnowned(TickEvent.ClientTickEvent event) {
         if (event != null && event.phase == TickEvent.Phase.END) {
-            LostTalesMapCursor.releaseIfUnowned(Minecraft.getMinecraft());
+            LostTalesPointer.releaseIfUnowned(Minecraft.getMinecraft());
         }
     }
 
@@ -468,7 +471,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
     @SubscribeEvent
     public void renderWorldMarkers(RenderWorldLastEvent event) {
         try {
-            LostTalesWorldQuestMarkerRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
+            LostTalesWorldLabelRenderer.render(Minecraft.getMinecraft(), event.partialTicks);
         } catch (Throwable ignored) {
             // World-space marker rendering should never crash the client render tick.
         }
@@ -600,7 +603,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 && event.gui.getClass() == LOTRGuiMiniquestOffer.class) {
             // A quest offered in Middle-earth is talked about in the Lost
             // Tales screen; an offer that cannot be read keeps LOTR's own.
-            GuiScreen conversation = LostTalesQuestDialogueHooks
+            GuiScreen conversation = LostTalesQuestConversationHooks
                     .replaceLotrOffer((LOTRGuiMiniquestOffer)event.gui);
             if (conversation != null) {
                 event.gui = conversation;
@@ -655,14 +658,14 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
             return;
         }
         try {
-            GuiScreen conversation = LostTalesQuestDialogueHooks.forEntity(
+            GuiScreen conversation = LostTalesQuestConversationHooks.forEntity(
                     event.target);
             if (conversation != null) {
                 minecraft.displayGuiScreen(conversation);
             } else {
                 // With the conversation screen switched off, the person's
                 // words go to the chat and a ready hand-in is given over.
-                LostTalesQuestDialogueHooks.answerWithoutScreen(event.target);
+                LostTalesQuestConversationHooks.answerWithoutScreen(event.target);
             }
         } catch (RuntimeException failed) {
             // A conversation that cannot be built is no conversation;
@@ -695,13 +698,13 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 || event.gui instanceof LostTalesLotrMapGui) {
             return;
         }
-        LostTalesMapCursor.acquire();
+        LostTalesPointer.acquire();
         // One place decides the pose for every screen: the screen's own
         // answer about what is under the pointer, asked at the point its
         // draw and its clicks see — the event carries the window's point,
         // the screen is handed it through the opening animation's
         // inverse. The sprite itself stands on the window's point.
-        LostTalesMapCursor.render(
+        LostTalesPointer.render(
                 Minecraft.getMinecraft(), event.mouseX, event.mouseY,
                 LostTalesGuiPointerTargets.poseFor(event.gui,
                         LostTalesGuiAnimations.inverseMouseX(event.gui,
@@ -745,7 +748,7 @@ public class LostTalesClientEventHandler implements IResourceManagerReloadListen
                 LostTalesCompassHudRenderer.render(minecraft, event.partialTicks);
                 LostTalesMapMarkerHudRenderer.render(minecraft, event.partialTicks);
                 LostTalesFellowshipHudRenderer.render(minecraft, event.partialTicks);
-                LostTalesQuestHudRenderer.render(minecraft, event.partialTicks);
+                LostTalesQuestTrackerRenderer.render(minecraft, event.partialTicks);
             } finally {
                 LostTalesHudFade.endPanels(minecraft);
             }

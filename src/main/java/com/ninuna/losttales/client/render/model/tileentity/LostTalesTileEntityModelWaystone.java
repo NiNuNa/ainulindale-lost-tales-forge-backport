@@ -13,7 +13,7 @@ public final class LostTalesTileEntityModelWaystone
             LostTalesTileEntityWaystone tileEntity) {
         return new ResourceLocation(
                 LostTalesMetaData.MOD_ID,
-                "geo/druedain_statue.geo.json");
+                "geo/watch_stone.geo.json");
     }
 
     @Override
@@ -21,7 +21,7 @@ public final class LostTalesTileEntityModelWaystone
             LostTalesTileEntityWaystone tileEntity) {
         return new ResourceLocation(
                 LostTalesMetaData.MOD_ID,
-                "textures/models/druedain_statue.png");
+                "textures/models/watch_stone.png");
     }
 
     @Override

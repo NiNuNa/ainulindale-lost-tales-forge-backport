@@ -32,8 +32,9 @@ import org.lwjgl.opengl.GL11;
 /**
  * The tabs of one window, laid out the way a browser lays out
  * its tabs. Tabs stand side by side with a one-pixel seam on the
- * window's top rule; the selected tab is drawn last, lifted, and
- * brighter. A tab is built rather than stretched: the sheet's left and
+ * window's top rule; the selected tab is drawn last, brighter, its feet
+ * on the rule joining the tool strip. A tab is built rather than
+ * stretched: the sheet's left and
  * right border pieces at its ends, a line joining their tips, and the
  * tab's interior tone filling the span between them, so a label of any
  * length leaves the artwork undistorted. Switching is a hard cut: the
@@ -41,7 +42,7 @@ import org.lwjgl.opengl.GL11;
  * happened — a click, the keyboard, or a command bringing the console
  * forward — so nothing sweeps across the tabs between. What waits
  * unread in a tab sits in its icon's corner ({@link TabMark}); a
- * muted tab is drawn dim and italic. The channel's colour runs
+ * muted tab's name is drawn in italics. The page's colour runs
  * across each tab's face two rows under that line, full at the centre
  * and fading to nothing at both ends.
  *
@@ -58,7 +59,7 @@ import org.lwjgl.opengl.GL11;
  * so nothing jumps. The tab in front keeps its cross throughout; its
  * icon and name are cut short before it like any name, so the cross
  * ends where the icon stood. The row's other controls stand at its two ends:
- * the restore {@code +} follows the last tab, since what it opens joins
+ * the {@code +} follows the last tab, since the New Page it opens joins
  * that row, and the window's own controls are gathered against the
  * right edge beside the grip that moves it, in the order a title bar
  * reads them — the lock, a hairline, the window's menu (three dots), the
@@ -68,8 +69,7 @@ import org.lwjgl.opengl.GL11;
  * centred on the same row
  * of the strip, and the bare stretch left between the two ends drags
  * the window as the grip does. Geometry is computed once per change of
- * inputs and reused by drawing and hit testing, so a frame allocates
- * nothing.</p>
+ * inputs and reused by drawing and hit testing.</p>
  *
  * <p>Every change of the row — a tab opening or closing, one carried
  * past its neighbours, into the row or out of it — moves the whole row
@@ -90,15 +90,15 @@ import org.lwjgl.opengl.GL11;
  * comes up. Nothing is ever drawn floating free of the strip, and no
  * insertion bar is needed to say where a tab would land — it is already
  * there. Put down, it settles into its place and glows once in its
- * channel's colour, and the tool strip under the row glows with it; the
+ * page's colour, and the tool strip under the row glows with it; the
  * strip's own surface round the tabs does not.</p>
  *
  * <p>Several tabs of one row can be <em>marked</em> at once
  * ({@link TabSelection}); a marked tab wears the lit shape a hovered
  * one wears, so a group reads as picked out without shouting. The
- * channel accent says nothing about it: an accent is what a channel is,
- * and it is drawn at full strength on every tab whatever the pointer and
- * the marks are doing. Marks are the pointer's, not the row's: the row
+ * page's colour says nothing about it: it is what the page is, and it
+ * is drawn at full strength on every tab whatever the pointer and the
+ * marks are doing. Marks are the pointer's, not the row's: the row
  * only draws what it is handed.</p>
  *
  * <p>The row is positioned by its window: {@code rowBottom} and
@@ -216,7 +216,7 @@ public final class TabRow {
      * channels it would open: the widest the ping tile stands, at
      * {@code 99+}.
      */
-    private static final int RESTORE_MARK_WIDTH = LostTalesUiSheet
+    private static final int NEW_PAGE_MARK_WIDTH = LostTalesUiSheet
             .countTileWidth(LostTalesUiSheet.COUNT_MOST + 1);
     /** Hit square of a control inside the selected tab. */
     static final int CONTROL_SIZE = 7;
@@ -415,10 +415,10 @@ public final class TabRow {
     private boolean locked;
     /** The tab whose options are out in the row being drawn; its dots rest lit. */
     private WindowPage optionsOpen;
-    /** What waits in the channels the {@code +} would open, marked after it. */
-    private TabMark restoreMark = TabMark.NONE;
-    /** Width of the restore control together with its mark. */
-    private int restoreWidth;
+    /** What waits in the conversations no window holds, marked after the {@code +}. */
+    private TabMark newPageMark = TabMark.NONE;
+    /** Width of the New Page control together with its mark. */
+    private int newPageWidth;
     /** Right edge of the last tab, before the end controls. */
     private int tabsRight;
     /** How wide the run the hand is carrying is, and where in it the
@@ -447,7 +447,7 @@ public final class TabRow {
     private final LostTalesUiButtonMotion searchMotion =
             new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT);
-    private final LostTalesUiButtonMotion restoreMotion =
+    private final LostTalesUiButtonMotion newPageMotion =
             new LostTalesUiButtonMotion(
                     LostTalesUiButtonMotion.Character.LIFT);
     /**
@@ -528,7 +528,7 @@ public final class TabRow {
     /** When the row was last drawn. */
     private long lastFrameNanos;
     private int lockX = -1;
-    private int restoreX = -1;
+    private int newPageX = -1;
     /**
      * Left edge of the window's own menu dots, fullscreen control and
      * cross; -1 when absent.
@@ -539,7 +539,7 @@ public final class TabRow {
     /** Left edge of the hairline between the last tab and the +. */
     private int tabDividerX = -1;
     /** The fraction of a pixel that run is really drawn at. */
-    private float restoreRunFraction;
+    private float newPageRunFraction;
     /** Left edges of the hairlines around the window's own controls. */
     private int firstDividerX = -1;
     private int secondDividerX = -1;
@@ -554,7 +554,7 @@ public final class TabRow {
      * act on the window.
      */
     public enum HitKind {
-        TAB, CLOSE, OPTIONS, DRAFT, VIEWS, SEARCH, LOCK, RESTORE, WINDOW_MENU,
+        TAB, CLOSE, OPTIONS, DRAFT, VIEWS, SEARCH,  LOCK, NEW_PAGE, WINDOW_MENU,
         WINDOW_FULLSCREEN, WINDOW_CLOSE, GRIP
     }
 
@@ -625,8 +625,9 @@ public final class TabRow {
         public float fractionY;
         /**
          * Whether the window is locked: it keeps its place, its size and
-         * its tabs, so the {@code +}, the crosses and the fullscreen
-         * control stand greyed, and its tabs and its grip move nothing.
+         * its tabs, so the crosses and the fullscreen control stand
+         * greyed, and its tabs and its grip move nothing. Its {@code +}
+         * still opens, elsewhere.
          */
         public boolean locked;
         /** Whether the padlock is lit a moment: something tried to move a locked window. */
@@ -651,7 +652,7 @@ public final class TabRow {
         public boolean searchOpen;
         /** The tab of this row whose options are out right now; null for none. */
         public WindowPage optionsOpen;
-        /** What waits unread in the closed channels, marked after the +. */
+        /** What waits unread in the conversations no window holds, marked after the +. */
         public TabMark closedMark = TabMark.NONE;
         /** Whether this window is the one being dragged right now. */
         public boolean moving;
@@ -771,15 +772,15 @@ public final class TabRow {
      * The row's {@code +} where it answers, in screen space: what a new
      * player's second tip points at. Null while the row does not show it.
      */
-    public LostTalesUiHitBox restoreControlBox(Row row) {
-        if (this.restoreX < 0) {
+    public LostTalesUiHitBox newPageControlBox(Row row) {
+        if (this.newPageX < 0) {
             return null;
         }
-        LostTalesUiHitBox box = endControlBox(this.restoreX,
-                this.restoreWidth, LostTalesUiSheet.PLUS.getHeight(),
+        LostTalesUiHitBox box = endControlBox(this.newPageX,
+                this.newPageWidth, LostTalesUiSheet.PLUS.getHeight(),
                 row.rowBottom);
         return new LostTalesUiHitBox(box.left + row.offsetX + row.fractionX
-                + this.restoreRunFraction, box.top + row.fractionY,
+                + this.newPageRunFraction, box.top + row.fractionY,
                 box.width, box.height);
     }
 
@@ -850,10 +851,10 @@ public final class TabRow {
                 .contains(localX, localY)) {
             return new Hit(HitKind.LOCK, null);
         }
-        if (this.restoreX >= 0 && endControlBox(this.restoreX,
-                this.restoreWidth, LostTalesUiSheet.PLUS.getHeight(), bottom)
+        if (this.newPageX >= 0 && endControlBox(this.newPageX,
+                this.newPageWidth, LostTalesUiSheet.PLUS.getHeight(), bottom)
                 .contains(localX, localY)) {
-            return new Hit(HitKind.RESTORE, null);
+            return new Hit(HitKind.NEW_PAGE, null);
         }
         if (this.windowMenuX >= 0 && endControlBox(this.windowMenuX,
                 MORE_WIDTH, LostTalesUiSheet.MORE.getHeight(), bottom)
@@ -1127,23 +1128,23 @@ public final class TabRow {
                 }
             }
             GL11.glPushMatrix();
-            GL11.glTranslatef(this.restoreRunFraction, 0.0F, 0.0F);
+            GL11.glTranslatef(this.newPageRunFraction, 0.0F, 0.0F);
             if (!row.bare && this.tabDividerX >= 0) {
                 drawDivider(row.offsetX + this.tabDividerX, bottom);
             }
-            if (!row.bare && this.restoreX >= 0) {
+            if (!row.bare && this.newPageX >= 0) {
                 // A new page, as a browser's new tab. A locked window's +
                 // still opens: its page opens in another window.
                 drawEndControl(LostTalesUiSheet.PLUS,
                         LostTalesUiSheet.PLUS_LIT,
-                        step(this.restoreMotion, hovered, HitKind.RESTORE),
-                        row.offsetX + this.restoreX, bottom, false);
-                if (!this.restoreMark.isNone()) {
+                        step(this.newPageMotion, hovered, HitKind.NEW_PAGE),
+                        row.offsetX + this.newPageX, bottom, false);
+                if (!this.newPageMark.isNone()) {
                     // What waits behind the +, marked as a tab's icon
                     // marks it: the ping tile, else the white sphere.
-                    this.restoreMark.drawAt(row.offsetX + this.restoreX
+                    this.newPageMark.drawAt(row.offsetX + this.newPageX
                                     + PLUS_WIDTH + COUNTER_GAP,
-                            centredInStrip(bottom, this.restoreMark.height()),
+                            centredInStrip(bottom, this.newPageMark.height()),
                             scaled(0xFF));
                 }
             }
@@ -1313,10 +1314,9 @@ public final class TabRow {
             }
         }
         // The tool strip under the strip's rule: a band of exactly the
-        // selected tab's surface, the window's room for the controls
-        // that read its history rather than pick a tab, empty for now,
-        // and a handle on the window like the strip above it.
-        // Its last row is a rule of its own — the window's top rule,
+        // selected tab's surface, where the page in front keeps its
+        // controls (ToolStrip), and a handle on the window like
+        // the strip above it. Its last row is a rule of its own — the window's top rule,
         // which the history's clip and its top shade hang from — on the
         // tool strip's own surface, which runs under it, as it runs under
         // the strip's rule.
@@ -2011,7 +2011,7 @@ public final class TabRow {
             return;
         }
         // A locked window keeps its tabs: the cross stays, greyed and
-        // still, and its tip says why.
+        // still, with no tip; a press lights the padlock.
         drawTabControl(LostTalesUiSheet.CLOSE, LostTalesUiSheet.CLOSE_HOVER,
                 step(tab.closeMotion, this.locked ? null : hovered, tab,
                         HitKind.CLOSE),
@@ -2730,7 +2730,7 @@ public final class TabRow {
     }
 
     /**
-     * Puts the hairline and the restore control after the tabs, at the
+     * Puts the hairline and the New Page control after the tabs, at the
      * edge the row is currently drawn to. Both drawing and hit testing
      * read these, so a control answers where it is seen even while the
      * row is still settling.
@@ -2742,9 +2742,9 @@ public final class TabRow {
         // rather than a whole GUI pixel behind them.
         float edge = this.drawnTabsRight;
         int whole = (int)Math.floor(edge);
-        this.restoreRunFraction = edge - whole;
+        this.newPageRunFraction = edge - whole;
         this.tabDividerX = whole + EDGE_GAP;
-        this.restoreX = this.tabDividerX + DIVIDER_WIDTH + EDGE_GAP;
+        this.newPageX = this.tabDividerX + DIVIDER_WIDTH + EDGE_GAP;
     }
 
     /**
@@ -2783,7 +2783,7 @@ public final class TabRow {
         // tab itself all the way up and it shoves them over the padlock.
         //
         // That is what {@code tabsLimit} already is — the row's own
-        // right-hand limit, the padlock less the room the restore run
+        // right-hand limit, the padlock less the room the New Page run
         // keeps. It is measured from the strip, never from the tabs, so
         // it does not move as tabs come and go and the place a tab was
         // taken from is still inside the room a moment later.
@@ -3166,7 +3166,7 @@ public final class TabRow {
     }
 
     /**
-     * One of the row's end controls — the restore {@code +}, the
+     * One of the row's end controls — the {@code +}, the
      * window's three dots, the window's cross — drawn where it was laid out
      * and centred in the strip, the way the lock beside them is;
      * {@code held} greys one a locked window holds back.
@@ -3202,8 +3202,8 @@ public final class TabRow {
         float y = (float)endControlInk(x, FULLSCREEN_WIDTH,
                 LostTalesUiSheet.FULLSCREEN.getHeight(), rowBottom).top;
         if (locked) {
-            // A locked window keeps its size: the control stays, greyed,
-            // still, and its tip says why.
+            // A locked window keeps its size: the control stays, greyed
+            // and still, with no tip; a press lights the padlock.
             LostTalesUiSheet glyph = share >= 0.5F
                     ? LostTalesUiSheet.FULLSCREEN_EXIT
                     : LostTalesUiSheet.FULLSCREEN;
@@ -3351,7 +3351,7 @@ public final class TabRow {
                 || row.tabs.isEmpty()) {
             this.cachedTabs = Collections.emptyList();
             this.lockX = -1;
-            this.restoreX = -1;
+            this.newPageX = -1;
             this.windowMenuX = -1;
             this.windowFullscreenX = -1;
             this.windowCloseX = -1;
@@ -3368,15 +3368,15 @@ public final class TabRow {
         }
         List<WindowPage> channels = row.tabs;
         int count = channels.size();
-        TabMark restoreMark = row.closedMark;
-        // The restore control's run is reserved with room for its mark:
+        TabMark newPageMark = row.closedMark;
+        // The New Page control's run is reserved with room for its mark:
         // the very room the narrowest window is bounded by, so a window
         // dragged to that bound shows every tab at its narrowest and
         // nothing less, and the tabs never reflow as the mark comes and
         // goes.
-        int restoreRun = restoreRunWidth();
+        int newPageRun = newPageRunWidth();
         int windowRun = WINDOW_CONTROLS_WIDTH;
-        int endControls = restoreRun + END_CONTROL_GAP + windowRun
+        int endControls = newPageRun + END_CONTROL_GAP + windowRun
                 + MIN_GRIP_WIDTH;
         // The row's right edge as it really stands, fractions included:
         // the end controls hang from it, and the tabs share what is
@@ -3500,18 +3500,18 @@ public final class TabRow {
         }
         this.tabsRight = tabs.isEmpty()
                 ? row.left + LEAD_RUN : (int)Math.round(cursor - TAB_GAP);
-        // The + opens a channel into this row, so it stands with the
+        // The + opens a New Page into this row, so it stands with the
         // tabs; everything that acts on the window itself stands with
         // the grip, against the row's right edge.
-        this.restoreMark = restoreMark;
-        this.restoreWidth = PLUS_WIDTH
-                + (restoreMark.isNone() ? 0 : COUNTER_GAP + restoreMark.width());
+        this.newPageMark = newPageMark;
+        this.newPageWidth = PLUS_WIDTH
+                + (newPageMark.isNone() ? 0 : COUNTER_GAP + newPageMark.width());
         placeLeftRun();
         // The window's own controls hang from the row's right edge, past
-        // the room the tabs and the restore run were given; the tabs'
+        // the room the tabs and the New Page run were given; the tabs'
         // end is the exact total rounded, so it can stand at most half
         // a pixel past that room and never pushes them off the edge.
-        int leftX = this.tabsRight + END_CONTROL_GAP + restoreRun;
+        int leftX = this.tabsRight + END_CONTROL_GAP + newPageRun;
         int controlX = Math.max(leftX - 1,
                 this.endEdge - MIN_GRIP_WIDTH - windowRun);
         this.lockX = controlX;
@@ -3858,34 +3858,31 @@ public final class TabRow {
      * Room the hairline, the {@code +} and its mark take after the tabs,
      * the mark's room kept whether or not one shows.
      */
-    private static int restoreRunWidth() {
+    private static int newPageRunWidth() {
         return EDGE_GAP + DIVIDER_WIDTH + EDGE_GAP
-                + PLUS_WIDTH + COUNTER_GAP + RESTORE_MARK_WIDTH;
+                + PLUS_WIDTH + COUNTER_GAP + NEW_PAGE_MARK_WIDTH;
     }
 
     /**
      * Room a row keeps clear of its tabs however many there are: the
-     * restore control after the last tab with the room its mark takes,
+     *  New Page control after the last tab with the room its mark takes,
      * the window's own controls and the grip at the right end, so the
      * tabs do not reflow as something behind the {@code +} goes unread.
      */
     private static int endControlsWidth() {
-        return restoreRunWidth() + END_CONTROL_GAP + WINDOW_CONTROLS_WIDTH
+        return newPageRunWidth() + END_CONTROL_GAP + WINDOW_CONTROLS_WIDTH
                 + MIN_GRIP_WIDTH;
     }
 
     /**
-     * The chat width below which the row could not hold its tabs at
-     * their least: the widest of them whole — whichever comes to the
-     * front keeps its whole name and both controls — every other at its
-     * icon alone, the seams between them, and the room the end controls
-     * hold. Zero when the row cannot be measured.
+     * The box width below which the window's row could not hold its tabs
+     * at their least ({@link #leastBoxWidth}), and never under the
+     * windows' own least width. Zero when the row cannot be measured.
      *
      * <p>This is what bounds a resize. A window may be dragged as narrow
      * as its own tabs allow and no narrower, so a tab can never be made
-     * to vanish by pulling an edge — the other tabs' names give way down
-     * to their icons and the edge then stops. The same measure decides
-     * whether a row has room for one more tab.</p>
+     * to vanish by pulling an edge. The same measure decides whether a
+     * row has room for one more tab ({@link #rowHasRoomFor}).</p>
      */
     static int boxWidthForNarrowestRow(Minecraft minecraft,
                                        Window window) {
@@ -3897,10 +3894,18 @@ public final class TabRow {
         if (tabs.isEmpty()) {
             return 0;
         }
-        int rowWidth = LEAD_RUN + endControlsWidth()
+        return Math.max(WindowPlacement.MIN_BOX_WIDTH, leastBoxWidth(tabs));
+    }
+
+    /**
+     * How wide a window's box must be for its row to hold these tabs:
+     * every tab at its narrowest, the seams between them, the buttons at
+     * the row's left end, the end controls' kept room and the strip's
+     * insets.
+     */
+    private static int leastBoxWidth(List<WindowPage> tabs) {
+        return STRIP_INSET * 2 + LEAD_RUN + endControlsWidth()
                 + TAB_GAP * (tabs.size() - 1) + reservedRowWidth(tabs);
-        return Math.max(WindowPlacement.MIN_BOX_WIDTH,
-                rowWidth + STRIP_INSET * 2);
     }
 
     /** {@link #reservedRowWidth(int[])} over the tabs themselves. */
@@ -3925,7 +3930,7 @@ public final class TabRow {
                         : row.splitPartner.equals(this.cachedPartner))
                 && row.splitPairs.equals(this.cachedPairs)
                 && showClose == this.cachedShowClose
-                && row.closedMark.equals(this.restoreMark)
+                && row.closedMark.equals(this.newPageMark)
                 && row.tabs.equals(this.cachedChannels);
         for (int index = 0; index < row.tabs.size(); index++) {
             WindowPage tab = row.tabs.get(index);
@@ -3945,6 +3950,13 @@ public final class TabRow {
                 current = false;
             }
         }
+        if (!current) {
+            // A page gone from the row is forgotten, so the row holds no
+            // page closed or carried off long ago.
+            this.cachedLabels.keySet().retainAll(row.tabs);
+            this.cachedMuted.keySet().retainAll(row.tabs);
+            this.cachedDraft.keySet().retainAll(row.tabs);
+        }
         return current;
     }
 
@@ -3954,17 +3966,15 @@ public final class TabRow {
 
     /**
      * Whether the window's row has room for {@code candidates} besides
-     * the tabs it shows: the same measure that bounds a resize — every
-     * tab at its narrowest, the seams between
-     * them, and the end controls' reserved room, the restore control's
-     * counted at its widest badge so the answer does not flap as the
-     * {@code +} comes and goes. This is what the auto-open policy asks
-     * before filing a new tab into a window, and what a dock asks before
-     * a carried tab joins a row: a row that can hold one more tab at
-     * that least takes it, however tight that makes the names; one that
-     * cannot is full, and the channel opens elsewhere. Without a
-     * renderer to measure with the answer is yes, which keeps the layout
-     * usable headlessly.
+     * the tabs it shows, by the measure that bounds a resize
+     * ({@link #leastBoxWidth}), the {@code +}'s mark counted at its widest
+     * so the answer does not flap as something waits behind it. A page
+     * opening by itself asks this before it joins a window, and so does a
+     * carried tab before it joins a row: a row that can hold one more tab
+     * at that least takes it, however tight that makes the names; one
+     * that cannot is full, and the page opens elsewhere. Without a
+     * renderer to measure with the answer is yes, so the layout works
+     * without a game.
      */
     static boolean rowHasRoomFor(Minecraft minecraft, Window window,
                                  List<? extends WindowPage> candidates) {
@@ -3990,12 +4000,7 @@ public final class TabRow {
         WindowPlacement.Box box = WindowPlacement.restingBounds(
                 window, minecraft, resolution.getScaledWidth(),
                 resolution.getScaledHeight());
-        // The row spans the window minus the two-pixel insets the screen
-        // lays it out with.
-        int rowWidth = box.width - 4 - LEAD_RUN;
-        int available = rowWidth - endControlsWidth()
-                - TAB_GAP * (tabs.size() - 1);
-        return reservedRowWidth(tabs) <= available;
+        return leastBoxWidth(tabs) <= box.width;
     }
 
     static final class Tab {
@@ -4079,7 +4084,7 @@ public final class TabRow {
         final int optionsX;
         /** Resting left edge of the draft mark once settled, or -1. */
         final int draftX;
-        /** Whether the tab's lines are kept out of the closed feed. */
+        /** Whether the tab's lines are kept out of the feed. */
         final boolean muted;
 
         Tab(WindowPage tab, int rowIndex, boolean icon, String label,

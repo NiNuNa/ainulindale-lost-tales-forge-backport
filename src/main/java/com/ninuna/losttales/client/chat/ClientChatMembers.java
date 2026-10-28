@@ -1,5 +1,7 @@
 package com.ninuna.losttales.client.chat;
 
+import com.ninuna.losttales.chat.ChatSpeechRange;
+import com.ninuna.losttales.chat.ChatPageIds;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesChatMembersPacket;
@@ -13,11 +15,13 @@ import net.minecraft.client.Minecraft;
 /**
  * What the server last said of who is in each conversation, for the
  * member lists of the windows showing it, and when to ask again. A
- * conversation is the one a tab shows ({@link ConversationPage#viewed}), known by
+ * conversation is the one a page shows ({@link ConversationPage#viewed}), known by
  * its id: a channel's, a faction's or a fellowship's as the chat is read, a
- * whisper held as one identity, an NPC's.
+ * whisper held as one identity, an NPC's. A conversation heard nearby is
+ * asked for at the range the copy speaks at, and each range keeps its
+ * own answer: the list is who that range reaches (CHAT-37).
  *
- * <p>A window whose list stands asks for its front tab's conversation
+ * <p>A window whose list stands asks for its front page's conversation
  * while it has no answer, once the answer is older than
  * {@link #REFRESH_MILLIS}, and at once when the identity the chat is read
  * as has changed since it asked, but never more often than
@@ -28,8 +32,8 @@ import net.minecraft.client.Minecraft;
  * a player has asked for lately and sends one again by itself the moment
  * it changes, so these asks are what keeps it doing so.</p>
  *
- * <p>When the chat opens, every tab of a window whose list stands is
- * asked for ahead of being shown ({@link #prefetch}), so a tab brought
+ * <p>When the chat opens, every page of a window whose list stands is
+ * asked for ahead of being shown ({@link #prefetch}), so a page brought
  * forward finds its list waiting rather than empty. A status this player
  * chooses asks again at once ({@link #askAgain}). Session state, cleared
  * on disconnect.</p>
@@ -95,58 +99,61 @@ public final class ClientChatMembers {
         }
     }
 
-    /** The answer last told for the conversation the tab shows, or null while none has been. */
-    static synchronized Answer of(ConversationPage tab) {
-        return tab == null ? null : BY_CONVERSATION.get(keyOf(tab));
+    /** The answer last told for the conversation the page shows, or null while none has been. */
+    static synchronized Answer of(ConversationPage page) {
+        return page == null ? null : BY_CONVERSATION.get(keyOf(page));
     }
 
     /**
-     * Asks for the members of the conversation the tab shows when its
+     * Asks for the members of the conversation the page shows when its
      * list is due an answer; nothing when one was asked for too recently.
      */
-    static void requestIfDue(ConversationPage tab) {
-        ConversationPage viewed = ConversationPage.viewedConversation(tab);
+    static void requestIfDue(ConversationPage page) {
+        ConversationPage viewed = ConversationPage.viewedConversation(page);
         if (viewed == null || viewed.getChannel() == null) {
             return;
         }
         long now = System.currentTimeMillis();
         String asAs = ClientChatIdentities.inUseKey();
-        String key = viewed.id();
+        String key = keyOf(page);
         synchronized (ClientChatMembers.class) {
             if (!isDue(now, ASKED_AT.get(key), ANSWERED_AT.get(key),
                     asAs.equals(ASKED_AS.get(key)))) {
                 return;
             }
         }
-        ask(viewed, now, asAs, ClientChatIdentities.viewIdentityKey(tab));
+        ask(viewed, key, ChatSpeechRanges.of(page), now, asAs,
+                ClientChatIdentities.viewIdentityKey(page));
     }
 
     /**
-     * Asks ahead for every tab of the windows whose list stands, the tab
+     * Asks ahead for every page of the windows whose list stands, the page
      * in front first, as the chat opens: at most {@link #MAX_PREFETCH},
      * and none already answered or asked for this session.
      */
-    static void prefetch(List<ConversationPage> tabs) {
-        if (tabs == null) {
+    static void prefetch(List<ConversationPage> pages) {
+        if (pages == null) {
             return;
         }
         long now = System.currentTimeMillis();
         String asAs = ClientChatIdentities.inUseKey();
         int asked = 0;
-        for (ConversationPage tab : tabs) {
+        for (ConversationPage page : pages) {
             if (asked >= MAX_PREFETCH) {
                 return;
             }
-            ConversationPage viewed = ConversationPage.viewedConversation(tab);
+            ConversationPage viewed = ConversationPage.viewedConversation(page);
             if (viewed == null || viewed.getChannel() == null) {
                 continue;
             }
+            String key = keyOf(page);
             synchronized (ClientChatMembers.class) {
-                if (ASKED_AT.containsKey(viewed.id())) {
+                if (ASKED_AT.containsKey(key)) {
                     continue;
                 }
             }
-            ask(viewed, now, asAs, ClientChatIdentities.viewIdentityKey(tab));
+            ask(viewed, key, ChatSpeechRanges.of(page), now, asAs,
+                    ClientChatIdentities.viewIdentityKey(page));
             asked++;
         }
     }
@@ -160,9 +167,9 @@ public final class ClientChatMembers {
         ASKED_AT.clear();
     }
 
-    private static void ask(ConversationPage viewed, long now, String asAs,
+    private static void ask(ConversationPage viewed, String key,
+                            ChatSpeechRange range, long now, String asAs,
                             String copyIdentity) {
-        String key = viewed.id();
         long held;
         synchronized (ClientChatMembers.class) {
             ASKED_AT.put(key, Long.valueOf(now));
@@ -178,7 +185,7 @@ public final class ClientChatMembers {
                         player ? ClientChatChannelState.partnerCharacterIdOf(viewed)
                                 : null,
                         viewed.isWhisper() ? heldCharacterOf(viewed, copyIdentity) : null,
-                        held));
+                        held).range(range));
     }
 
     /**
@@ -199,11 +206,26 @@ public final class ClientChatMembers {
         }
     }
 
-    /** The key a tab's conversation is known by. */
-    private static String keyOf(ConversationPage tab) {
-        ConversationPage viewed = ConversationPage.viewedConversation(tab);
-        return viewed == null ? "" : viewed.id();
+    /**
+     * The key a page's conversation is known by: the conversation's id, and
+     * for one heard nearby the range the copy speaks at.
+     */
+    private static String keyOf(ConversationPage page) {
+        ConversationPage viewed = ConversationPage.viewedConversation(page);
+        if (viewed == null) {
+            return "";
+        }
+        return ChatSpeechRanges.hasRange(page)
+                ? keyOf(viewed.id(), ChatSpeechRanges.of(page)) : viewed.id();
     }
+
+    /** A conversation heard nearby's key at {@code range}: its id, a separator and the range. */
+    static String keyOf(String conversationId, ChatSpeechRange range) {
+        return conversationId + ChatPageIds.SEPARATOR + RANGE_MARK + range.id;
+    }
+
+    /** What a nearby conversation's key names its range after. */
+    static final String RANGE_MARK = "range:";
 
     /**
      * Whether a conversation asked for at {@code askedAt} and last

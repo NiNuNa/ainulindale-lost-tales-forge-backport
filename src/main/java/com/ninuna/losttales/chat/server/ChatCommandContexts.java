@@ -6,7 +6,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Where each player typed the command they are about to send: the tab
+ * Where each player typed the command they are about to send: the page
  * id their client reported a moment before the command itself, kept
  * until the command arrives or a few seconds pass. A vanilla command
  * carries no channel, so the console line saying where it was typed
@@ -18,15 +18,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * is in place before the command is run; queued to the server tick it
  * could land a tick late and miss the command. Nothing here touches the
  * world. The id is a bounded string the client chose: console readers
- * are shown it as a link, and it names the tab the command's answers are
+ * are shown it as a link, and it names the page the command's answers are
  * kept under. That is all it decides, and the server checks it first —
- * an answer stays under the tab only while the player may read that
+ * an answer stays under the page only while the player may read that
  * conversation, and goes to their Console otherwise
- * ({@link LostTalesServerBroadcastHook#answerTab}). Cleared with the rest
+ * ({@link LostTalesServerBroadcastHook#answerPage}). Cleared with the rest
  * of the server's chat state.</p>
  *
  * <p>Once the command runs, its note becomes the player's running
- * context ({@link #beginCommand}): the tab the command's answers are
+ * context ({@link #beginCommand}): the page the command's answers are
  * kept under, answered line by line ({@link #answerLine}) for as long
  * as a note is fresh and for at most {@link #MAX_LINES_PER_COMMAND}
  * lines. The history charges every answer to the player's own share
@@ -36,21 +36,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ChatCommandContexts {
     /** How long a note answers for a command; commands follow at once. */
     static final long VALID_MILLIS = 5000L;
-    /** The most answer lines one command has kept under its tab. */
+    /** The most answer lines one command has kept under its page. */
     static final int MAX_LINES_PER_COMMAND = 32;
     /** More players than this have no note kept at once. */
     private static final int MAX_ENTRIES = 512;
     private static final ConcurrentHashMap<UUID, Entry> CONTEXTS =
             new ConcurrentHashMap<UUID, Entry>();
-    /** The tab each player's running command was typed in. */
+    /** The page each player's running command was typed in. */
     private static final ConcurrentHashMap<UUID, Entry> RUNNING =
             new ConcurrentHashMap<UUID, Entry>();
 
     private ChatCommandContexts() {}
 
     /** Remembers where {@code playerId}'s next command was typed. */
-    public static void note(UUID playerId, String tabId, long nowMillis) {
-        if (playerId == null || tabId == null || tabId.length() == 0) {
+    public static void note(UUID playerId, String pageId, long nowMillis) {
+        if (playerId == null || pageId == null || pageId.length() == 0) {
             return;
         }
         if (CONTEXTS.size() >= MAX_ENTRIES) {
@@ -59,11 +59,11 @@ public final class ChatCommandContexts {
                 return;
             }
         }
-        CONTEXTS.put(playerId, new Entry(tabId, nowMillis));
+        CONTEXTS.put(playerId, new Entry(pageId, nowMillis));
     }
 
     /**
-     * The tab id noted for the player's command, taken so it answers
+     * The page id noted for the player's command, taken so it answers
      * once; empty when none was noted or the note has gone stale.
      */
     public static String take(UUID playerId, long nowMillis) {
@@ -71,7 +71,7 @@ public final class ChatCommandContexts {
         if (entry == null || !entry.isFresh(nowMillis)) {
             return "";
         }
-        return entry.tabId;
+        return entry.pageId;
     }
 
     /**
@@ -81,11 +81,11 @@ public final class ChatCommandContexts {
      * runs with no context, and its answers are kept nowhere.
      */
     public static String beginCommand(UUID playerId, long nowMillis) {
-        String tabId = take(playerId, nowMillis);
+        String pageId = take(playerId, nowMillis);
         if (playerId == null) {
             return "";
         }
-        if (tabId.length() == 0) {
+        if (pageId.length() == 0) {
             RUNNING.remove(playerId);
             return "";
         }
@@ -93,13 +93,13 @@ public final class ChatCommandContexts {
             purge(RUNNING, nowMillis);
         }
         if (RUNNING.size() < MAX_ENTRIES) {
-            RUNNING.put(playerId, new Entry(tabId, nowMillis));
+            RUNNING.put(playerId, new Entry(pageId, nowMillis));
         }
-        return tabId;
+        return pageId;
     }
 
     /**
-     * The tab a line sent to the player right now is an answer to:
+     * The page a line sent to the player right now is an answer to:
      * their running command's, while the command is fresh and has kept
      * fewer than {@link #MAX_LINES_PER_COMMAND} lines; else empty, and
      * the line is nobody's answer.
@@ -114,7 +114,7 @@ public final class ChatCommandContexts {
             return "";
         }
         entry.linesKept++;
-        return entry.tabId;
+        return entry.pageId;
     }
 
     /** Drops every stale note. */
@@ -143,13 +143,13 @@ public final class ChatCommandContexts {
     }
 
     private static final class Entry {
-        final String tabId;
+        final String pageId;
         final long notedMillis;
-        /** Answer lines kept under a running command's tab so far. */
+        /** Answer lines kept under a running command's page so far. */
         int linesKept;
 
-        Entry(String tabId, long notedMillis) {
-            this.tabId = tabId;
+        Entry(String pageId, long notedMillis) {
+            this.pageId = pageId;
             this.notedMillis = notedMillis;
         }
 

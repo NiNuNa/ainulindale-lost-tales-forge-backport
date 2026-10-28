@@ -37,8 +37,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
     static final int MAX_ACTIVE_QUESTS = 1024;
     static final int MAX_QUEST_ID_COLLECTION = 8192;
     static final int MAX_OBJECTIVE_PROGRESS = 512;
-    static final int MAX_DYNAMIC_MARKERS = 2048;
-    static final int MAX_DYNAMIC_QUESTS = 512;
+    static final int MAX_GIVER_MARKERS = 2048;
+    static final int MAX_MISSIVES = 512;
     /** Quest ids, and the stage, objective and marker ids beside them, all within the one quest-id bound. */
     static final int MAX_IDENTIFIER_BYTES = LostTalesQuestIds.MAX_BYTES;
     static final int MAX_NAME_BYTES = 1024;
@@ -47,10 +47,10 @@ public class LostTalesQuestSyncPacket implements IMessage {
     private final List<LostTalesQuestProgress> activeQuests = new ArrayList<LostTalesQuestProgress>();
     private final List<LostTalesQuestHistoryEntry> questHistory = new ArrayList<LostTalesQuestHistoryEntry>();
     private final Set<String> discoveredMarkerIds = new LinkedHashSet<String>();
-    private final Set<String> pinnedQuestIds = new LinkedHashSet<String>();
-    private final List<LostTalesMapMarkerDefinition> dynamicMapMarkers = new ArrayList<LostTalesMapMarkerDefinition>();
-    private final List<LostTalesQuestDefinition> dynamicQuestDefinitions = new ArrayList<LostTalesQuestDefinition>();
-    private String pinnedMapMarkerId = "";
+    private final Set<String> trackedQuestIds = new LinkedHashSet<String>();
+    private final List<LostTalesMapMarkerDefinition> giverMarkers = new ArrayList<LostTalesMapMarkerDefinition>();
+    private final List<LostTalesQuestDefinition> missiveDefinitions = new ArrayList<LostTalesQuestDefinition>();
+    private String trackedMapMarkerId = "";
     private final Set<String> heardRumours = new LinkedHashSet<String>();
     /** Where those rumours point, by quest, each a quest among them (QUEST-20). */
     private final Map<String, QuestRumourPlace> rumourPlaces =
@@ -64,7 +64,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
 
     public LostTalesQuestSyncPacket() {}
 
-    public LostTalesQuestSyncPacket(Collection<LostTalesQuestProgress> activeQuests, Collection<LostTalesQuestHistoryEntry> questHistory, Collection<String> pinnedQuestIds, Collection<String> discoveredMarkerIds, String pinnedMapMarkerId, Collection<LostTalesMapMarkerDefinition> dynamicMapMarkers, Collection<LostTalesQuestDefinition> dynamicQuestDefinitions) {
+    public LostTalesQuestSyncPacket(Collection<LostTalesQuestProgress> activeQuests, Collection<LostTalesQuestHistoryEntry> questHistory, Collection<String> trackedQuestIds, Collection<String> discoveredMarkerIds, String trackedMapMarkerId, Collection<LostTalesMapMarkerDefinition> giverMarkers, Collection<LostTalesQuestDefinition> missiveDefinitions) {
         if (activeQuests != null) {
             for (LostTalesQuestProgress progress : activeQuests) {
                 if (progress != null) {
@@ -79,10 +79,10 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 }
             }
         }
-        if (pinnedQuestIds != null) {
-            for (String questId : pinnedQuestIds) {
+        if (trackedQuestIds != null) {
+            for (String questId : trackedQuestIds) {
                 if (questId != null && questId.length() > 0) {
-                    this.pinnedQuestIds.add(questId);
+                    this.trackedQuestIds.add(questId);
                 }
             }
         }
@@ -93,21 +93,21 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 }
             }
         }
-        if (dynamicMapMarkers != null) {
-            for (LostTalesMapMarkerDefinition marker : dynamicMapMarkers) {
+        if (giverMarkers != null) {
+            for (LostTalesMapMarkerDefinition marker : giverMarkers) {
                 if (marker != null && marker.getId() != null && marker.getId().length() > 0) {
-                    this.dynamicMapMarkers.add(marker);
+                    this.giverMarkers.add(marker);
                 }
             }
         }
-        if (dynamicQuestDefinitions != null) {
-            for (LostTalesQuestDefinition quest : dynamicQuestDefinitions) {
+        if (missiveDefinitions != null) {
+            for (LostTalesQuestDefinition quest : missiveDefinitions) {
                 if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
-                    this.dynamicQuestDefinitions.add(quest);
+                    this.missiveDefinitions.add(quest);
                 }
             }
         }
-        this.pinnedMapMarkerId = pinnedMapMarkerId == null ? "" : pinnedMapMarkerId;
+        this.trackedMapMarkerId = trackedMapMarkerId == null ? "" : trackedMapMarkerId;
     }
 
     public static LostTalesQuestSyncPacket fromPlayerData(LostTalesQuestPlayerData data) {
@@ -115,10 +115,10 @@ public class LostTalesQuestSyncPacket implements IMessage {
             return new LostTalesQuestSyncPacket();
         }
         LostTalesQuestSyncPacket packet = new LostTalesQuestSyncPacket(data.getActiveQuests(),
-                data.getQuestHistory(), data.getPinnedQuestIds(),
-                data.getDiscoveredMarkerIds(), data.getPinnedMapMarkerId(),
-                data.getDynamicMapMarkers(),
-                data.getDynamicQuestDefinitions());
+                data.getQuestHistory(), data.getTrackedQuestIds(),
+                data.getDiscoveredMarkerIds(), data.getTrackedMapMarkerId(),
+                data.getGiverMarkers(),
+                data.getMissiveDefinitions());
         return packet.withHeardRumours(data.getHeardRumours())
                 .withWaitingRewards(data.getWaitingRewards());
     }
@@ -163,7 +163,7 @@ public class LostTalesQuestSyncPacket implements IMessage {
 
     /**
      * The same log with the rumours its character heard (QUEST-20); a
-     * place kept for a rumour no longer among them goes.
+     * place kept for a rumour not among them goes.
      */
     public LostTalesQuestSyncPacket withHeardRumours(Collection<String> rumours) {
         this.heardRumours.clear();
@@ -239,13 +239,13 @@ public class LostTalesQuestSyncPacket implements IMessage {
                 this.activeQuests.add(readProgress(buf));
             }
 
-            int pinnedQuestCount = LostTalesPacketCodec.readCount(
-                    buf, MAX_QUEST_ID_COLLECTION, "pinned quest");
-            for (int i = 0; i < pinnedQuestCount; i++) {
-                addIfPresent(this.pinnedQuestIds, readIdentifier(buf));
+            int trackedQuestCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_QUEST_ID_COLLECTION, "tracked quest");
+            for (int i = 0; i < trackedQuestCount; i++) {
+                addIfPresent(this.trackedQuestIds, readIdentifier(buf));
             }
 
-            this.pinnedMapMarkerId = readIdentifier(buf);
+            this.trackedMapMarkerId = readIdentifier(buf);
             readIdentifierSet(buf, this.discoveredMarkerIds,
                     "discovered marker");
             int historyCount = LostTalesPacketCodec.readCount(
@@ -280,9 +280,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
                         completedOptionalObjectives, completions, stagePath));
             }
 
-            int dynamicMarkerCount = LostTalesPacketCodec.readCount(
-                    buf, MAX_DYNAMIC_MARKERS, "dynamic marker");
-            for (int i = 0; i < dynamicMarkerCount; i++) {
+            int giverMarkerCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_GIVER_MARKERS, "giver marker");
+            for (int i = 0; i < giverMarkerCount; i++) {
                 String markerId = readIdentifier(buf);
                 String name = readName(buf);
                 String namedAfter = LostTalesPacketCodec.readUtf8String(buf,
@@ -309,28 +309,28 @@ public class LostTalesQuestSyncPacket implements IMessage {
                         || compassFadeInRadius < 0.0D
                         || discoveryRadius < 0.0D) {
                     throw new LostTalesPacketCodec.DecodeException(
-                            "invalid dynamic marker");
+                            "invalid giver marker");
                 }
-                this.dynamicMapMarkers.add(
+                this.giverMarkers.add(
                         new LostTalesMapMarkerDefinition(
                                 markerId, name, icon, color, category, "",
                                 hasFastTravel, dimensionId, x, y, z,
                                 compassFadeInRadius, discoveryRadius, hidden,
                                 discoverable, requiresRegionUnlock,
-                                LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                                LostTalesMapMarkerSource.QUEST_GIVER,
                                 false, "", priority, namedAfter));
             }
 
-            int dynamicQuestCount = LostTalesPacketCodec.readCount(
-                    buf, MAX_DYNAMIC_QUESTS, "dynamic quest");
-            for (int i = 0; i < dynamicQuestCount; i++) {
+            int missiveCount = LostTalesPacketCodec.readCount(
+                    buf, MAX_MISSIVES, "missive");
+            for (int i = 0; i < missiveCount; i++) {
                 LostTalesQuestDefinition quest = LostTalesQuestDefinitionCodec.read(buf);
                 if (quest == null || quest.getId() == null
                         || quest.getId().length() == 0) {
                     throw new LostTalesPacketCodec.DecodeException(
-                            "invalid dynamic quest");
+                            "invalid missive");
                 }
-                this.dynamicQuestDefinitions.add(quest);
+                this.missiveDefinitions.add(quest);
             }
             readIdentifierSet(buf, this.heardRumours, "heard rumour",
                     LostTalesQuestPlayerData.MAX_RUMOURS);
@@ -371,8 +371,8 @@ public class LostTalesQuestSyncPacket implements IMessage {
             writeProgress(buf, progress);
         }
 
-        writeIdentifierSet(buf, this.pinnedQuestIds, "pinned quest");
-        writeIdentifier(buf, this.pinnedMapMarkerId);
+        writeIdentifierSet(buf, this.trackedQuestIds, "tracked quest");
+        writeIdentifier(buf, this.trackedMapMarkerId);
         writeIdentifierSet(buf, this.discoveredMarkerIds,
                 "discovered marker");
         LostTalesPacketCodec.writeCount(buf, this.questHistory.size(),
@@ -397,11 +397,11 @@ public class LostTalesQuestSyncPacket implements IMessage {
                     LostTalesQuestProgress.MAX_PATH_STAGES);
         }
 
-        LostTalesPacketCodec.writeCount(buf, this.dynamicMapMarkers.size(),
-                MAX_DYNAMIC_MARKERS, "dynamic marker");
-        for (LostTalesMapMarkerDefinition marker : this.dynamicMapMarkers) {
+        LostTalesPacketCodec.writeCount(buf, this.giverMarkers.size(),
+                MAX_GIVER_MARKERS, "giver marker");
+        for (LostTalesMapMarkerDefinition marker : this.giverMarkers) {
             if (!isValidMarker(marker)) {
-                throw new IllegalStateException("invalid dynamic marker");
+                throw new IllegalStateException("invalid giver marker");
             }
             writeIdentifier(buf, marker.getId());
             writeName(buf, marker.getName());
@@ -424,9 +424,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
         }
 
         LostTalesPacketCodec.writeCount(buf,
-                this.dynamicQuestDefinitions.size(), MAX_DYNAMIC_QUESTS,
-                "dynamic quest");
-        for (LostTalesQuestDefinition quest : this.dynamicQuestDefinitions) {
+                this.missiveDefinitions.size(), MAX_MISSIVES,
+                "missive");
+        for (LostTalesQuestDefinition quest : this.missiveDefinitions) {
             LostTalesQuestDefinitionCodec.write(buf, quest);
         }
         writeIdentifierSet(buf, this.heardRumours, "heard rumour",
@@ -560,9 +560,9 @@ public class LostTalesQuestSyncPacket implements IMessage {
             uncounted.add(progress.withoutCounts());
         }
         return new LostTalesQuestSyncPacket(uncounted, this.questHistory,
-                this.pinnedQuestIds, this.discoveredMarkerIds,
-                this.pinnedMapMarkerId, this.dynamicMapMarkers,
-                this.dynamicQuestDefinitions).withHeardRumours(this.heardRumours)
+                this.trackedQuestIds, this.discoveredMarkerIds,
+                this.trackedMapMarkerId, this.giverMarkers,
+                this.missiveDefinitions).withHeardRumours(this.heardRumours)
                 .withRumourPlaces(this.rumourPlaces.values())
                 .withWaitingRewards(this.waitingRewards);
     }
@@ -585,20 +585,20 @@ public class LostTalesQuestSyncPacket implements IMessage {
         return Collections.unmodifiableSet(new LinkedHashSet<String>(this.discoveredMarkerIds));
     }
 
-    public List<LostTalesMapMarkerDefinition> getDynamicMapMarkers() {
-        return Collections.unmodifiableList(new ArrayList<LostTalesMapMarkerDefinition>(this.dynamicMapMarkers));
+    public List<LostTalesMapMarkerDefinition> getGiverMarkers() {
+        return Collections.unmodifiableList(new ArrayList<LostTalesMapMarkerDefinition>(this.giverMarkers));
     }
 
-    public List<LostTalesQuestDefinition> getDynamicQuestDefinitions() {
-        return Collections.unmodifiableList(new ArrayList<LostTalesQuestDefinition>(this.dynamicQuestDefinitions));
+    public List<LostTalesQuestDefinition> getMissiveDefinitions() {
+        return Collections.unmodifiableList(new ArrayList<LostTalesQuestDefinition>(this.missiveDefinitions));
     }
 
-    public Set<String> getPinnedQuestIds() {
-        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.pinnedQuestIds));
+    public Set<String> getTrackedQuestIds() {
+        return Collections.unmodifiableSet(new LinkedHashSet<String>(this.trackedQuestIds));
     }
 
-    public String getPinnedMapMarkerId() {
-        return this.pinnedMapMarkerId == null ? "" : this.pinnedMapMarkerId;
+    public String getTrackedMapMarkerId() {
+        return this.trackedMapMarkerId == null ? "" : this.trackedMapMarkerId;
     }
 
     public boolean isMalformed() {
@@ -613,10 +613,10 @@ public class LostTalesQuestSyncPacket implements IMessage {
         this.activeQuests.clear();
         this.questHistory.clear();
         this.discoveredMarkerIds.clear();
-        this.pinnedQuestIds.clear();
-        this.dynamicMapMarkers.clear();
-        this.dynamicQuestDefinitions.clear();
-        this.pinnedMapMarkerId = "";
+        this.trackedQuestIds.clear();
+        this.giverMarkers.clear();
+        this.missiveDefinitions.clear();
+        this.trackedMapMarkerId = "";
     }
 
     /**

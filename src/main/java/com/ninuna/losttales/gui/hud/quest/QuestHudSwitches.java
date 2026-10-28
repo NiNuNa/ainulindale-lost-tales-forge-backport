@@ -33,8 +33,8 @@ public final class QuestHudSwitches {
     /** What shows by the client's settings now. */
     public static QuestHudSwitches current() {
         return of(LostTalesConfig.showLostTalesHud,
-                LostTalesConfig.showQuestHud,
-                LostTalesConfig.showQuestHudNotifications,
-                LostTalesConfig.showWorldQuestMarkers);
+                LostTalesConfig.showQuestTracker,
+                LostTalesConfig.showQuestBanners,
+                LostTalesConfig.showWorldLabels);
     }
 }

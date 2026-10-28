@@ -103,7 +103,7 @@ public final class LostTalesPermissionsTest {
     public void aPermissionExpandsToTheCapabilitiesItNames() {
         LostTalesPermissionCatalog permissions = ChatRoleConfig.parsePermissions(
                 new String[] {"keeper=capability:chat.moderate;"
-                        + "capability:chat.server_console.read"},
+                        + "capability:chat.server_log.read"},
                 ChatRoleConfig.SILENT);
         ChatRoleCatalog catalog = ChatRoleCatalog.of(
                 Arrays.asList(role("moderator", 15, "keeper")), null, null);
@@ -111,7 +111,7 @@ public final class LostTalesPermissionsTest {
         assertTrue(LostTalesPermissions.isGranted(bit,
                 LostTalesCapability.CHAT_MODERATE, catalog, permissions));
         assertTrue(LostTalesPermissions.isGranted(bit,
-                LostTalesCapability.CHAT_SERVER_CONSOLE_READ, catalog, permissions));
+                LostTalesCapability.CHAT_SERVER_LOG_READ, catalog, permissions));
         assertFalse("nothing the permission does not name",
                 LostTalesPermissions.isGranted(bit,
                         LostTalesCapability.SERVER_CONFIG, catalog, permissions));
@@ -124,13 +124,13 @@ public final class LostTalesPermissionsTest {
     @Test
     public void aPermissionMayNarrowAnIdThatNamesACapability() {
         LostTalesPermissionCatalog permissions = ChatRoleConfig.parsePermissions(
-                new String[] {"chat.moderate=capability:chat.server_console.read"},
+                new String[] {"chat.moderate=capability:chat.server_log.read"},
                 ChatRoleConfig.SILENT);
         ChatRoleCatalog catalog = ChatRoleCatalog.of(
                 Arrays.asList(role("moderator", 15, "chat.moderate")), null, null);
         int bit = catalog.byId("moderator").bit();
         assertTrue(LostTalesPermissions.isGranted(bit,
-                LostTalesCapability.CHAT_SERVER_CONSOLE_READ, catalog, permissions));
+                LostTalesCapability.CHAT_SERVER_LOG_READ, catalog, permissions));
         assertFalse("the permission, not the capability of the same id",
                 LostTalesPermissions.isGranted(bit,
                         LostTalesCapability.CHAT_MODERATE, catalog, permissions));

@@ -1,0 +1,311 @@
+package com.ninuna.losttales.client.chat;
+
+import com.ninuna.losttales.client.window.OtherPage;
+import com.ninuna.losttales.client.window.TabSelection;
+import com.ninuna.losttales.client.window.Window;
+import com.ninuna.losttales.client.window.WindowDrawing;
+import com.ninuna.losttales.client.window.WindowLayout;
+import com.ninuna.losttales.client.window.WindowSplit;
+import com.ninuna.losttales.client.window.WindowPage;
+import com.ninuna.losttales.client.window.WindowView;
+import java.util.List;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.util.StatCollector;
+
+/**
+ * The selection and the page and window verbs every other part of the
+ * chat screen needs: the one place that changes the selected page and
+ * keeps the screen consistent afterwards — the window being typed in
+ * comes to the front, drafts change hands with the page, a completion
+ * walked in the page just left is over, a reply aimed at it is put down
+ * — and the verbs that open a whisper, close a page or a window, or
+ * bring an open page forward.
+ */
+public final class ChatPageActions {
+    private final ChatInputBar bar;
+    private final ChatInputCompletion completion;
+    private final ChatComposer composer;
+    private Minecraft mc;
+    private GuiTextField field;
+    private ConversationPage lastSelected;
+
+    ChatPageActions(ChatInputBar bar, ChatInputCompletion completion,
+                   ChatComposer composer) {
+        this.bar = bar;
+        this.completion = completion;
+        this.composer = composer;
+    }
+
+    /**
+     * Takes the field the screen just built; called from {@code initGui},
+     * which also runs on every resize. The selection as it stands is
+     * what the next sync compares against, so a rebuild changes nothing.
+     */
+    void bind(Minecraft mc, GuiTextField field) {
+        this.mc = mc;
+        this.field = field;
+        this.lastSelected = ClientChatChannelState.getSelected();
+    }
+
+    /**
+     * Text belongs to the page it was typed in: what the field holds goes
+     * back to the page just left, and the page coming to the front brings
+     * its own unsent text, if any. A walk through the page's sent lines
+     * ends here, so the line it left in the field is what goes back.
+     */
+    private void swapDraft(ConversationPage previous, ConversationPage selected) {
+        if (this.field == null) {
+            return;
+        }
+        ClientChatChannelState.endSentBrowse();
+        if (previous != null) {
+            ClientChatChannelState.setDraft(previous, this.field.getText());
+        }
+        this.field.setText(ClientChatChannelState.getDraft(selected));
+        this.field.setCursorPositionEnd();
+    }
+
+    /**
+     * Reacts to any selection change, whatever path caused it: the
+     * selected channel comes to the front of its window, and every
+     * window's front page counts as read while the screen is open.
+     */
+    void syncSelection() {
+        ConversationPage selected = ClientChatChannelState.getSelected();
+        // A set of marks is anchored on the page being typed in and
+        // always holds it: a page that has gone is forgotten, and moving
+        // the input off the set — to another page, or another window —
+        // ends it.
+        TabSelection.prune();
+        if (TabSelection.windowId() != null
+                && !TabSelection.isSelected(selected)) {
+            TabSelection.clear();
+        }
+        // The selected page is always the front page of its window, whether
+        // the selection just changed or the layout came back from its
+        // file with another page in front; setting what is already set
+        // changes nothing.
+        // A page brought in front of the page typed in, or its window in a
+        // view the screen does not show, lends the input to the
+        // conversation in front of the window last brought forward, which
+        // stays where it stands; with none, the input waits with no bar.
+        // The covered page stays the last used.
+        boolean moved = false;
+        Window holding = WindowLayout.windowOf(selected);
+        if (WindowLayout.showsPage(holding)
+                || holding != null && !WindowView.shows(selected)) {
+            ConversationPage elsewhere = frontConversationElsewhere();
+            if (elsewhere != null) {
+                ClientChatChannelState.lendInput(elsewhere);
+                selected = ClientChatChannelState.getSelected();
+                moved = true;
+            }
+        }
+        if (!WindowLayout.showsPage(WindowLayout.windowOf(selected))) {
+            WindowLayout.setActiveTab(selected);
+        }
+        if (!selected.equals(this.lastSelected)) {
+            ConversationPage previous = this.lastSelected;
+            this.lastSelected = selected;
+            // The window being typed in comes to the front, a completion
+            // walked in the page just left is over, and so is its read
+            // unread divider: it was there to be seen, and it was.
+            this.completion.dismissCompletion();
+            ClientChatChannelViews.dismissSeenDivider(previous);
+            Window selectedWindow = WindowLayout.windowOf(selected);
+            if (selectedWindow != null && !moved) {
+                WindowLayout.raise(selectedWindow.getId());
+            }
+            this.bar.updateInputBounds();
+            swapDraft(previous, selected);
+
+        }
+        List<Window> windows = WindowLayout.windows();
+        for (int index = 0; index < windows.size(); index++) {
+            Window window = windows.get(index);
+            WindowPage shown = ChatFrame.activeTab(window,
+                    ChatFrame.visibleTabs(window));
+            ConversationPage front = ConversationPage.from(shown);
+            if (front != null) {
+                ClientChatChannelViews.markViewed(front);
+            }
+            // A conversation on the other side of a split is read where
+            // it stands too.
+            WindowSplit split = shown == null ? null : window.splitOf(shown);
+            ConversationPage beside = WindowDrawing.shows(split, shown)
+                    ? ConversationPage.from(split.other(shown)) : null;
+            if (beside != null) {
+                ClientChatChannelViews.markViewed(beside);
+            }
+        }
+    }
+
+    /**
+     * The conversation in front of the window last brought forward among
+     * those that show one; null while every window shows a page.
+     */
+    private static ConversationPage frontConversationElsewhere() {
+        List<Window> stacked = WindowLayout.stacked();
+        for (int index = stacked.size() - 1; index >= 0; index--) {
+            Window window = stacked.get(index);
+            ConversationPage front = ConversationPage.from(ChatFrame.activeTab(window,
+                    ChatFrame.visibleTabs(window)));
+            if (front != null && ClientChatChannelState.isSelectable(front)) {
+                return front;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Moves the input to a window: its front page becomes the selected
+     * one, so what is typed goes where the player just clicked. Does
+     * nothing for the window that already has it.
+     */
+    public void selectWindow(Window window) {
+        if (window == null) {
+            return;
+        }
+        WindowPage front = ChatFrame.activeTab(window,
+                ChatFrame.visibleTabs(window));
+        if (front instanceof OtherPage) {
+            // A page takes no input: its window only comes forward.
+            WindowLayout.raise(window.getId());
+            return;
+        }
+        if (front != null && !front.equals(
+                ClientChatChannelState.getSelected())) {
+            selectChannel(front);
+        }
+    }
+
+    /**
+     * Makes a page the one being typed into. A reply, and an edit, belong
+     * to the page they were started in; moving away from that page
+     * abandons them rather than carrying them along. The pickers close,
+     * the field takes focus, and the mention candidates — shaped per
+     * channel identity — are rebuilt.
+     */
+    public void selectChannel(WindowPage picked) {
+        if (picked instanceof OtherPage) {
+            // A page is never typed into: the copy picked comes in front
+            // of its window, and the input moves off it. One no window
+            // holds opens where a page opened by hand does.
+            Window holding = WindowLayout.holds(picked)
+                    ? WindowLayout.windowOf(picked) : null;
+            if (holding != null) {
+                WindowLayout.setActiveTab(picked);
+                WindowLayout.raise(holding.getId());
+            } else {
+                WindowLayout.showPage((OtherPage)picked);
+            }
+            syncSelection();
+            return;
+        }
+        ConversationPage page = ConversationPage.from(picked);
+        this.composer.onPageSelected(page);
+        ClientChatChannelState.select(page);
+        if (page != null && page.equals(ClientChatChannelState.getSelected())) {
+            // The conversation picked comes in front of its window, over a
+            // page there too; a page only moves the input when it is the
+            // one brought forward.
+            WindowLayout.setActiveTab(page);
+        }
+        syncSelection();
+        this.field.setFocused(true);
+        this.completion.invalidateMentionCandidates();
+    }
+
+    /**
+     * Opens (and selects) the conversation a name names: with the
+     * account when the name is theirs, and with the person as they are
+     * playing when it is the name on their lines. A name nobody online
+     * answers to opens the account conversation, which is what the
+     * server refuses if it is nobody's — the notice is the server's to
+     * give, not a guess made here.
+     */
+    ConversationPage openWhisperPage(String account) {
+        String[] played = ClientChatChannelState.playedBy(account);
+        return played == null ? openWhisperPage(account, "")
+                : openWhisperPage(played[0], played[1]);
+    }
+
+    /** As above with one identity of that account; empty is its own. */
+    ConversationPage openWhisperPage(String account, String identity) {
+        String name = account == null ? "" : account.trim();
+        if (name.length() == 0) {
+            return null;
+        }
+        if (this.mc.thePlayer != null && name.equalsIgnoreCase(
+                this.mc.thePlayer.getCommandSenderName())) {
+            this.bar.showNotice(StatCollector.translateToLocal(
+                    "chat.losttales.whisper.self"));
+            return null;
+        }
+        Window current = WindowLayout.windowOf(
+                ClientChatChannelState.getSelected());
+        ConversationPage page = ChatLayout.openWhisper(name, identity,
+                current == null ? null : current.getId());
+        if (page != null) {
+            selectChannel(page);
+        }
+        return page;
+    }
+
+    /**
+     * Closes a whole window: its pages leave it and the window goes. The
+     * channels behind them keep receiving, so nothing is lost — the
+     * {@code +} offers them back, and a view left with no window opens
+     * with its defaults the next time.
+     */
+    void closeWindow(Window window) {
+        if (window == null
+                || !WindowLayout.closeWindow(window.getId())) {
+            return;
+        }
+        TabSelection.prune();
+        syncSelection();
+    }
+
+    /**
+     * Closes one page, a conversation through the chat and a page as any
+     * window's page; the group it was marked with ends with it.
+     */
+    void closeTab(WindowPage page) {
+        ConversationPage conversation = ConversationPage.from(page);
+        if (conversation != null ? ClientChatChannelState.close(conversation)
+                : WindowLayout.close(page)) {
+            // What is left of the marks would be anchored on a page that
+            // has gone.
+            TabSelection.clear();
+            syncSelection();
+        }
+    }
+
+    /**
+     * What Ctrl+W closes: the marked pages while more than one is marked,
+     * and the page being typed in otherwise. The marks always hold the
+     * page in front, so a group closes that one with the rest. A locked
+     * window keeps its pages either way.
+     */
+    void closeMarkedOrActiveTabs() {
+        if (!TabSelection.isGroup()) {
+            closeTab(ClientChatChannelState.getSelected());
+            return;
+        }
+        List<WindowPage> marked = TabSelection.selectedIn(
+                WindowLayout.window(TabSelection.windowId()));
+        boolean closed = false;
+        for (int index = 0; index < marked.size(); index++) {
+            ConversationPage conversation = ConversationPage.from(marked.get(index));
+            closed |= conversation != null
+                    ? ClientChatChannelState.close(conversation)
+                    : WindowLayout.close(marked.get(index));
+        }
+        if (closed) {
+            TabSelection.clear();
+            syncSelection();
+        }
+    }
+}

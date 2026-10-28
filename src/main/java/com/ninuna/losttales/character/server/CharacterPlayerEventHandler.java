@@ -30,7 +30,11 @@ import net.minecraft.util.ChatComponentTranslation;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 
-/** Coordinates character persistence with the legacy Forge player lifecycle. */
+/**
+ * The played character through a player's join, death, respawn, change of
+ * dimension and logout: its journal settled, its saved life written, and
+ * its name the one the game shows.
+ */
 public final class CharacterPlayerEventHandler {
 
     /** The most of a player's deleted characters purged at one login. */
@@ -236,17 +240,24 @@ public final class CharacterPlayerEventHandler {
 
         boolean switchingReady = lifecycleResult == CharacterErrorId.NONE
                 || lifecycleResult == CharacterErrorId.SWITCH_DEATH_PENDING;
+        // A switch waiting for an administrator holds the player as a
+        // ghost until an operator settles it (CHAR-45).
+        boolean journalHeld = CharacterJoin.settleJournalHold(serverPlayer);
         if (switchingReady) {
             CharacterLifecycleStateTracker.markReady(serverPlayer);
-        } else if (action == LifecycleAction.LOGIN) {
+        }
+        if (action == LifecycleAction.LOGIN && (journalHeld || !switchingReady)) {
             // Joining with switching unavailable is a state only an operator
             // can clear, so the player is told once, on the join itself. A
             // respawn or a dimension change says nothing: those are the
             // transitions the tracker is expected to be busy during.
-            serverPlayer.addChatMessage(new ChatComponentTranslation(
-                    "chat.losttales.character.switching_unavailable"));
+            serverPlayer.addChatMessage(new ChatComponentTranslation(journalHeld
+                    ? "chat.losttales.character.journal_held"
+                    : "chat.losttales.character.switching_unavailable"));
         }
         if (action == LifecycleAction.LOGIN) {
+            // What the saved lives held that the game no longer takes (CHAR-46).
+            SavedLifeNotices.tell(serverPlayer);
             // A first visit waits in the creator, held as a ghost; one
             // whose first character was made but not yet played plays it.
             CharacterJoin.arrive(serverPlayer, result.getRoster());

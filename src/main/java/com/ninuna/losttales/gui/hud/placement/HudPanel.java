@@ -10,7 +10,7 @@ import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.fellowship.FellowshipHudLayout;
 import com.ninuna.losttales.gui.hud.fellowship.LostTalesFellowshipHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
-import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
+import com.ninuna.losttales.gui.hud.quest.LostTalesQuestTrackerRenderer;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
@@ -28,7 +28,7 @@ import net.minecraft.util.StatCollector;
 public enum HudPanel {
     COMPASS("compass"),
     FELLOWSHIP("fellowship"),
-    QUICK_LOOT("quickloot"),
+    QUICK_LOOT("quick_loot"),
     QUEST_TRACKER("quest"),
     NOTIFICATIONS("notifications"),
     CHAT_FEED("");
@@ -135,7 +135,7 @@ public enum HudPanel {
             case QUICK_LOOT:
                 return LostTalesQuickLootHudRenderer.getPlacementWidth();
             case QUEST_TRACKER:
-                return LostTalesQuestHudRenderer.getTrackerPlacementWidth();
+                return LostTalesQuestTrackerRenderer.getTrackerPlacementWidth();
             default:
                 return LostTalesNotificationHud.getPlacementWidth();
         }
@@ -151,7 +151,7 @@ public enum HudPanel {
             case QUICK_LOOT:
                 return LostTalesQuickLootHudRenderer.getPlacementHeight();
             case QUEST_TRACKER:
-                return LostTalesQuestHudRenderer.getTrackerPlacementHeight();
+                return LostTalesQuestTrackerRenderer.getTrackerPlacementHeight();
             default:
                 return LostTalesNotificationHud.getPlacementHeight();
         }
@@ -166,7 +166,7 @@ public enum HudPanel {
             case QUICK_LOOT:
                 return LostTalesConfig.quickLootHudOffsetX;
             case QUEST_TRACKER:
-                return LostTalesConfig.questHudOffsetX;
+                return LostTalesConfig.questTrackerHudOffsetX;
             default:
                 return LostTalesConfig.notificationHudOffsetX;
         }
@@ -181,7 +181,7 @@ public enum HudPanel {
             case QUICK_LOOT:
                 return LostTalesConfig.quickLootHudOffsetY;
             case QUEST_TRACKER:
-                return LostTalesConfig.questHudOffsetY;
+                return LostTalesConfig.questTrackerHudOffsetY;
             default:
                 return LostTalesConfig.notificationHudOffsetY;
         }

@@ -19,10 +19,11 @@ import java.util.Set;
 /**
  * The server's settings as the Server Settings page edits them: the
  * snapshot the server last sent, and the values changed on top of it,
- * which wait until they are saved. A value put back as the server holds
- * it waits no longer, a number compared as a number. A secret is never
- * read, only replaced: an empty value leaves it as it is. Free of
- * Minecraft.
+ * which wait until they are saved. A value put back to what the server
+ * holds stops waiting, a number compared as a number. A secret is never
+ * read, only replaced: an empty value leaves it as it is. A setting too
+ * long for the page takes no change and is never part of a save
+ * (DATA-16). Free of Minecraft.
  */
 final class ServerSettingsDraft {
     /** Places a number's step and values are shown to at most. */
@@ -48,7 +49,8 @@ final class ServerSettingsDraft {
 
     /**
      * Takes the settings as the server holds them now. What waits stays
-     * on top where its setting is still there and still differs.
+     * on top where its setting is still there, still fits the page and
+     * still differs.
      */
     void load(List<ServerConfigEntry> snapshot) {
         this.saved = snapshot == null ? Collections.<ServerConfigEntry>emptyList()
@@ -60,7 +62,7 @@ final class ServerSettingsDraft {
         while (waits.hasNext()) {
             Map.Entry<String, List<String>> wait = waits.next();
             ServerConfigEntry entry = find(wait.getKey());
-            if (entry == null || same(entry, wait.getValue())) {
+            if (entry == null || entry.isTooLong() || same(entry, wait.getValue())) {
                 waits.remove();
             }
         }
@@ -110,7 +112,7 @@ final class ServerSettingsDraft {
      * value leaves a secret as it is.
      */
     void set(ServerConfigEntry entry, String value) {
-        if (entry == null || entry.isList()) {
+        if (entry == null || entry.isList() || entry.isTooLong()) {
             return;
         }
         String text = value == null ? "" : value.trim();
@@ -125,7 +127,7 @@ final class ServerSettingsDraft {
 
     /** Sets the item at {@code index} of a list; an empty value takes it out. */
     void setItem(ServerConfigEntry entry, int index, String value) {
-        if (entry == null || !entry.isList()) {
+        if (entry == null || !entry.isList() || entry.isTooLong()) {
             return;
         }
         List<String> items = new ArrayList<String>(values(entry));
@@ -143,8 +145,8 @@ final class ServerSettingsDraft {
 
     /** Whether a list takes another item: it holds fewer than a change may carry. */
     boolean canAdd(ServerConfigEntry entry) {
-        return entry != null && entry.isList() && values(entry).size()
-                < ServerConfigChangeValidator.MAX_LIST_ITEMS;
+        return entry != null && entry.isList() && !entry.isTooLong()
+                && values(entry).size() < ServerConfigChangeValidator.MAX_LIST_ITEMS;
     }
 
     /** Adds an item at a list's end; an empty value adds nothing. */
@@ -172,7 +174,7 @@ final class ServerSettingsDraft {
         List<ServerConfigChange> changes = new ArrayList<ServerConfigChange>();
         for (ServerConfigEntry entry : this.saved) {
             List<String> waits = this.waiting.get(nameOf(entry));
-            if (waits != null) {
+            if (waits != null && !entry.isTooLong()) {
                 changes.add(new ServerConfigChange(entry.getCategory(),
                         entry.getKey(), entry.isList(), waits));
             }
@@ -187,8 +189,8 @@ final class ServerSettingsDraft {
 
     /**
      * What became of the changes sent: each the server applied is what
-     * it holds now, and waits no longer unless it changed again since it
-     * was sent; each refused still waits.
+     * it holds, and stops waiting unless it changed again after it was
+     * sent; each refused still waits.
      */
     void settle(List<ServerConfigChange> sent, ServerConfigApplyResult result) {
         if (sent == null || result == null) {

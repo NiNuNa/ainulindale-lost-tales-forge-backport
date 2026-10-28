@@ -198,8 +198,8 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      */
     private final LostTalesMapCameraFocus cameraFocus =
             new LostTalesMapCameraFocus();
-    private final LostTalesMapCursorPosition cursorPosition =
-            new LostTalesMapCursorPosition();
+    private final LostTalesPointerPosition cursorPosition =
+            new LostTalesPointerPosition();
     /**
      * Set while a left press has landed on empty map. The "go here" marker is
      * only placed if that press comes back up without becoming a drag, so
@@ -660,7 +660,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         // initGui again finds it already held and does nothing. In a window
         // the window screen holds the pointer.
         if (this.page == null) {
-            LostTalesMapCursor.acquire();
+            LostTalesPointer.acquire();
         }
         boolean preserveSmoothZoom = this.smoothZoomInitialized;
         LostTalesLotrMapLayout.prepareBeforeInit(this);
@@ -1560,7 +1560,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         // above was resolved against. In a window the window screen draws
         // it, over everything the screen has.
         if (this.page == null) {
-            LostTalesMapCursor.render(this.mc, fixedMouseX, fixedMouseY,
+            LostTalesPointer.render(this.mc, fixedMouseX, fixedMouseY,
                     LostTalesGuiPointerTargets.isOverInteractable(
                             this, mouseX, mouseY));
         }
@@ -2066,7 +2066,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             boolean place = click && this.goHerePressPending;
             this.goHerePressPending = false;
             if (place) {
-                placeGoHereMarkerAtPointer(mouseX, mouseY);
+                placeGoHereMarkAtPointer(mouseX, mouseY);
             }
         }
         if (which == ROTATE_MAP_BUTTON) {
@@ -2113,7 +2113,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             }
             return true;
         }
-        String localMarkerId = getLocalGoHereMarkerId(state);
+        String localMarkerId = getLocalGoHereMarkId(state);
         LostTalesMapMarkerData marker =
                 LostTalesLotrMapMarkerIconOverlay
                         .getHoveredStandaloneMarker(
@@ -2202,7 +2202,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
      * everyone is walking towards, so moving it is asked for rather than
      * assumed.</p>
      */
-    private void placeGoHereMarkerAtPointer(int mouseX, int mouseY) {
+    private void placeGoHereMarkAtPointer(int mouseX, int mouseY) {
         FellowshipStateSnapshot state = ClientFellowshipStateCache.getSnapshot();
         UUID ownerId = personalMarkerOwnerId(state);
         if (this.mc == null || this.mc.thePlayer == null
@@ -2222,17 +2222,17 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
             openMoveMarkerPrompt(destination);
             return;
         }
-        sendGoHereMarker(ownerId, destination);
+        sendGoHereMark(ownerId, destination);
         LostTalesLotrMapMarkerIconOverlay
                 .clearLotrSelectedWaypoint(this);
     }
 
-    private void sendGoHereMarker(UUID ownerId, int[] destination) {
+    private void sendGoHereMark(UUID ownerId, int[] destination) {
         if (ownerId == null || destination == null
                 || destination.length < 3) {
             return;
         }
-        FellowshipClientRequestManager.setGoHereMarker(
+        FellowshipClientRequestManager.setGoHereMark(
                 ownerId, destination[0], destination[1], destination[2]);
     }
 
@@ -2287,10 +2287,10 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         // Every answer is a request the server re-derives ownership for; the
         // popup itself owns nothing.
         if (action == LostTalesMapMoveMarkerPrompt.Action.MOVE) {
-            sendGoHereMarker(ownerId, destination);
+            sendGoHereMark(ownerId, destination);
         } else if (action
                 == LostTalesMapMoveMarkerPrompt.Action.REMOVE) {
-            FellowshipClientRequestManager.removeGoHereMarker(ownerId);
+            FellowshipClientRequestManager.removeGoHereMark(ownerId);
         }
     }
 
@@ -2454,7 +2454,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                 ? state.getActiveIdentityId() : null;
     }
 
-    private static String getLocalGoHereMarkerId(FellowshipStateSnapshot state) {
+    private static String getLocalGoHereMarkId(FellowshipStateSnapshot state) {
         FellowshipMark own = ClientFellowshipMarks.ownGoHere(state);
         return own == null ? null : own.getMarkerId();
     }
@@ -2538,7 +2538,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
                         .collectFastTravelCandidates(
                                 this.lastRenderedWaypoints,
                                 this.lastRenderedIncludeHidden,
-                                getLocalGoHereMarkerId(
+                                getLocalGoHereMarkId(
                                         ClientFellowshipStateCache
                                                 .getSnapshot())),
                 anchorX, anchorZ,
@@ -2699,7 +2699,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         } else {
             return;
         }
-        FellowshipClientRequestManager.setGoHereMarker(
+        FellowshipClientRequestManager.setGoHereMark(
                 ownerId, dimensionId, x, z);
     }
 
@@ -3074,7 +3074,7 @@ public class LostTalesLotrMapGui extends LOTRGuiMap
         // screen's state, and the view has to outlive it.
         rememberView();
         if (this.page == null) {
-            LostTalesMapCursor.release();
+            LostTalesPointer.release();
         }
         clearFastTravelPrompt();
         clearWaypointPrompt();

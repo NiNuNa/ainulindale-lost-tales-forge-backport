@@ -15,7 +15,11 @@ import lotr.common.world.map.LOTRWaypoint;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentTranslation;
 
-/** Server-authoritative discovery gate for marker-backed LOTR fast travel. */
+/**
+ * The server's checks on LOTR's own fast travel to a place that is a
+ * marker: the player may see it, its region is unlocked, and the played
+ * character has discovered it where it must be discovered.
+ */
 public final class LostTalesWaypointFastTravelPolicy {
 
     private static final String DENIAL_KEY =
@@ -24,9 +28,10 @@ public final class LostTalesWaypointFastTravelPolicy {
     private LostTalesWaypointFastTravelPolicy() {}
 
     /**
-     * ASM-compatible replacement for LOTRPlayerData#setTargetFTWaypoint in the
-     * LOTR packet handler. The original operation is called only after the
-     * active character's discovery state authorizes this exact waypoint.
+     * Stands in for {@code LOTRPlayerData.setTargetFTWaypoint} in LOTR's
+     * fast-travel packet handler (the coremod's redirect): the target is
+     * set only where the player may travel to it, and a waystone's target
+     * is moved to where its house says a traveller arrives.
      */
     public static void setTargetIfAllowed(
             LOTRPlayerData data, LOTRAbstractWaypoint waypoint,
@@ -61,7 +66,11 @@ public final class LostTalesWaypointFastTravelPolicy {
         player.addChatMessage(new ChatComponentTranslation(DENIAL_KEY));
     }
 
-    /** Defense in depth if another coremod prevents the packet hook applying. */
+    /**
+     * Every tick: checks a journey under way again, and drops a target the
+     * player may not travel to, which only a packet hook that did not land
+     * lets through.
+     */
     public static void cancelUnauthorizedTarget(EntityPlayerMP player) {
         if (player == null || player.worldObj == null
                 || player.worldObj.isRemote) {
@@ -79,11 +88,10 @@ public final class LostTalesWaypointFastTravelPolicy {
     }
 
     /**
-     * Whether the player has actually reached a marker: they may see it,
-     * its fast-travel region (if any) is unlocked for them, and, if it has
-     * to be discovered, their active character has discovered it. This is
-     * the rule for sharing a marker in chat; it deliberately ignores
-     * whether the marker offers fast travel or which dimension it is in.
+     * Whether the player has reached a marker: they may see it, its region
+     * is unlocked for them where it needs one, and the played character
+     * has discovered it where it must be discovered. Sharing a place in
+     * the chat asks this, whatever its fast travel or world.
      */
     public static boolean hasVisited(
             EntityPlayerMP player, LostTalesMapMarkerRecord record) {
@@ -142,41 +150,23 @@ public final class LostTalesWaypointFastTravelPolicy {
         return "";
     }
 
+    /**
+     * Whether the player may fast-travel to the waypoint: one that is no
+     * marker always, a marker with fast travel in the player's world that
+     * they have reached ({@link #hasVisited}); a bundled marker whose
+     * record is gone never.
+     */
     public static boolean isAllowed(
             EntityPlayerMP player, LOTRAbstractWaypoint waypoint) {
         LostTalesMapMarkerRecord record =
                 getSavedMarker(player, waypoint);
         if (record == null) {
-            LostTalesMapMarkerDefinition marker =
-                    LostTalesMapMarkerWaypointRegistry
-                            .getMarkerForWaypoint(waypoint);
-            if (marker == null) {
-                return true;
-            }
-            return false;
+            return LostTalesMapMarkerWaypointRegistry
+                    .getMarkerForWaypoint(waypoint) == null;
         }
-        if (!record.hasFastTravel()
-                || record.getDimensionId() != player.dimension
-                || !LostTalesMapMarkerVisibilityPolicy.canView(
-                        record, player)) {
-            return false;
-        }
-        if (record.requiresRegionUnlock()) {
-            LOTRWaypoint.Region markerRegion =
-                    LostTalesMapMarkerRegionResolver.resolve(
-                            player.worldObj, record.toDefinition());
-            LOTRPlayerData lotrData = LOTRLevelData.getData(player);
-            if (markerRegion == null || lotrData == null
-                    || !lotrData.isFTRegionUnlocked(markerRegion)) {
-                return false;
-            }
-        }
-        if (!record.isDiscoverable()) {
-            return true;
-        }
-        LostTalesQuestPlayerData data =
-                LostTalesQuestPlayerData.get(player);
-        return data != null && data.isMarkerDiscovered(record.getId());
+        return record.hasFastTravel()
+                && record.getDimensionId() == player.dimension
+                && hasVisited(player, record);
     }
 
     private static LostTalesMapMarkerRecord getSavedMarker(

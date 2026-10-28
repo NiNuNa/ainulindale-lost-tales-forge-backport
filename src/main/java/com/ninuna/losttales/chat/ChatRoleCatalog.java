@@ -16,7 +16,9 @@ import java.util.UUID;
  * server — who is assigned each: accounts, and characters. The Lost
  * Tales Team mark keeps bit 0 whatever the config says; every other
  * role, the operator role included, comes from the config and takes the
- * next bit in the order the config lists them. Precedence is by rank.
+ * next bit in the order the config lists them. Precedence is by rank,
+ * the lowest first: the order names are coloured in, and the role
+ * hierarchy's, which decides who manages which role (DATA-14).
  * One catalogue is current per side: the server's from its config, a
  * client's from the last chat access packet.
  *
@@ -168,7 +170,7 @@ public final class ChatRoleCatalog {
         return sorted;
     }
 
-    /** Every role, in precedence order. */
+    /** Every role, in precedence order: the lowest rank, the highest role, first. */
     public List<ChatAccountRole> roles() {
         return this.roles;
     }

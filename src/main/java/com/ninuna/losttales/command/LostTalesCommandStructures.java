@@ -30,7 +30,7 @@ public final class LostTalesCommandStructures extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/losttales structures <ban|allow> [player|character]";
+        return "/losttales structures <ban|allow|list> [player|character]";
     }
 
     @Override

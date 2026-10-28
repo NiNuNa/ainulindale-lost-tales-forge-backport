@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * What became of an operator's changes: what was set, of that what waits
+ * What became of a set of changes: what was set, of that what waits
  * for the next start, what was refused and why, what restarted. Every word
  * in it is a lang key under {@link #WORDS},
  * with its arguments, so the command and the Server Settings page each

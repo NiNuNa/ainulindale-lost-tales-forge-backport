@@ -15,20 +15,27 @@ import java.util.Map;
 
 /**
  * How the members of the player's fellowships stand in the quests the
- * player runs too (QUEST-25), the whole list each time: each member's name,
- * whether past the player's stage, whether travelling with the player, and
- * the counts. The journal shows them under each objective. A list that
- * fails to read changes nothing.
+ * player runs too (QUEST-25), the whole list each time: whether the server
+ * shares progress between members at all, then each member's name, whether
+ * past the player's stage, whether travelling with the player, and the
+ * counts. The journal shows them under each objective. A list that fails
+ * to read changes nothing.
  */
 public final class LostTalesQuestFellowsPacket implements IMessage {
     private static final int MAX_NAME_BYTES = QuestFellowCount.MAX_NAME_CHARACTERS * 4;
 
     private final List<QuestFellowCount> counts = new ArrayList<QuestFellowCount>();
+    private boolean shared;
     private boolean malformed;
 
     public LostTalesQuestFellowsPacket() {}
 
-    public LostTalesQuestFellowsPacket(List<QuestFellowCount> counts) {
+    /**
+     * The counts, and whether the server shares kills and arrivals between
+     * members ({@code enableSharedQuestProgress}).
+     */
+    public LostTalesQuestFellowsPacket(List<QuestFellowCount> counts, boolean shared) {
+        this.shared = shared;
         if (counts != null) {
             for (QuestFellowCount count : counts) {
                 if (count != null) {
@@ -44,8 +51,10 @@ public final class LostTalesQuestFellowsPacket implements IMessage {
     @Override
     public void fromBytes(ByteBuf buf) {
         this.counts.clear();
+        this.shared = false;
         this.malformed = false;
         try {
+            boolean sharing = buf.readBoolean();
             int count = LostTalesPacketCodec.readCount(buf, QuestFellows.MAX_COUNTS,
                     "fellow count");
             for (int index = 0; index < count; index++) {
@@ -75,8 +84,10 @@ public final class LostTalesQuestFellowsPacket implements IMessage {
                         travelling, each));
             }
             LostTalesPacketCodec.requireFinished(buf);
+            this.shared = sharing;
         } catch (RuntimeException exception) {
             this.counts.clear();
+            this.shared = false;
             this.malformed = true;
             LostTalesPacketCodec.discardRemaining(buf);
         }
@@ -84,6 +95,7 @@ public final class LostTalesQuestFellowsPacket implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buf) {
+        buf.writeBoolean(this.shared);
         LostTalesPacketCodec.writeCount(buf, this.counts.size(), QuestFellows.MAX_COUNTS,
                 "fellow count");
         for (QuestFellowCount count : this.counts) {
@@ -105,6 +117,11 @@ public final class LostTalesQuestFellowsPacket implements IMessage {
 
     public List<QuestFellowCount> getCounts() {
         return Collections.unmodifiableList(this.counts);
+    }
+
+    /** Whether the server shares kills and arrivals between members at all. */
+    public boolean isShared() {
+        return this.shared;
     }
 
     public boolean isMalformed() {

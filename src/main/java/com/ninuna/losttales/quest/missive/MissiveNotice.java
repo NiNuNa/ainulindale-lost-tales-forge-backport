@@ -36,6 +36,29 @@ public final class MissiveNotice {
     }
 
     /**
+     * World ticks until a notice posted at {@code postedAt} is past its
+     * days, {@code expiration} ticks long, at {@code worldTime}:
+     * {@link #STAYS_UP} for one that never is, with expiry off, with no
+     * posting time (0) or posted after {@code worldTime}. The one rule for
+     * a notice's days: the board taking it down, its page, accepting its
+     * letter and the world's record of missives taken all ask it.
+     */
+    public static long ticksLeft(long postedAt, long expiration,
+                                 long worldTime) {
+        if (expiration <= 0L || postedAt <= 0L || worldTime < postedAt) {
+            return STAYS_UP;
+        }
+        long stood = worldTime - postedAt;
+        return stood >= expiration ? 0L : expiration - stood;
+    }
+
+    /** Whether a notice posted at {@code postedAt} is past its days at {@code worldTime} ({@link #ticksLeft}). */
+    public static boolean isPast(long postedAt, long expiration,
+                                 long worldTime) {
+        return ticksLeft(postedAt, expiration, worldTime) == 0L;
+    }
+
+    /**
      * A running world quest's notice, which every board shows while it runs
      * (QUEST-36): no letter, nothing to accept or take; {@code slot} is the
      * page's own, below every board slot.

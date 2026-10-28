@@ -45,8 +45,8 @@ import org.lwjgl.input.Keyboard;
  * Everything that offers to finish what is being typed into the chat's
  * field: the emoji, mention and share completion lists that open above
  * the input as a shortcode, an {@code @} or a share opener is typed;
- * command tab completion, owned here rather than left to vanilla so the
- * candidate list is filed under the tab that was selected when Tab was
+ * command page completion, owned here rather than left to vanilla so the
+ * candidate list is filed under the page that was selected when Tab was
  * pressed instead of falling into the console as an untracked line;
  * and the tokens the pickers and the lists insert. The screen hands it
  * the keys, the clicks and the frame; it hands the screen back whether
@@ -84,12 +84,12 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
     private final List<String> completionCandidates = new ArrayList<String>();
     /** Index of the candidate standing in the field; -1 for none yet. */
     private int completionCycleIndex = -1;
-    /** Set while further Tabs walk {@link #completionCandidates}. */
+    /** Set while further Pages walk {@link #completionCandidates}. */
     private boolean completionCycling;
     /** Set between sending a completion request and its answer. */
     private boolean completionWaiting;
-    /** The tab whose input the pending or walked completion belongs to. */
-    private ConversationPage completionTab;
+    /** The page whose input the pending or walked completion belongs to. */
+    private ConversationPage completionPage;
     /** The candidates as a popup over the input, never a chat line. */
     private final ChatCommandSuggestionBox commandSuggestions =
             new ChatCommandSuggestionBox();
@@ -98,7 +98,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
             Collections.emptyList();
     private int mentionRevision;
     private long mentionBuiltNanos;
-    private ConversationPage mentionTab;
+    private ConversationPage mentionPage;
 
     ChatInputCompletion(ChatNoticeSink notices) {
         this.notices = notices;
@@ -293,7 +293,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
 
     /**
      * The channels a {@code #} may name: every channel the player can
-     * read, in the order the tabs stand in.
+     * read, in the order the pages stand in.
      */
     private void refreshChannelSuggestions() {
         List<ChatChannel> channels = new ArrayList<ChatChannel>();
@@ -325,18 +325,18 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
      * locally through {@code ClientCommandHandler}, everything else is
      * asked of the server — but the answer comes back to
      * {@link #onServerCompletions}, which files the candidate list under
-     * the tab the request was typed in.
+     * the page the request was typed in.
      */
     void completeInput() {
         if (this.completionCycling && !this.completionCandidates.isEmpty()) {
             if (ClientChatChannelState.getSelected().equals(
-                    this.completionTab)) {
+                    this.completionPage)) {
                 insertCompletion((this.completionCycleIndex + 1)
                         % this.completionCandidates.size());
                 return;
             }
-            // The walked list belongs to another tab's input; the field
-            // now holds this tab's draft, so start over on it.
+            // The walked list belongs to another page's input; the field
+            // now holds this page's draft, so start over on it.
             dismissCompletion();
         }
         String beforeCursor = this.field.getText().substring(0,
@@ -354,14 +354,14 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
         this.mc.thePlayer.sendQueue.addToSendQueue(new C14PacketTabComplete(
                 ChatMessageValidator.oneLine(beforeCursor)));
         this.completionWaiting = true;
-        this.completionTab = ClientChatChannelState.getSelected();
+        this.completionPage = ClientChatChannelState.getSelected();
     }
 
     /**
      * The completion answer. Inserts the candidates' common prefix, or —
      * when the word already is that prefix — starts walking the list and
      * shows it as a popup over the input. An answer arriving after the
-     * selection moved is dropped: the field holds another tab's draft,
+     * selection moved is dropped: the field holds another page's draft,
      * and splicing into that would corrupt it.
      */
     void onServerCompletions(String[] serverCompletions) {
@@ -373,7 +373,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
         this.completionCandidates.clear();
         this.completionCycleIndex = -1;
         this.commandSuggestions.clear();
-        ConversationPage owner = this.completionTab;
+        ConversationPage owner = this.completionPage;
         if (owner == null
                 || !owner.equals(ClientChatChannelState.getSelected())) {
             return;
@@ -389,7 +389,7 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
                 this.completionCandidates.add(candidate);
             }
         }
-        // In an in-character tab /me is the chat's own action verb: it is
+        // In an in-character page /me is the chat's own action verb: it is
         // offered, with a word on what it does, wherever the verb being
         // typed could become it.
         String actionHint = "";
@@ -729,16 +729,16 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
      * keystroke or frame.
      */
     private List<ChatMentionCandidate> mentionCandidates() {
-        ConversationPage tab = ClientChatChannelState.getSelected();
+        ConversationPage page = ClientChatChannelState.getSelected();
         long now = System.nanoTime();
-        if (tab != null && tab.equals(this.mentionTab)
+        if (page != null && page.equals(this.mentionPage)
                 && this.mentionBuiltNanos != 0L
                 && now - this.mentionBuiltNanos < MENTION_REFRESH_NANOS) {
             return this.mentionCandidates;
         }
         this.mentionBuiltNanos = now;
-        this.mentionTab = tab;
-        List<ChatMentionCandidate> built = buildMentionCandidates(tab);
+        this.mentionPage = page;
+        List<ChatMentionCandidate> built = buildMentionCandidates(page);
         if (!sameCandidates(built, this.mentionCandidates)) {
             this.mentionCandidates = built;
             this.mentionRevision++;
@@ -751,15 +751,15 @@ final class ChatInputCompletion implements ChatInputField.MentionSource {
      * appearance cache, handed to the pure builder. A list not asked for
      * yet is asked for here, so the names come in while the player types.
      */
-    private List<ChatMentionCandidate> buildMentionCandidates(ConversationPage tab) {
+    private List<ChatMentionCandidate> buildMentionCandidates(ConversationPage page) {
         if (this.mc.thePlayer == null) {
             return new ArrayList<ChatMentionCandidate>();
         }
         List<LostTalesChatMembersPacket.Member> members =
                 Collections.<LostTalesChatMembersPacket.Member>emptyList();
-        if (tab != null) {
-            ClientChatMembers.requestIfDue(tab);
-            ClientChatMembers.Answer answer = ClientChatMembers.of(tab);
+        if (page != null) {
+            ClientChatMembers.requestIfDue(page);
+            ClientChatMembers.Answer answer = ClientChatMembers.of(page);
             if (answer != null) {
                 members = answer.members;
             }

@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.ninuna.losttales.LostTalesMetaData;
+import com.ninuna.losttales.character.validation.CharacterValidator;
 import com.ninuna.losttales.data.DataFiles;
 import com.ninuna.losttales.data.JsonReading;
 import com.ninuna.losttales.world.waystone.LostTalesWaystoneHousePlacer;
@@ -365,6 +366,13 @@ public final class LostTalesMapMarkerFiles {
                     || marker.getCategoryName().length() > MAX_CATEGORY_LENGTH) {
                 warnings.add(at + "has a description past " + MAX_DESCRIPTION_LENGTH
                         + " or a category past " + MAX_CATEGORY_LENGTH + " characters");
+            }
+            if (!CharacterValidator.isValidLine(marker.getName(), Integer.MAX_VALUE)
+                    || !CharacterValidator.isValidLine(marker.getDescription(), Integer.MAX_VALUE)
+                    || !CharacterValidator.isValidLine(marker.getCategoryName(),
+                            Integer.MAX_VALUE)) {
+                warnings.add(at + "writes a formatting code, a control character or an"
+                        + " invisible mark in its words");
             }
             if (!marker.getIconName().matches("[A-Za-z0-9_-]{1,64}")) {
                 warnings.add(at + "has the icon '" + marker.getIconName()

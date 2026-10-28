@@ -16,8 +16,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Spreads periodic durable character checkpoints across server ticks. Each
- * checkpoint also keeps the played character's LOTR pledge on its record.
+ * Writes every online player's played character every few minutes, a few
+ * players a tick. Each round also keeps the played character's LOTR pledge
+ * on its record.
  * The first tick after the server starts purges the deleted characters
  * past their retention, a bounded number of them.
  */

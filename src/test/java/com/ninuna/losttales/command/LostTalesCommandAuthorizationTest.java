@@ -94,8 +94,15 @@ public final class LostTalesCommandAuthorizationTest {
      */
     @Test
     public void anUnknownSubCommandIsAnsweredWithWhatTheSenderMayRun() {
-        FakeCommandSender operator = FakeCommandSender.administrator("Ops");
-        new LostTalesCommandRoot().processCommand(operator, new String[] {"%s%n"});
+        final FakeCommandSender operator = FakeCommandSender.administrator("Ops");
+        final FakeCommandSender player = FakeCommandSender.player("Someone");
+        onTheServerThread(new Runnable() {
+            @Override
+            public void run() {
+                new LostTalesCommandRoot().processCommand(operator, new String[] {"%s%n"});
+                new LostTalesCommandRoot().processCommand(player, new String[] {"nowhere"});
+            }
+        });
         List<String> told = operator.told();
         assertEquals("Unknown Lost Tales sub-command: %s%n", told.get(0));
         assertEquals(EnumChatFormatting.RED,
@@ -104,10 +111,62 @@ public final class LostTalesCommandAuthorizationTest {
         assertEquals("/losttales " + ELostTalesSubCommand.QUEST.getUsage(), told.get(2));
         assertEquals(2 + ELostTalesSubCommand.values().length, told.size());
 
-        FakeCommandSender player = FakeCommandSender.player("Someone");
-        new LostTalesCommandRoot().processCommand(player, new String[] {"nowhere"});
         assertEquals(Arrays.asList("Unknown Lost Tales sub-command: nowhere",
                 "Lost Tales commands:"), player.told());
+    }
+
+    /**
+     * Only the server's own thread runs a sub-command; RCON's, and any
+     * other, is refused with one line and nothing runs (DATA-13).
+     */
+    @Test
+    public void onlyTheServerThreadRunsASubCommand() {
+        assertTrue(LostTalesCommandRoot.onServerThread(new Thread("Server thread")));
+        assertFalse(LostTalesCommandRoot.onServerThread(new Thread("RCON Client #1")));
+        assertFalse(LostTalesCommandRoot.onServerThread(new Thread("Netty Server IO #2")));
+        assertFalse(LostTalesCommandRoot.onServerThread(null));
+
+        FakeCommandSender rcon = FakeCommandSender.administrator("Rcon");
+        Thread thread = Thread.currentThread();
+        String name = thread.getName();
+        thread.setName("RCON Client #1");
+        try {
+            new LostTalesCommandRoot().processCommand(rcon, new String[] {"help"});
+            new LostTalesCommandRoot().processCommand(rcon, new String[] {"clock", "accept"});
+        } finally {
+            thread.setName(name);
+        }
+        assertEquals(2, rcon.told().size());
+        assertTrue(rcon.told().get(0).contains("RCON"));
+        assertEquals(EnumChatFormatting.RED, rcon.heard().get(0).getChatStyle().getColor());
+    }
+
+    /** Runs {@code body} on this thread named as the server's own. */
+    private static void onTheServerThread(Runnable body) {
+        Thread thread = Thread.currentThread();
+        String name = thread.getName();
+        thread.setName(LostTalesCommandRoot.SERVER_THREAD);
+        try {
+            body.run();
+        } finally {
+            thread.setName(name);
+        }
+    }
+
+    /**
+     * The command handler completes past the first word without asking
+     * whether the sender may run the command: the root asks for the
+     * sub-command, so someone who may not run it is offered nothing of it.
+     */
+    @Test
+    public void completionOffersOnlyWhatTheSenderMayRun() {
+        LostTalesCommandRoot root = new LostTalesCommandRoot();
+        assertEquals(null, root.addTabCompletionOptions(FakeCommandSender.player("Someone"),
+                new String[] {"role", ""}));
+        assertEquals(null, root.addTabCompletionOptions(FakeCommandSender.operator("Ops"),
+                new String[] {"config", ""}));
+        assertTrue(root.addTabCompletionOptions(FakeCommandSender.administrator("Admin"),
+                new String[] {"role", ""}).contains("assign"));
     }
 
     /**

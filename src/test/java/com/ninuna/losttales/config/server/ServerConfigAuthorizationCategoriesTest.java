@@ -87,7 +87,7 @@ public final class ServerConfigAuthorizationCategoriesTest {
     public void aSecretIsBlankedWhateverTheCaseOfItsKey() {
         Configuration config = new Configuration();
         config.get(LostTalesConfig.CATEGORY_DISCORD, "BOTTOKEN", "").set("hunter2");
-        config.get(LostTalesConfig.CATEGORY_DISCORD, "CHANNELBINDINGS",
+        config.get(LostTalesConfig.CATEGORY_DISCORD, "CHANNELLINKS",
                 new String[0]).set(new String[] {"ooc=BIDIRECTIONAL;channel=1"});
 
         List<ServerConfigEntry> entries = ServerConfigSnapshot.fromConfiguration(
@@ -108,7 +108,7 @@ public final class ServerConfigAuthorizationCategoriesTest {
     @Test
     public void theDiscordLinksAreNotOnTheSettingsSurface() {
         Configuration config = new Configuration();
-        config.get(LostTalesConfig.CATEGORY_DISCORD, "channelBindings",
+        config.get(LostTalesConfig.CATEGORY_DISCORD, "channelLinks",
                 new String[0]).set(new String[] {
                         "ooc=BIDIRECTIONAL;channel=1;webhook=https://discord.com/api/webhooks/1/x"});
         config.get(LostTalesConfig.CATEGORY_DISCORD, "enabled", false).set(true);
@@ -118,7 +118,7 @@ public final class ServerConfigAuthorizationCategoriesTest {
                 ServerConfigSnapshot.COMMAND_KEYS, ServerConfigSnapshot.SECRET_KEYS);
 
         assertNull(ServerConfigSnapshot.find(entries,
-                LostTalesConfig.CATEGORY_DISCORD, "channelBindings"));
+                LostTalesConfig.CATEGORY_DISCORD, "channelLinks"));
         assertEquals("the bridge's other settings still are", 1, entries.size());
         assertEquals("enabled", entries.get(0).getKey());
     }

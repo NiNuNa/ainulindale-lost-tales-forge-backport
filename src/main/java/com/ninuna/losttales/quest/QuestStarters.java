@@ -17,8 +17,9 @@ import net.minecraft.world.World;
  * A quest's starter: the mod's own item ({@link LostTalesItemQuestStarter},
  * QUEST-39) naming its quest, sealed by the world as a missive letter is
  * (QUEST-34). Only a sealed starter starts its quest, and it is used up as
- * the quest starts, so a starter made or changed by hand starts nothing and
- * one starter starts one quest.
+ * the quest starts, the world recording its nonce ({@link StartersUsed}),
+ * so a starter made or changed by hand starts nothing and one starter,
+ * copies included, starts one quest.
  *
  * <p>A starter keeps no name. Each reader's game words it: a bundled
  * quest's title from the lang line its id names, a server quest file's
@@ -34,7 +35,8 @@ public final class QuestStarters {
     public static final String TAG_TITLE = "LostTalesQuestTitle";
     /** The most a carried title holds, in UTF-8 bytes, as a quest card's does. */
     static final int MAX_TITLE_BYTES = 256;
-    private static final int NONCE_BYTES = 16;
+    /** How long a starter's nonce is; the world records a used starter by it (QUEST-34). */
+    static final int NONCE_BYTES = 16;
 
     private QuestStarters() {}
 
@@ -113,6 +115,13 @@ public final class QuestStarters {
             return carried;
         }
         return line != null && line.length() > 0 ? line : questId;
+    }
+
+    /** The nonce a starter carries; null for any other stack or a starter without one. */
+    static byte[] nonceOf(ItemStack stack) {
+        NBTTagCompound tag = isStarter(stack) ? stack.getTagCompound() : null;
+        return tag == null || !tag.hasKey(TAG_NONCE, Constants.NBT.TAG_BYTE_ARRAY) ? null
+                : tag.getByteArray(TAG_NONCE);
     }
 
     /** Whether the stack is a starter carrying this world's seal over the quest it names. */

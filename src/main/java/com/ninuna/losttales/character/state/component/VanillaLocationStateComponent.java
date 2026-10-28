@@ -11,8 +11,9 @@ import net.minecraftforge.common.util.Constants;
 import java.util.Set;
 
 /**
- * Character-owned dimension and position. Application is coordinator-only so
- * a malformed snapshot can never invoke an unjournaled dimension transfer.
+ * Where the character stands: its dimension and position, or its starting
+ * waypoint. Only the switch moves the player there, so no saved life moves
+ * a player into another dimension outside a journaled switch.
  */
 public final class VanillaLocationStateComponent implements CharacterStateComponent {
 

@@ -3,10 +3,11 @@ package com.ninuna.losttales.fellowship.model;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 
 /**
- * The colours fellowship members wear, one each, in the order a joining member
- * is given the first one free: as many as a fellowship can hold members. Each
- * carries the palette entry it is drawn in, so the HUD, the chat and the
- * Fellowship page show one member in one colour.
+ * The eight colours fellowship members wear. A joining member is given the
+ * one fewest members wear, the first of them in this order on a tie; past
+ * eight members, colours repeat. Each carries the palette entry it is drawn
+ * in, so the HUD, the chat and the Fellowships page show one member in one
+ * colour.
  */
 public enum FellowshipColor {
     GREEN(0, "green", LostTalesColors.MEADOW_GREEN),

@@ -32,7 +32,7 @@ public final class ChatRolePresentationTest {
         assertTrue(ChatRolePresentation.speaksAsPlayedCharacter(ChatChannel.FELLOWSHIP));
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.GLOBAL,
                 ChatChannel.FACTION, ChatChannel.WHISPER, ChatChannel.OOC,
-                ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE}) {
+                ChatChannel.OPERATOR, ChatChannel.CONSOLE}) {
             assertFalse(channel.getId(), ChatRolePresentation.speaksAsPlayedCharacter(channel));
         }
     }

@@ -254,7 +254,7 @@ public final class LostTalesMapMarkerCatalog {
     public static boolean isVisibleByDefault(String markerId) {
         LostTalesMapMarkerDefinition marker = getMarker(markerId);
         // This method describes discovery secrecy only. Region visibility is
-        // character-specific and must not invalidate an otherwise valid pin.
+        // character-specific and must not invalidate an otherwise valid track.
         return marker != null && (!marker.isDiscoverable()
                 || !marker.isHiddenUntilDiscovered());
     }

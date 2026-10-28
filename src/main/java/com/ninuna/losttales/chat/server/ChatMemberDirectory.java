@@ -11,12 +11,16 @@ import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.chat.ChatAccountRole;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatFellowship;
-import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.chat.ChatPageIds;
 import com.ninuna.losttales.chat.ChatChannelAccess;
 import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.chat.ChatSpeechRange;
+import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
+import com.ninuna.losttales.permission.LostTalesCapability;
+import com.ninuna.losttales.permission.LostTalesPermissions;
 import com.ninuna.losttales.compat.discord.DiscordMemberDirectory;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
@@ -58,7 +62,10 @@ import net.minecraft.world.storage.IPlayerFileData;
  * LOTR's lang key, so each game names them in its own language.</p>
  *
  * <p>Every other identity that may read the channel is absent, and the
- * absent stand together after everyone here, by name. On an
+ * absent stand together after everyone here, by name. Nearby, those here
+ * are whoever the asking copy's range reaches (CHAT-37), and one the One
+ * Ring conceals stands in nobody's list but their own and staff's
+ * (CHAT-84). On an
  * in-character channel that is every other character of the world's
  * rosters that may read it — every character of the faction for Faction,
  * the fellowship's members for Fellowship — including a player's characters other
@@ -161,7 +168,8 @@ public final class ChatMemberDirectory {
                         request.getPartnerCharacterId(),
                         request.getHeldCharacterId())
                 : answerFor(viewer, channel,
-                        ChatTabIds.scopeOf(request.getConversationKey()));
+                        ChatPageIds.scopeOf(request.getConversationKey()),
+                        request.getRange());
         return new LostTalesChatMembersPacket(channel,
                 request.getConversationKey(), answer.members, answer.unlisted);
     }
@@ -177,6 +185,15 @@ public final class ChatMemberDirectory {
      */
     public static Answer answerFor(EntityPlayerMP viewer, ChatChannel channel,
                                    String scope) {
+        return answerFor(viewer, channel, scope, ChatSpeechRange.TALK);
+    }
+
+    /**
+     * As above, a conversation heard nearby listed as far as a line said
+     * at {@code range} carries (CHAT-37).
+     */
+    public static Answer answerFor(EntityPlayerMP viewer, ChatChannel channel,
+                                   String scope, ChatSpeechRange range) {
         if (viewer == null || channel == null || channel == ChatChannel.WHISPER
                 || !ChatChannelPolicy.canRead(viewer, channel,
                         ChatIdentitySelection.roles(viewer))) {
@@ -217,13 +234,22 @@ public final class ChatMemberDirectory {
                 new ArrayList<LostTalesChatMembersPacket.Member>();
         Set<String> presentKeys = new HashSet<String>();
         List<EntityPlayerMP> reached = new ArrayList<EntityPlayerMP>(
-                ChatChannelPolicy.route(viewer, channel, fellowship, factionId)
-                        .recipients);
+                ChatChannelPolicy.route(viewer, channel, fellowship, factionId,
+                        ChatSpeechRange.forChannel(channel, range)).recipients);
         if (!reached.contains(viewer)) {
             reached.add(viewer);
         }
+        boolean nearby = ChatSpeechRange.appliesTo(channel);
+        boolean staff = nearby && LostTalesPermissions.has(viewer,
+                LostTalesCapability.CHAT_MODERATE);
         for (EntityPlayerMP member : reached) {
             if (member == null || member.getUniqueID() == null) {
+                continue;
+            }
+            if (nearby && hidesUnseen(member == viewer, staff,
+                    AccessoryEffectService.isConcealed(member))) {
+                // Nobody sees the wearer, so nobody near knows they are
+                // there (CHAT-84).
                 continue;
             }
             for (RoleplayCharacter character : identitiesIn(member, channel,
@@ -267,6 +293,15 @@ public final class ChatMemberDirectory {
         }
         return assemble(present, absent, presentKeys,
                 LostTalesChatMembersPacket.MAX_MEMBERS);
+    }
+
+    /**
+     * Whether a member heard nearby is left out of a list: one the One Ring
+     * {@code concealed}, unless the list is their own ({@code self}) or
+     * its reader is {@code staff} holding {@code chat.moderate} (CHAT-84).
+     */
+    static boolean hidesUnseen(boolean self, boolean staff, boolean concealed) {
+        return concealed && !self && !staff;
     }
 
     /**

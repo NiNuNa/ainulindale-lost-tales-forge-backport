@@ -20,17 +20,9 @@ public final class LostTalesQuestObjectiveSelection {
         if (quest == null || progress == null) {
             return -1;
         }
-        List<LostTalesQuestStageDefinition> stages = quest.getStages();
-        String stageId = progress.getStageId();
-        if (stageId == null || stageId.length() == 0) {
-            return -1;
-        }
-        for (int index = 0; index < stages.size(); index++) {
-            if (stageId.equals(stages.get(index).getId())) {
-                return index;
-            }
-        }
-        return -1;
+        int index = LostTalesQuestRules.stageIndexOf(quest,
+                progress.getStageId());
+        return index < quest.getStages().size() ? index : -1;
     }
 
     public static LostTalesQuestStageDefinition getCurrentStage(

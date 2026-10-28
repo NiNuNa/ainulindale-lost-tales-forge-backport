@@ -2,10 +2,10 @@ package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatCodeNames;
-import com.ninuna.losttales.compat.discord.DiscordBindingEntries;
+import com.ninuna.losttales.compat.discord.DiscordLinkEntries;
 import com.ninuna.losttales.compat.discord.DiscordBridgePolicy;
 import com.ninuna.losttales.compat.discord.DiscordBridgeDirection;
-import com.ninuna.losttales.compat.discord.DiscordChannelBinding;
+import com.ninuna.losttales.compat.discord.DiscordChannelLink;
 import com.ninuna.losttales.compat.discord.DiscordLinkCodes;
 import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
@@ -13,8 +13,6 @@ import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigChange;
 import com.ninuna.losttales.config.server.ServerConfigSnapshot;
 import com.ninuna.losttales.permission.LostTalesCapability;
-import cpw.mods.fml.common.FMLCommonHandler;
-import cpw.mods.fml.relauncher.Side;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -27,7 +25,8 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
 
 /**
- * The Discord links, live. {@code list} shows what is linked where;
+ * The Discord links, live. {@code list} shows what is linked where, and
+ * the language each link writes in on Discord (DISC-30);
  * {@code link} hands out a code that an admin of a Discord server types
  * into the channel to link ({@code /link}), where the bot makes the
  * channel's webhook itself, so no webhook address is ever typed or
@@ -40,7 +39,7 @@ import net.minecraft.util.IChatComponent;
  */
 public final class LostTalesCommandDiscord extends LostTalesCommandBase {
 
-    private static final String BINDINGS_KEY = "channelBindings";
+    private static final String LINKS_KEY = "channelLinks";
     /** What the lang key of each of the command's answers begins with. */
     static final String SAY = "chat.losttales.command.discord.";
 
@@ -64,10 +63,6 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             sendUsage(sender);
             return;
         }
-        if (FMLCommonHandler.instance().getEffectiveSide() != Side.SERVER) {
-            say(sender, EnumChatFormatting.RED, SAY + "side_only");
-            return;
-        }
         String action = args[0];
         if ("list".equalsIgnoreCase(action)) {
             list(sender);
@@ -82,20 +77,21 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
 
     /**
      * Every link as the bridge holds it, a line each: the game channel,
-     * the Discord channel, the way lines cross. An entry the bridge
-     * refuses is not among them; the server log says why.
+     * the Discord channel, the way lines cross, or that the link is
+     * switched off, and the language it writes in on Discord. An entry the
+     * bridge cannot read is not among them; the server log says why.
      */
     private void list(ICommandSender sender) {
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
         List<IChatComponent> lines = new ArrayList<IChatComponent>();
-        for (DiscordChannelBinding binding : bridge.bindingsInForce().all()) {
+        for (DiscordChannelLink channelLink : bridge.linksInForce().all()) {
             // Indented under the heading, the indent outside the words.
             IChatComponent line = new ChatComponentText("  ");
             line.getChatStyle().setColor(EnumChatFormatting.WHITE);
             line.appendSibling(words(SAY + "list.entry",
-                    LostTalesDiscordBridge.gameChannelComponent(binding.key()),
-                    bridge.discordChannelComponent(binding.getDiscordChannelId()),
-                    describe(binding.getDirection())));
+                    LostTalesDiscordBridge.gameChannelComponent(channelLink.key()),
+                    bridge.discordChannelComponent(channelLink.getDiscordChannelId()),
+                    describe(channelLink.getDirection()), language(channelLink)));
             lines.add(line);
         }
         String heading;
@@ -206,29 +202,29 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             return;
         }
         String key = args[1].toLowerCase(Locale.ROOT);
-        String[] before = LostTalesConfig.discordChannelBindings;
+        String[] before = LostTalesConfig.discordChannelLinks;
         List<String> after;
         if (args.length > 2) {
             List<String> ofKey = new ArrayList<String>();
             for (String entry : before) {
-                if (!key.equalsIgnoreCase(DiscordBindingEntries.keyOf(entry))
-                        || !args[2].equals(DiscordBindingEntries.optionOf(entry, "channel"))) {
+                if (!key.equalsIgnoreCase(DiscordLinkEntries.keyOf(entry))
+                        || !args[2].equals(DiscordLinkEntries.optionOf(entry, "channel"))) {
                     ofKey.add(entry);
                 }
             }
             after = ofKey;
         } else {
-            after = DiscordBindingEntries.removeKey(before, key);
+            after = DiscordLinkEntries.removeKey(before, key);
         }
         if (after.size() == before.length) {
             say(sender, EnumChatFormatting.RED, args.length > 2
                     ? SAY + "unlink.nothing_there" : SAY + "unlink.nothing", args[1]);
             return;
         }
-        List<String> webhooks = DiscordBindingEntries.webhooksRemoved(before, after);
+        List<String> webhooks = DiscordLinkEntries.webhooksRemoved(before, after);
         LostTalesCommandConfig.report(sender, LostTalesServerConfigService.applyOwned(
                 Collections.singletonList(new ServerConfigChange(
-                        LostTalesConfig.CATEGORY_DISCORD, BINDINGS_KEY, true, after)),
+                        LostTalesConfig.CATEGORY_DISCORD, LINKS_KEY, true, after)),
                 Collections.<String>emptySet(), ServerConfigSnapshot.COMMAND_KEYS));
         LostTalesDiscordBridge.getInstance().retireWebhooks(webhooks);
     }
@@ -245,6 +241,16 @@ public final class LostTalesCommandDiscord extends LostTalesCommandBase {
             default:
                 return SAY + "not_connected.setup";
         }
+    }
+
+    /**
+     * The language a link writes in on Discord: its own code, or the
+     * server's default named as the default. A code is never translated.
+     */
+    static IChatComponent language(DiscordChannelLink channelLink) {
+        return channelLink.getLanguage().length() > 0
+                ? new ChatComponentText(channelLink.getLanguage())
+                : words(SAY + "list.language_default", LostTalesConfig.discordLanguage);
     }
 
     /** The way lines cross a link, as words the sender's game translates. */

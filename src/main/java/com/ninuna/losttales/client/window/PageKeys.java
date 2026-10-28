@@ -293,7 +293,7 @@ public final class PageKeys {
                         window("windows.move", DRAG),
                         window("windows.fullscreen", DOUBLE_CLICK, OR, CLICK),
                         window("windows.snap_edge", DRAG),
-                        window("windows.snap_flyout", HOVER, OR, CLICK),
+                        window("windows.snap_layouts", HOVER, OR, CLICK),
                         window("windows.snap_assist", CLICK),
                         window("windows.snap_side", alt, PLUS, left, OR, right),
                         window("windows.snap_up", alt, PLUS, up),

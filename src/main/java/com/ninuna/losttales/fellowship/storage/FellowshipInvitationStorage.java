@@ -5,7 +5,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 
-/** Resolves pending invitations from dimension-zero MapStorage. */
+/** The world's waiting invitations, kept in dimension 0's MapStorage; the server's alone. */
 public final class FellowshipInvitationStorage {
 
     private FellowshipInvitationStorage() {}

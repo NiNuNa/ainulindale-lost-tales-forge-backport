@@ -52,8 +52,8 @@ public enum PerkEffect {
     PROTECTION(Unit.PERCENT),
     /** One named set's four pieces let a share less of a blow through. */
     MATCHING_SET(Unit.PERCENT),
-    /** While you sneak, foes notice you a share less far, and others hear your steps a share quieter. */
-    SOFT_STEP(Unit.PERCENT, "volume"),
+    /** While you sneak, foes notice you a share less far; a foe you strike picks you all the same. */
+    SOFT_STEP(Unit.PERCENT),
     /** A share more speed. */
     SPEED(Unit.PERCENT),
     /** A melee blow has a chance to do no harm. */

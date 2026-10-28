@@ -64,8 +64,8 @@ public final class CharacterRosterSyncPacketTest {
         ByteBuf buffer = Unpooled.buffer();
         new CharacterRosterSyncPacket(1, snapshot).toBytes(buffer);
         CharacterRosterSyncPacket shortened = new CharacterRosterSyncPacket();
-        // The deleted count and the store's flag after it.
-        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 2));
+        // The deleted count and the two flags after it.
+        shortened.fromBytes(buffer.slice(0, buffer.readableBytes() - 3));
         assertTrue(shortened.isMalformed());
         assertNull(shortened.getSnapshot());
     }
@@ -87,6 +87,23 @@ public final class CharacterRosterSyncPacketTest {
         assertFalse("a roster with characters is read", held.withStoreUnreadable(true)
                 .isStoreUnreadable());
         assertFalse(roundTrip(held).getSnapshot().isStoreUnreadable());
+    }
+
+    /** A player whose last switch waits for an administrator is said so, roster and all (CHAR-45). */
+    @Test
+    public void aHeldJournalIsSaidSoWithTheRoster() {
+        UUID id = UUID.randomUUID();
+        CharacterRosterSnapshot roster = new CharacterRosterSnapshot(OWNER, 1, id, 4L,
+                Collections.singletonList(summary(id, 0, "Aldric", "lotr:gondor")),
+                Collections.<DeletedCharacterSummary>emptyList());
+        assertFalse(roster.isJournalHeld());
+        assertFalse(roundTrip(roster).getSnapshot().isJournalHeld());
+
+        CharacterRosterSyncPacket decoded = roundTrip(roster.withJournalHeld(true));
+        assertFalse(decoded.isMalformed());
+        assertTrue(decoded.getSnapshot().isJournalHeld());
+        assertEquals(id, decoded.getSnapshot().getActiveCharacterId());
+        assertEquals(1, decoded.getSnapshot().getCharacterCount());
     }
 
     @Test

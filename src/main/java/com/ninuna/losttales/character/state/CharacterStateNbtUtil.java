@@ -6,7 +6,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-/** Small defensive helpers shared by the state codec and components. */
+/** What the saved-life parts share: a compound's compressed size, and a clamp. */
 public final class CharacterStateNbtUtil {
 
     private CharacterStateNbtUtil() {}

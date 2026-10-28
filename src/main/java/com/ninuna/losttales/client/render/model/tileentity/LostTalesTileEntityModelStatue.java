@@ -9,12 +9,12 @@ public class LostTalesTileEntityModelStatue extends AnimatedGeoModel<LostTalesTi
 
     @Override
     public ResourceLocation getModelLocation(LostTalesTileEntityStatue tileEntityStatue) {
-        return new ResourceLocation(LostTalesMetaData.MOD_ID, "geo/druedain_statue.geo.json");
+        return new ResourceLocation(LostTalesMetaData.MOD_ID, "geo/watch_stone.geo.json");
     }
 
     @Override
     public ResourceLocation getTextureLocation(LostTalesTileEntityStatue tileEntityStatue) {
-        return new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/models/druedain_statue.png");
+        return new ResourceLocation(LostTalesMetaData.MOD_ID, "textures/models/watch_stone.png");
     }
 
     @Override

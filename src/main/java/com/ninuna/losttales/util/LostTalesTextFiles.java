@@ -108,8 +108,10 @@ public final class LostTalesTextFiles {
 
     /**
      * Writes the lines over the file, each ended by a newline and a null
-     * one as an empty line, making its folder first. Answers whether the
-     * file was written; a failure is reported by {@link #writeFailed}.
+     * one as an empty line, making its folder first. A line break inside
+     * a line is written as a space, so one entry stays one line whatever
+     * words a server put in it. Answers whether the file was written; a
+     * failure is reported by {@link #writeFailed}.
      */
     public static boolean writeLines(File file, Iterable<String> lines) {
         if (file == null) {
@@ -125,7 +127,8 @@ public final class LostTalesTextFiles {
             writer = new OutputStreamWriter(
                     new FileOutputStream(file), UTF_8);
             for (String line : lines) {
-                writer.write(line == null ? "" : line);
+                writer.write(line == null ? ""
+                        : line.replace('\n', ' ').replace('\r', ' '));
                 writer.write('\n');
             }
             // Closed here, so bytes that fail to reach the disk as it

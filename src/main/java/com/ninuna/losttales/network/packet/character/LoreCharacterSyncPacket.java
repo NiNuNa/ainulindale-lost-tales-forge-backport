@@ -12,7 +12,7 @@ import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Bounded server snapshot of definitions and world ownership availability. */
+/** The lore list as one player sees it: every figure, and whether it is free, claimed or theirs. */
 public final class LoreCharacterSyncPacket implements IMessage {
 
     private static final int MAX_LORE_CHARACTERS = 1024;

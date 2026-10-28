@@ -93,7 +93,8 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
     private void mute(ICommandSender sender, ChatMuteWorldData mutes,
                       String[] args) {
         if (args.length < 2) {
-            usage(sender, "/losttales chat mute <player> [30s|15m|2h|7d] [reason]");
+            usage(sender, "/losttales chat mute <player|discord:name|discord:id> "
+                    + "[30s|15m|2h|7d] [reason]");
             return;
         }
         DiscordMember member = DiscordMember.parse(args[1]);
@@ -202,7 +203,7 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
     private void unmute(ICommandSender sender, ChatMuteWorldData mutes,
                         String[] args) {
         if (args.length < 2) {
-            usage(sender, "/losttales chat unmute <player>");
+            usage(sender, "/losttales chat unmute <player|discord:name|discord:id>");
             return;
         }
         DiscordMember member = DiscordMember.parse(args[1]);
@@ -374,9 +375,6 @@ public final class LostTalesCommandChatModeration extends LostTalesCommandBase {
             return true;
         }
     }
-
-
-
 
     private World resolveWorld(ICommandSender sender) {
         if (sender instanceof EntityPlayerMP) {

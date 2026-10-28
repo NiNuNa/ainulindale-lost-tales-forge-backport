@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
-import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.client.motion.Motions;
 import java.util.ArrayList;
@@ -17,14 +17,17 @@ import java.util.UUID;
 /**
  * What each speaker has just said, for the words drawn over their head.
  *
- * <p>Only lines spoken <em>in character</em> are kept: the channel says
- * which those are ({@link ChatRolePresentation#isInCharacter}) — Global,
- * Proximity, Fellowship, Faction and whispers — so a channel added later needs
- * nothing here, and the out-of-character ones (OOC, the operator channel,
- * the console, the Discord bridge) never reach the world. Fellowship, Faction,
- * whispers and Global carry no distance of their
- * own, but a speaker has to be rendered in front of you for the words to
- * be drawn at all, so what shows over a head is always someone present.</p>
+ * <p>Only words said aloud float (CHAT-58): a line heard nearby, in
+ * Proximity Chat or a server channel heard nearby
+ * ({@link ChatSpeechRange#appliesTo}), so a channel added later needs
+ * nothing here. A line of any other channel was never said where its
+ * speaker stands. Each line keeps how far it carried, which sets its
+ * words in italics for a whisper and in bold for a shout, and how far
+ * its bubble is drawn.</p>
+ *
+ * <p>A line longer than {@link #MAX_CHARACTERS} is cut there and marked
+ * cut, and its bubble's last row fades out at its end as a cut name does
+ * (CHAT-86, LOOK-37), with no dots.</p>
  *
  * <p>A speaker keeps their last {@link #MAX_LINES} lines and nothing
  * older than a line's whole life, so the store holds a handful of short
@@ -46,8 +49,8 @@ public final class ChatSpeechBubbles {
      * at once.
      */
     static final int FADE_MILLIS = 1200;
-    /** Longest line kept; anything past this is cut with an ellipsis. */
-    private static final int MAX_CHARACTERS = 160;
+    /** Longest line kept; anything past this is cut, and its bubble fades at its end. */
+    static final int MAX_CHARACTERS = 160;
 
     private static final Map<UUID, Speech> SPOKEN =
             new LinkedHashMap<UUID, Speech>();
@@ -66,9 +69,10 @@ public final class ChatSpeechBubbles {
         }
         ChatChannel channel = packet.getChannel();
         UUID speaker = packet.getSenderId();
-        // The Narrator tells; nothing is said over a head, nor over an
-        // unseen voice's, which nobody sees.
-        if (speaker == null || !ChatRolePresentation.isInCharacter(channel)
+        // Only words said aloud float (CHAT-58). The Narrator tells;
+        // nothing is said over a head, nor over an unseen voice's, which
+        // nobody sees.
+        if (speaker == null || !ChatSpeechRange.appliesTo(channel)
                 || packet.isNarrator() || packet.isNotInWorld()
                 || packet.isUnseen()
                 || !ClientChatChannelState.isAvailable(LostTalesChatPresentation.fileUnder(packet))) {
@@ -80,25 +84,27 @@ public final class ChatSpeechBubbles {
         // Words a copy spoke as a character not in the world stay in the
         // chat: the body they would float over is somebody else (CHAT-05).
         file(speaker, packet.getIdentityName(), packet.getNameColor(),
-                packet.getMessage(), packet.isAction(), packet.getNamedPlayers());
+                packet.getMessage(), packet.isAction(), packet.getNamedPlayers(),
+                packet.getSpeechRange());
     }
 
     /**
      * An NPC's floating speech, filed the same way a player's line is:
      * LOTR hands the words to the chat and to the world at once, and
      * this is the copy the world draws. The name and its colour are the
-     * ones the conversation tab shows, so an NPC reads the same in both
+     * ones the conversation page shows, so an NPC reads the same in both
      * places.
      */
     public static synchronized void receiveNpc(UUID speaker, String name,
                                                int nameColor, String body) {
         file(speaker, name, nameColor, body, false,
-                Collections.<ChatNamedPlayer>emptyList());
+                Collections.<ChatNamedPlayer>emptyList(), ChatSpeechRange.TALK);
     }
 
     private static void file(UUID speaker, String name, int nameColor,
                              String body, boolean action,
-                             List<ChatNamedPlayer> named) {
+                             List<ChatNamedPlayer> named,
+                             ChatSpeechRange range) {
         if (speaker == null || body == null) {
             return;
         }
@@ -110,8 +116,9 @@ public final class ChatSpeechBubbles {
         if (spoken.length() == 0) {
             return;
         }
-        if (spoken.length() > MAX_CHARACTERS) {
-            spoken = spoken.substring(0, MAX_CHARACTERS - 3) + "...";
+        boolean cut = spoken.length() > MAX_CHARACTERS;
+        if (cut) {
+            spoken = spoken.substring(0, MAX_CHARACTERS);
         }
         Speech speech = SPOKEN.remove(speaker);
         if (speech == null) {
@@ -119,7 +126,8 @@ public final class ChatSpeechBubbles {
         }
         speech.name = name == null ? "" : name;
         speech.nameColor = nameColor & 0xFFFFFF;
-        speech.lines.add(new Line(spoken, System.nanoTime(), action));
+        speech.lines.add(new Line(spoken, System.nanoTime(), action,
+                range == null ? ChatSpeechRange.TALK : range, cut));
         while (speech.lines.size() > MAX_LINES) {
             speech.lines.remove(0);
         }
@@ -185,11 +193,18 @@ public final class ChatSpeechBubbles {
          * name opens, in italics, as the chat shows it.
          */
         final boolean action;
+        /** How far it carried: its words in italics for a whisper, in bold for a shout. */
+        final ChatSpeechRange range;
+        /** Whether it was cut at {@link #MAX_CHARACTERS}: its last row fades at its end. */
+        final boolean cut;
 
-        private Line(String text, long spokenNanos, boolean action) {
+        private Line(String text, long spokenNanos, boolean action,
+                     ChatSpeechRange range, boolean cut) {
             this.text = text;
             this.spokenNanos = spokenNanos;
             this.action = action;
+            this.range = range;
+            this.cut = cut;
         }
 
         /** Full strength while it is held, then out over the fade. */

@@ -24,7 +24,7 @@ import java.util.Map;
  * no id at all ({@link ChatMessageIds#NONE}) is one nobody can name: a
  * system notice, an adopted stray, a vanilla print.</p>
  *
- * <p>Bounded like the tab index, and cleared with the rest of the
+ * <p>Bounded like the page index, and cleared with the rest of the
  * client's chat state.</p>
  */
 public final class ClientChatMessageIds {

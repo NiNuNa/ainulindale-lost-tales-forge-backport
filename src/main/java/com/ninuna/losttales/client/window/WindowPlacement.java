@@ -178,7 +178,7 @@ public final class WindowPlacement {
         ownLineWidths = allowed;
     }
 
-    /** The game's own chat width: the feed's, and every window's default. */
+    /** The game's own chat width: the feed's, and a window's while its lines cannot follow its own width. */
     public static int chatWidth(Minecraft minecraft) {
         GuiNewChat chat = chat(minecraft);
         return chat == null ? 220 : chat.func_146228_f();
@@ -275,7 +275,11 @@ public final class WindowPlacement {
         }
     }
 
-    /** The box width of a window without one of its own: the game's chat width. */
+    /**
+     * The box width the game's chat width gives: the chat bar's while no
+     * window is drawn, and a window's while the screen's size cannot be
+     * read. A window without a width of its own takes the default place's.
+     */
     public static int windowWidth(Minecraft minecraft) {
         GuiNewChat chat = chat(minecraft);
         return chat == null ? 160 : gameChatBoxWidth(chat);
@@ -452,7 +456,7 @@ public final class WindowPlacement {
                         int screenWidth, int screenHeight) {
         WindowFrame frame = WindowFrame.find(window.getId());
         if (frame == null || !frame.hasSeenFill()) {
-            return boundsFor(window, ContentView.fillOf(window), resting,
+            return boundsFor(window, Borderless.fillOf(window), resting,
                     minecraft, screenWidth, screenHeight);
         }
         WindowPlacement.Box from = frame.fillLegFrom();
@@ -524,7 +528,7 @@ public final class WindowPlacement {
 
     /**
      * The box a window is laid in while its page fills it
-     * ({@link ContentView}): the box it shows ({@link #shownBox}) with its
+     * ({@link Borderless}): the box it shows ({@link #shownBox}) with its
      * row and tool strip above that box's top and its bar below its
      * bottom, so the page takes the whole of it.
      */
@@ -606,7 +610,7 @@ public final class WindowPlacement {
         int own = chatWidth(window, minecraft);
         WindowFrame frame = WindowFrame.find(window.getId());
         if (frame == null || !frame.hasSeenFill()) {
-            return chatWidthFor(window, ContentView.fillOf(window), own,
+            return chatWidthFor(window, Borderless.fillOf(window), own,
                     minecraft, screenWidth);
         }
         WindowPlacement.Box from = frame.fillLegFrom();

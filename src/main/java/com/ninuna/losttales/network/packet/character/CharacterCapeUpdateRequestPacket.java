@@ -14,7 +14,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
 
-/** Client request to update the persistent cape settings of one owned character. */
+/** Asks to change the capes of one of the player's own characters. */
 public final class CharacterCapeUpdateRequestPacket implements IMessage {
 
     private static final UUID NIL_UUID = new UUID(0L, 0L);

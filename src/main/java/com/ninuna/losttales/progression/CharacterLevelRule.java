@@ -7,7 +7,7 @@ package com.ninuna.losttales.progression;
  * starts a skill at adds nothing (PROG-05).
  */
 public final class CharacterLevelRule {
-    /** The highest level kept, far past anything eleven skills reach. */
+    /** The highest level kept, far past anything the skills reach. */
     public static final int MAX_LEVEL = 10000;
 
     private final int base;

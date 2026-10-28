@@ -14,7 +14,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class MissiveSealTest {
-    private static final String QUEST = "losttales:missive/generated/dim0_4_65_9/1200_0";
+    private static final String QUEST = "losttales:missive/dim0_4_65_9/1200_0";
 
     private static byte[] key(int seed) {
         byte[] key = new byte[MissiveSeal.LENGTH];
@@ -148,12 +148,12 @@ public final class MissiveSealTest {
     @Test
     public void theSealCoversTheFirstPosting() {
         LostTalesMissiveData letter = LostTalesMissiveData.builder(
-                "losttales:missive/generated/b/1_0", "kill").titleId("dangerous_work")
+                "losttales:missive/b/1_0", "kill").titleId("dangerous_work")
                 .generationWorldTime(1000L)
                 .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
                 .build();
         LostTalesMissiveData moved = LostTalesMissiveData.builder(
-                "losttales:missive/generated/b/1_0", "kill").titleId("dangerous_work")
+                "losttales:missive/b/1_0", "kill").titleId("dangerous_work")
                 .generationWorldTime(50000L)
                 .objective(new LostTalesMissiveObjectiveData("o", "kill", false, null))
                 .build();

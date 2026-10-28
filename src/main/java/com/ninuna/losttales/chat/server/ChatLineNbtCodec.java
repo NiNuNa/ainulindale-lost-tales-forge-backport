@@ -5,6 +5,7 @@ import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.chat.share.ChatQuestCard;
 import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShowcase;
@@ -61,11 +62,12 @@ final class ChatLineNbtCodec {
     private static final String TAG_REPLY = "Reply";
     private static final String TAG_BODY = "Body";
     private static final String TAG_NAMED = "Named";
-    private static final String TAG_TAB = "Tab";
+    private static final String TAG_PAGE = "Page";
     private static final String TAG_CALLED_ROLES = "CalledRoles";
     private static final String TAG_NOT_IN_WORLD = "NotInWorld";
     private static final String TAG_TYPED = "Typed";
     private static final String TAG_UNSEEN = "Unseen";
+    private static final String TAG_RANGE = "Range";
 
     private static final String TAG_REPLY_KIND = "Kind";
     private static final String TAG_REPLY_AUTHOR = "Author";
@@ -156,11 +158,12 @@ final class ChatLineNbtCodec {
             named.appendTag(entry);
         }
         tag.setTag(TAG_NAMED, named);
-        tag.setString(TAG_TAB, line.getTabId());
+        tag.setString(TAG_PAGE, line.getPageId());
         tag.setTag(TAG_CALLED_ROLES, writeStrings(line.getMentionedRoles()));
         tag.setBoolean(TAG_NOT_IN_WORLD, line.isNotInWorld());
         tag.setString(TAG_TYPED, line.getTyped());
         tag.setBoolean(TAG_UNSEEN, line.isUnseen());
+        tag.setString(TAG_RANGE, line.getSpeechRange().id);
         return tag;
     }
 
@@ -177,6 +180,13 @@ final class ChatLineNbtCodec {
             ChatChannel channel = ChatChannel.fromId(string(tag, TAG_CHANNEL));
             UUID sender = NbtTags.readUuid(tag, TAG_SENDER);
             if (channel == null || sender == null) {
+                return null;
+            }
+            // How far it carried: a range this build knows, and anything
+            // but talk only on a channel heard nearby.
+            ChatSpeechRange range = ChatSpeechRange.of(string(tag, TAG_RANGE), null);
+            if (range == null || (range != ChatSpeechRange.TALK
+                    && !ChatSpeechRange.appliesTo(channel))) {
                 return null;
             }
             List<ChatShowcase> showcases = new ArrayList<ChatShowcase>();
@@ -216,11 +226,12 @@ final class ChatLineNbtCodec {
                     .withScope(string(tag, TAG_SCOPE))
                     .withAction(flag(tag, TAG_ACTION))
                     .withServerBody(string(tag, TAG_BODY), named)
-                    .withTabId(string(tag, TAG_TAB))
+                    .withPageId(string(tag, TAG_PAGE))
                     .withMentionedRoles(knownRoles(strings(tag, TAG_CALLED_ROLES)))
                     .withNotInWorld(flag(tag, TAG_NOT_IN_WORLD))
                     .withTyped(string(tag, TAG_TYPED))
-                    .withUnseen(flag(tag, TAG_UNSEEN));
+                    .withUnseen(flag(tag, TAG_UNSEEN))
+                    .withSpeechRange(range);
             return readsOnTheWire(line) ? line : null;
         } catch (RuntimeException unreadable) {
             return null;

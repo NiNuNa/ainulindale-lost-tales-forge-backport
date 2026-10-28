@@ -131,7 +131,7 @@ public final class FellowshipStateSnapshot {
 
     /**
      * The state of {@code state}, each fellowship with LOTR's fellowship
-     * behind it from {@code lotrFellowshipIds}, by our fellowship's id.
+     * behind it from {@code lotrFellowshipIds}, keyed by the fellowship's own id.
      */
     public static FellowshipStateSnapshot fromState(UUID ownerId,
                                                     long synchronizationSequence,

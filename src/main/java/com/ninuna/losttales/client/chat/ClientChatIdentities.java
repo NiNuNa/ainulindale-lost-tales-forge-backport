@@ -27,7 +27,7 @@ import net.minecraft.client.Minecraft;
  * copies of Global may speak as two characters, a Faction copy reads its
  * character's faction, and a whisper copy holds the conversation with
  * that character. The Narrator's voice is taken up per copy too. What
- * the closed feed shows always follows the character played.
+ * the feed shows always follows the character played.
  *
  * <p>The voices are kept per place in the layout file, one {@code voice}
  * line each ({@link #describeVoices}), and come back at the next visit. A
@@ -81,18 +81,18 @@ final class ClientChatIdentities {
     private ClientChatIdentities() {}
 
     /** What a copy's voice is kept by: the id of the row entry its window holds, its copy's number in it. */
-    private static String voiceKey(ConversationPage tab) {
-        ConversationPage row = ConversationPage.row(tab);
+    private static String voiceKey(ConversationPage page) {
+        ConversationPage row = ConversationPage.row(page);
         return row == null ? null : row.id();
     }
 
-    private static synchronized Voice voiceOf(ConversationPage tab) {
-        String key = voiceKey(tab);
+    private static synchronized Voice voiceOf(ConversationPage page) {
+        String key = voiceKey(page);
         return key == null ? null : VOICES.get(key);
     }
 
-    private static synchronized void setVoice(ConversationPage tab, Voice voice) {
-        String key = voiceKey(tab);
+    private static synchronized void setVoice(ConversationPage page, Voice voice) {
+        String key = voiceKey(page);
         if (key == null) {
             return;
         }
@@ -109,17 +109,17 @@ final class ClientChatIdentities {
      * is what the roleplaying channels fall back to while no character is
      * held, never a choice. Choosing one puts the Narrator's voice down.
      */
-    static void select(ConversationPage tab, Identity identity) {
-        if (choose(tab, identity)) {
+    static void select(ConversationPage page, Identity identity) {
+        if (choose(page, identity)) {
             WindowLayout.persist();
         }
     }
 
-    private static synchronized boolean choose(ConversationPage tab, Identity identity) {
+    private static synchronized boolean choose(ConversationPage page, Identity identity) {
         if (identity == null || identity.account || !isHeld(identity.characterId)) {
             return false;
         }
-        setVoice(tab, new Voice(identity.characterId, false));
+        setVoice(page, new Voice(identity.characterId, false));
         return true;
     }
 
@@ -129,10 +129,10 @@ final class ClientChatIdentities {
      * that character. The played character, the account and one the roster
      * no longer holds leave the copy following the character played.
      */
-    static synchronized void holdAs(ConversationPage tab, String ownerKey) {
+    static synchronized void holdAs(ConversationPage page, String ownerKey) {
         UUID characterId = characterOf(ownerKey);
         if (characterId != null && !ownerKey.equals(activeIdentityKey())) {
-            setVoice(tab, new Voice(characterId, false));
+            setVoice(page, new Voice(characterId, false));
         }
     }
 
@@ -157,8 +157,8 @@ final class ClientChatIdentities {
      * roster still holds it, else the character played, else the account.
      * A whisper conversation held as one character is that character's.
      */
-    static synchronized Identity viewing(ConversationPage tab) {
-        UUID chosen = chosenCharacter(tab);
+    static synchronized Identity viewing(ConversationPage page) {
+        UUID chosen = chosenCharacter(page);
         if (chosen != null) {
             return of(ClientCharacterRosterCache.getSnapshot().getCharacter(chosen));
         }
@@ -166,18 +166,18 @@ final class ClientChatIdentities {
     }
 
     /** The key of the identity the copy reads as ({@link ConversationPage#ownerKeyOf}). */
-    static synchronized String viewIdentityKey(ConversationPage tab) {
-        UUID chosen = chosenCharacter(tab);
+    static synchronized String viewIdentityKey(ConversationPage page) {
+        UUID chosen = chosenCharacter(page);
         return chosen != null ? ConversationPage.ownerKeyOf(chosen)
                 : activeIdentityKey();
     }
 
     /** The character the copy chose and the roster still holds; null to follow the one played. */
-    private static UUID chosenCharacter(ConversationPage tab) {
-        if (tab != null && tab.isWhisper() && tab.getOwnerKey().length() > 0) {
-            return characterOf(tab.getOwnerKey());
+    private static UUID chosenCharacter(ConversationPage page) {
+        if (page != null && page.isWhisper() && page.getOwnerKey().length() > 0) {
+            return characterOf(page.getOwnerKey());
         }
-        Voice voice = voiceOf(tab);
+        Voice voice = voiceOf(page);
         return voice != null && voice.characterId != null
                 && isHeld(voice.characterId) ? voice.characterId : null;
     }
@@ -242,67 +242,67 @@ final class ClientChatIdentities {
      * as the Narrator, on its identity's own routing. The server says no
      * to a player who may not narrate.
      */
-    static synchronized boolean isNarrating(ConversationPage tab) {
-        Voice voice = voiceOf(tab);
+    static synchronized boolean isNarrating(ConversationPage page) {
+        Voice voice = voiceOf(page);
         return voice != null && voice.narrating
                 && ClientChatChannelState.holds(LostTalesCapability.CHAT_NARRATE);
     }
 
     /** Takes the copy's Narrator's voice up or puts it down. */
-    static void setNarrating(ConversationPage tab, boolean on) {
-        if (narrate(tab, on)) {
+    static void setNarrating(ConversationPage page, boolean on) {
+        if (narrate(page, on)) {
             WindowLayout.persist();
         }
     }
 
-    private static synchronized boolean narrate(ConversationPage tab, boolean on) {
-        if (isNarrating(tab) == on) {
+    private static synchronized boolean narrate(ConversationPage page, boolean on) {
+        if (isNarrating(page) == on) {
             return false;
         }
-        Voice voice = voiceOf(tab);
-        setVoice(tab, new Voice(voice == null ? null : voice.characterId, on));
+        Voice voice = voiceOf(page);
+        setVoice(page, new Voice(voice == null ? null : voice.characterId, on));
         return true;
     }
 
     /**
-     * Who the player is on a tab: on a conversation, who its copy speaks
+     * Who the player is on a page: on a conversation, who its copy speaks
      * as; on a page, the character played, whom every page is about.
      */
-    static synchronized Identity effectiveFor(WindowPage tab) {
-        if (tab != null && !(tab instanceof ConversationPage)) {
+    static synchronized Identity effectiveFor(WindowPage page) {
+        if (page != null && !(page instanceof ConversationPage)) {
             return played();
         }
-        ConversationPage chat = (ConversationPage)tab;
+        ConversationPage chat = (ConversationPage)page;
         if (!speaksInCharacter(chat)) {
             return accountIdentity();
         }
         return speaksAsPlayed(chat) ? played() : viewing(chat);
     }
 
-    /** Whether a tab's identity button shows the Narrator's mark: its copy's voice is taken up and it speaks in character. */
-    static boolean narratesOn(WindowPage tab) {
-        return tab instanceof ConversationPage
-                && speaksInCharacter((ConversationPage)tab)
-                && isNarrating((ConversationPage)tab);
+    /** Whether a page's identity button shows the Narrator's mark: its copy's voice is taken up and it speaks in character. */
+    static boolean narratesOn(WindowPage page) {
+        return page instanceof ConversationPage
+                && speaksInCharacter((ConversationPage)page)
+                && isNarrating((ConversationPage)page);
     }
 
-    /** Whether the identity button's menu chooses who the tab speaks as: Global, Faction, whispers. */
-    static boolean picksIdentity(WindowPage tab) {
-        return tab instanceof ConversationPage && picksIdentity((ConversationPage)tab);
+    /** Whether the identity button's menu chooses who the page speaks as: Global, Faction, whispers. */
+    static boolean picksIdentity(WindowPage page) {
+        return page instanceof ConversationPage && picksIdentity((ConversationPage)page);
     }
 
     /**
-     * Whether the tab speaks as the character played, whatever the head
+     * Whether the page speaks as the character played, whatever the head
      * button chose: Proximity and Fellowship
      * ({@link ChatRolePresentation#speaksAsPlayedCharacter}).
      */
-    static boolean speaksAsPlayed(ConversationPage tab) {
-        return tab != null && ChatRolePresentation.speaksAsPlayedCharacter(tab.getChannel());
+    static boolean speaksAsPlayed(ConversationPage page) {
+        return page != null && ChatRolePresentation.speaksAsPlayedCharacter(page.getChannel());
     }
 
-    /** Whether the identity button chooses who the tab speaks as: Global, Faction, whispers. */
-    static boolean picksIdentity(ConversationPage tab) {
-        return speaksInCharacter(tab) && !speaksAsPlayed(tab);
+    /** Whether the identity button chooses who the page speaks as: Global, Faction, whispers. */
+    static boolean picksIdentity(ConversationPage page) {
+        return speaksInCharacter(page) && !speaksAsPlayed(page);
     }
 
     /** The character played, or the account playing as itself. */
@@ -312,32 +312,32 @@ final class ClientChatIdentities {
     }
 
     /**
-     * Whether the tab's channel speaks as a character rather than the
+     * Whether the page's channel speaks as a character rather than the
      * account: where the identity button chooses, and where a choice shows.
      */
-    static boolean speaksInCharacter(ConversationPage tab) {
-        return tab != null && ChatRolePresentation.isInCharacter(tab.getChannel());
+    static boolean speaksInCharacter(ConversationPage page) {
+        return page != null && ChatRolePresentation.isInCharacter(page.getChannel());
     }
 
     /** How a line sent from the copy names who it speaks as. */
-    static synchronized int wireKind(ConversationPage tab) {
-        if (!speaksInCharacter(tab)) {
+    static synchronized int wireKind(ConversationPage page) {
+        if (!speaksInCharacter(page)) {
             return LostTalesChatSendPacket.IDENTITY_ACCOUNT;
         }
-        return speaksAsPlayed(tab) || chosenCharacter(tab) == null
+        return speaksAsPlayed(page) || chosenCharacter(page) == null
                 ? LostTalesChatSendPacket.IDENTITY_DEFAULT
                 : LostTalesChatSendPacket.IDENTITY_CHARACTER;
     }
 
-    static synchronized UUID wireCharacterId(ConversationPage tab) {
-        return wireKind(tab) == LostTalesChatSendPacket.IDENTITY_CHARACTER
-                ? chosenCharacter(tab) : null;
+    static synchronized UUID wireCharacterId(ConversationPage page) {
+        return wireKind(page) == LostTalesChatSendPacket.IDENTITY_CHARACTER
+                ? chosenCharacter(page) : null;
     }
 
     /**
      * The id of the identity the copy reacts as: the character it speaks
      * as, or the account's own id on an account channel and while no
-     * character is held; for no copy, the closed feed's, the identity
+     * character is held; for no copy, the feed's, the identity
      * played.
      */
     static synchronized UUID reactorIdOf(ConversationPage copy) {
@@ -351,13 +351,13 @@ final class ClientChatIdentities {
     }
 
     /** Whether a line sent from the copy signs as the Narrator. */
-    static synchronized boolean wireNarrating(ConversationPage tab) {
-        return narratesOn(tab);
+    static synchronized boolean wireNarrating(ConversationPage page) {
+        return narratesOn(page);
     }
 
-    static synchronized boolean isSelected(ConversationPage tab, Identity identity) {
+    static synchronized boolean isSelected(ConversationPage page, Identity identity) {
         return identity != null && ConversationPage.ownerKeyOf(identity.characterId)
-                .equals(viewIdentityKey(tab));
+                .equals(viewIdentityKey(page));
     }
 
     /** The character the owner key names, while the roster holds it; null for the account or one gone. */
@@ -528,7 +528,7 @@ final class ClientChatIdentities {
         kept.put(copy.id(), new Voice(characterId, narrating));
     }
 
-    /** Writes every place's kept voices, a tab-separated line each, since a place may hold spaces. */
+    /** Writes every place's kept voices, a page-separated line each, since a place may hold spaces. */
     static synchronized void describeVoices(List<String> lines) {
         for (Map.Entry<String, Map<String, Voice>> place : KEPT.entrySet()) {
             for (Map.Entry<String, Voice> entry : place.getValue().entrySet()) {

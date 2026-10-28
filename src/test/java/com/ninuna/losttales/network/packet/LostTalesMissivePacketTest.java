@@ -30,7 +30,7 @@ import static org.junit.Assert.fail;
  */
 public final class LostTalesMissivePacketTest {
     private static final String QUEST =
-            "losttales:missive/generated/dim0_4_65_9/1200_3";
+            "losttales:missive/dim0_4_65_9/1200_3";
 
     private static LostTalesMissiveData missive(String questId) {
         Map<String, String> params = new LinkedHashMap<String, String>();
@@ -585,5 +585,11 @@ public final class LostTalesMissivePacketTest {
         }
         assertFalse("the quest says its own requirements",
                 MissiveBoardStateReason.REQUIREMENTS.isSaidInChat());
+        assertFalse("the start gate says it",
+                MissiveBoardStateReason.ALREADY_ACTIVE.isSaidInChat());
+        assertFalse("the start gate says it",
+                MissiveBoardStateReason.ALREADY_COMPLETED.isSaidInChat());
+        assertFalse("the start gate says it",
+                MissiveBoardStateReason.REFUSED.isSaidInChat());
     }
 }

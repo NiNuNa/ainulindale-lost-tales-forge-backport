@@ -30,7 +30,7 @@ public final class ClientConfigChoicesTest {
                 client.get("chatFeedAlignment").getValidValues());
         // The HUD layout takes the ids of the layout files that loaded
         // (MAP-11), so it is defined with none before they are read.
-        String[] layouts = client.get("hudPlacementPreset").getValidValues();
+        String[] layouts = client.get("hudPanelLayout").getValidValues();
         assertTrue(layouts == null || layouts.length == 0);
         for (String colour : new String[] {"windowPrimaryColor",
                 "windowSecondaryColor", "windowAccentColor",

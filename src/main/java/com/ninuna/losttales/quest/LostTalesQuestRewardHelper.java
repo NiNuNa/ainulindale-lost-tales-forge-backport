@@ -289,12 +289,13 @@ public final class LostTalesQuestRewardHelper {
 
         /**
          * Hands over what is owed; what finds no room waits under the quest,
-         * and only what the quest log cannot keep falls at the player's
-         * feet. Then says what was paid and what waits.
+         * all of it on the death screen, and only what the quest log cannot
+         * keep falls at the player's feet. Then says what was paid and what
+         * waits.
          */
         void finish(boolean granted) {
             List<WaitingReward> left = QuestRewardPayout.leftOver(this.owed,
-                    new PlayerHands(this.player));
+                    mayBePaid(this.player) ? new PlayerHands(this.player) : NO_HANDS);
             boolean waits = false;
             if (!left.isEmpty()) {
                 LostTalesQuestPlayerData data =
@@ -325,6 +326,14 @@ public final class LostTalesQuestRewardHelper {
         }
     }
 
+    /** Hands that take nothing: a dead player's rewards all wait. */
+    private static final QuestRewardPayout.Hands NO_HANDS = new QuestRewardPayout.Hands() {
+        @Override
+        public int hand(WaitingReward reward) {
+            return reward.getCount();
+        }
+    };
+
     /** The player's inventory as the payout's hands. */
     private static final class PlayerHands implements QuestRewardPayout.Hands {
         private final EntityPlayerMP player;
@@ -340,7 +349,7 @@ public final class LostTalesQuestRewardHelper {
 
         /**
          * The item in stacks no larger than its own limit, until one finds
-         * no room; an item the game no longer has waits whole.
+         * no room; an item the game lacks waits whole.
          */
         private int handItems(WaitingReward reward) {
             Item item = itemOf(reward.getId());
@@ -407,7 +416,9 @@ public final class LostTalesQuestRewardHelper {
         }
         int limit = new ItemStack(item, 1, reward.getMeta()).getMaxStackSize();
         for (int size : stackSizes(reward.getCount(), limit)) {
-            dropStack(player, new ItemStack(item, size, reward.getMeta()));
+            ItemStack stack = new ItemStack(item, size, reward.getMeta());
+            Relics.mark(stack, reward.getRelic());
+            dropStack(player, stack);
         }
     }
 
@@ -425,10 +436,11 @@ public final class LostTalesQuestRewardHelper {
     }
 
     /**
-     * Whether items given now reach the player: not on the death screen,
-     * where they would stay with the body, nor a machine acting as one.
+     * Whether items and experience given now reach the player: not on the
+     * death screen, where they would stay with the body, nor a machine
+     * acting as one.
      */
-    private static boolean mayBePaid(EntityPlayerMP player) {
+    public static boolean mayBePaid(EntityPlayerMP player) {
         return !(player instanceof FakePlayer) && !player.isDead
                 && player.getHealth() > 0.0F;
     }

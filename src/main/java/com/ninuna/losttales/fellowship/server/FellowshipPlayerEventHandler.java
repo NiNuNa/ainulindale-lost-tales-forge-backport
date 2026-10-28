@@ -14,8 +14,12 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 
 /**
- * Loads, repairs, and periodically expires server-owned fellowship state,
- * and tells fellowships when one of their members comes or goes.
+ * The fellowships' server events. A login, a change of world and a respawn
+ * check the stores and send the player their state; a login and a logout
+ * are noted, so the members are told. Each server tick drives the health
+ * and position updates, sets LOTR's fellowships right once after the
+ * server starts, and tells the members who came or went. Every 200 ticks
+ * the cleanup runs.
  */
 public final class FellowshipPlayerEventHandler {
 

@@ -9,7 +9,7 @@ import java.util.Locale;
 
 /**
  * The kinds of content {@code /losttales reload} reads again (DATA-11),
- * each opened by its own system's capability (I82): quests and missive
+ * each opened by its own system's capability: quests and missive
  * templates by {@code quest.admin}, skills by {@code progression.admin},
  * map markers by {@code mapmarker.manage}, races, capes, starting kits and
  * lore characters by {@code character.admin}; {@code all} by

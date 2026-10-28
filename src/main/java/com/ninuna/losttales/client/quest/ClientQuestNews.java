@@ -72,7 +72,7 @@ public final class ClientQuestNews {
         return count;
     }
 
-    /** The inbox shows every piece of news kept now. */
+    /** Marks every piece of news kept as shown. */
     public static synchronized void markSeen() {
         seenUpTo = nextSerial - 1L;
     }

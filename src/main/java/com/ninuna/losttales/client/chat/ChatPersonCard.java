@@ -25,7 +25,7 @@ import net.minecraft.util.StatCollector;
  * changed while the card stands shows at once. A character's card shows
  * its glances, the pointer on one saying its words, and View Profile
  * under them, which opens the character's profile in the Characters
- * tab. The Server's shows how the server stands and Copy Address under
+ * page. The Server's shows how the server stands and Copy Address under
  * it. A card narrower or shorter than it wants cuts its rows at the
  * window's edge.
  */
@@ -36,13 +36,13 @@ final class ChatPersonCard extends SubWindowContent {
     private static final String COPY_ADDRESS = "copy_address";
     private static final String GLANCE_PREFIX = "glance:";
 
-    final LostTalesChatHoverCard.Target target;
+    final LostTalesChatCard.Target target;
     private final LostTalesUiButtonMotion viewMotion =
             new LostTalesUiButtonMotion(LostTalesUiButtonMotion.Character.LIFT);
     /** The glance under the pointer, for its tip; null for none. */
     private CharacterProfile.Glance hoveredGlance;
 
-    ChatPersonCard(LostTalesChatHoverCard.Target target) {
+    ChatPersonCard(LostTalesChatCard.Target target) {
         this.target = target;
     }
 
@@ -101,13 +101,13 @@ final class ChatPersonCard extends SubWindowContent {
 
     @Override
     public int naturalWidth() {
-        return LostTalesChatHoverCard.layOut(Minecraft.getMinecraft(),
-                this.target, true, 0, LostTalesChatHoverCard.MAX_WIDTH).width;
+        return LostTalesChatCard.layOut(Minecraft.getMinecraft(),
+                this.target, true, 0, LostTalesChatCard.MAX_WIDTH).width;
     }
 
     @Override
     public int naturalHeight(int width) {
-        return LostTalesChatHoverCard.layOut(Minecraft.getMinecraft(),
+        return LostTalesChatCard.layOut(Minecraft.getMinecraft(),
                 this.target, true, width, width).height + footer();
     }
 
@@ -120,12 +120,12 @@ final class ChatPersonCard extends SubWindowContent {
     @Override
     public int minHeight() {
         return MenuWindow.PADDING_Y * 2
-                + LostTalesChatHoverCard.HEAD_ROWS * MenuWindow.rowHeight();
+                + LostTalesChatCard.HEAD_ROWS * MenuWindow.rowHeight();
     }
 
     /** The button at the rows' left, the padding under the last row, which the card's height ends on. */
     private LostTalesUiHitBox buttonBox(FontRenderer font, LostTalesUiHitBox box,
-                                        LostTalesChatHoverCard.Laid laid) {
+                                        LostTalesChatCard.Laid laid) {
         return new LostTalesUiHitBox(
                 Math.floor(box.left) + MenuWindow.PADDING_X,
                 Math.floor(box.top) + laid.height,
@@ -143,12 +143,12 @@ final class ChatPersonCard extends SubWindowContent {
               double clipY, double pointerX, double pointerY, int alpha,
               int surfaceAlpha) {
         int width = (int)Math.floor(box.width);
-        LostTalesChatHoverCard.Laid laid = LostTalesChatHoverCard.layOut(
+        LostTalesChatCard.Laid laid = LostTalesChatCard.layOut(
                 minecraft, this.target, true, width, width);
         boolean clipped = beginClip(minecraft, clipX, clipY, box.width,
                 box.height);
         try {
-            LostTalesChatHoverCard.drawLaid(minecraft, laid,
+            LostTalesChatCard.drawLaid(minecraft, laid,
                     (int)Math.floor(box.left), (int)Math.floor(box.top),
                     alpha);
             String label = buttonLabel();
@@ -169,9 +169,9 @@ final class ChatPersonCard extends SubWindowContent {
     public WindowHover hoverAt(LostTalesUiHitBox box, double x, double y) {
         Minecraft minecraft = Minecraft.getMinecraft();
         int width = (int)Math.floor(box.width);
-        LostTalesChatHoverCard.Laid laid = LostTalesChatHoverCard.layOut(
+        LostTalesChatCard.Laid laid = LostTalesChatCard.layOut(
                 minecraft, this.target, true, width, width);
-        int glance = LostTalesChatHoverCard.glanceAt(laid,
+        int glance = LostTalesChatCard.glanceAt(laid,
                 (int)Math.floor(box.left), (int)Math.floor(box.top), x, y);
         this.hoveredGlance = glance < 0 ? null : laid.glances.get(glance);
         String part = glance >= 0 ? GLANCE_PREFIX + glance

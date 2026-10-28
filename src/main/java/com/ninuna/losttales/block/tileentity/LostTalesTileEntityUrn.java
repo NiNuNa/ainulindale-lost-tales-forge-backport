@@ -30,6 +30,8 @@ import software.bernie.geckolib3.core.manager.AnimationFactory;
  * though one may fill it while it is unsealed.
  */
 public class LostTalesTileEntityUrn extends TileEntity implements ISidedInventory, IAnimatable {
+    /** The most slots a vessel has: the loutrophoros'. */
+    private static final int MAX_SLOTS = 4;
     private static final int CLIENT_EVENT_FILL = 0;
     private static final int CLIENT_EVENT_FULL = 1;
 
@@ -62,8 +64,9 @@ public class LostTalesTileEntityUrn extends TileEntity implements ISidedInventor
         return this.factory;
     }
 
+    /** One to four slots; anything else read from a save takes two. */
     public void setInventorySize(int slots) {
-        if (slots <= 0) slots = 2;
+        if (slots <= 0 || slots > MAX_SLOTS) slots = 2;
         this.desiredSlots = slots;
         if (this.inventory.length != slots) {
             ItemStack[] resized = new ItemStack[slots];

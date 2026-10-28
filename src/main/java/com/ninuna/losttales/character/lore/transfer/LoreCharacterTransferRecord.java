@@ -5,7 +5,7 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
-/** Immutable crash-recovery marker for one claim or release operation. */
+/** The journal of one claim or release, with the step it has reached. */
 public final class LoreCharacterTransferRecord {
 
     public static final int CURRENT_DATA_VERSION = 1;

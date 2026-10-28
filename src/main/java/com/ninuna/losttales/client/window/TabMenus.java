@@ -1193,9 +1193,9 @@ final class TabMenus {
             }
             if (ENTRY_WINDOW_RESET.equals(entry.id)
                     && WindowLayout.resetWindow(window.getId())) {
-                ContentView.leave(window);
+                Borderless.leave(window);
                 for (WindowPage tab : window.getTabs()) {
-                    tab.resetView();
+                    tab.resetPanels();
                 }
             }
             return false;

@@ -92,7 +92,8 @@ public final class LostTalesCompassMarkerIconTest {
     @Test
     public void aNameNoIconGoesByShowsTheQuestionMark() {
         for (String name : new String[] {"town", "fort", "tavern",
-                "fountain", "", null}) {
+                "fountain", "woods", "harbour", "cemetery", "big-port",
+                "", null}) {
             assertEquals(String.valueOf(name),
                     LostTalesCompassMarkerIcon.UNDISCOVERED,
                     LostTalesCompassMarkerIcon.fromName(name));
@@ -100,7 +101,7 @@ public final class LostTalesCompassMarkerIconTest {
     }
 
     @Test
-    public void iconNamesResolveIconsAndTheirOtherWords() {
+    public void iconNamesResolveTheirIconsInAnyCase() {
         assertEquals(LostTalesCompassMarkerIcon.SHACK,
                 LostTalesCompassMarkerIcon.fromName("shack"));
         assertEquals(LostTalesCompassMarkerIcon.MOUNTAINS,
@@ -116,11 +117,11 @@ public final class LostTalesCompassMarkerIconTest {
         assertEquals(LostTalesCompassMarkerIcon.PERSONAL,
                 LostTalesCompassMarkerIcon.fromName("personal"));
         assertEquals(LostTalesCompassMarkerIcon.GRAVEYARD,
-                LostTalesCompassMarkerIcon.fromName("cemetery"));
+                LostTalesCompassMarkerIcon.fromName("Graveyard"));
         assertEquals(LostTalesCompassMarkerIcon.FOREST,
-                LostTalesCompassMarkerIcon.fromName("woods"));
+                LostTalesCompassMarkerIcon.fromName(" forest "));
         assertEquals(LostTalesCompassMarkerIcon.PORT,
-                LostTalesCompassMarkerIcon.fromName("harbour"));
+                LostTalesCompassMarkerIcon.fromName("PORT"));
     }
 
     private static boolean hasVisiblePixel(BufferedImage atlas,

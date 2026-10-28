@@ -13,7 +13,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
 
-/** Client request to delete one owned character after client confirmation. */
+/** Asks to delete one of the player's own characters, once the player has said yes. */
 public final class CharacterDeleteRequestPacket implements IMessage {
 
     private int requestId;

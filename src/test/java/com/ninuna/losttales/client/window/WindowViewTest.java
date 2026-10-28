@@ -44,7 +44,7 @@ public final class WindowViewTest {
     private static final ConversationPage GLOBAL = ConversationPage.of(ChatChannel.GLOBAL);
     private static final ConversationPage OOC = ConversationPage.of(ChatChannel.OOC);
     private static final ConversationPage CONSOLE =
-            ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+            ConversationPage.of(ChatChannel.CONSOLE);
 
     @BeforeClass
     public static void registerPages() {

@@ -48,9 +48,9 @@ public final class ChatFeedTypingTest {
                 Arrays.asList(GLOBAL, PROXIMITY, OOC));
 
         assertEquals(2, segments.size());
-        assertEquals(GLOBAL, segments.get(0).tab);
+        assertEquals(GLOBAL, segments.get(0).page);
         assertEquals(Arrays.asList("Aldric", "Mira"), segments.get(0).names);
-        assertEquals(OOC, segments.get(1).tab);
+        assertEquals(OOC, segments.get(1).page);
         // A conversation the feed does not carry is never named.
         assertTrue(ChatFeedTyping.segments(
                 Collections.singletonList(PROXIMITY)).isEmpty());

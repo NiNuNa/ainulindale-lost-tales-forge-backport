@@ -16,10 +16,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * World-level authoritative store for roleplaying character rosters.
- *
- * Instances are owned by dimension-zero MapStorage. Access and mutation are
- * expected to occur on the logical server thread.
+ * The rosters of this world, in dimension 0's storage, read and changed on
+ * the server thread.
  */
 public class CharacterWorldData extends WorldSavedData {
 
@@ -98,8 +96,7 @@ public class CharacterWorldData extends WorldSavedData {
     }
 
     /**
-     * Stores or reaffirms a roster after an authoritative mutation and marks
-     * the world data dirty so normal server saves persist it.
+     * Keeps a roster after a change, marked to be written at the next save.
      */
     public void saveRoster(CharacterRoster roster) {
         ensureWritable();
@@ -129,11 +126,9 @@ public class CharacterWorldData extends WorldSavedData {
     }
 
     /**
-     * Resolves a globally unique roleplay-character identity without exposing
-     * mutable roster internals. This is used by integrations, such as LOTR
-     * faction bounties, whose persisted records contain the character UUID
-     * instead of the owning Minecraft account UUID. An id held by more than
-     * one roster answers nothing.
+     * The character of that id in any roster, for records that hold a
+     * character's id, such as LOTR's bounties. An id held by more than one
+     * roster answers nothing.
      */
     public RoleplayCharacter findCharacter(UUID characterId) {
         return characterIndex().find(characterId);

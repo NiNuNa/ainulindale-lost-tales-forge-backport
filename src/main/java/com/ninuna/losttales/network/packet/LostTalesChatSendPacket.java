@@ -6,6 +6,7 @@ import com.ninuna.losttales.chat.ChatFellowship;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatMessageValidator;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.chat.ChatTypedText;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -25,22 +26,23 @@ import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
- * Bounded channel request. Recipient selection never crosses the wire, and
- * neither does shared data: a shared item is only a slot index and a shared
- * marker only an id, both re-read by the server from its own state and
- * paired by order with the tokens the server itself parses out of the
- * message.
+ * A line a player sends. Who it reaches never crosses the wire, and
+ * neither does what it shares: a shared item is only a slot, a shared
+ * marker or quest only an id, each read again by the server from its own
+ * state and paired in order with the tokens the server finds in the
+ * words.
  */
 public final class LostTalesChatSendPacket implements IMessage {
     /** Speak as the channel's default identity. */
     public static final int IDENTITY_DEFAULT = 0;
-    /** Speak as the Minecraft account, wherever the message goes. */
+    /** Speak as the account; in character the server refuses it (CHAT-06). */
     public static final int IDENTITY_ACCOUNT = 1;
     /** Speak as one of the sender's own roster characters. */
     public static final int IDENTITY_CHARACTER = 2;
 
-    // The fixed fields, the action flag and the unkept-quote flag among them.
-    private static final int MAX_PACKET_BYTES = 816
+    // The fixed fields, the action flag, the unkept-quote flag and the
+    // speech range among them.
+    private static final int MAX_PACKET_BYTES = 817
             + ChatMessageValidator.MAX_UTF8_BYTES
             + 5 + ChatTypedText.MAX_UTF8_BYTES
             + ChatShareTokenParser.MAX_TOKENS
@@ -132,6 +134,13 @@ public final class LostTalesChatSendPacket implements IMessage {
      * ({@link ChatTypedText}): kept by the server so they can edit it later.
      */
     private String typed = "";
+    /**
+     * How far the line carries where it is heard nearby (CHAT-37): the
+     * range the copy's button picked. A request: the server measures who
+     * it reaches itself, and takes anything but talk only on a channel
+     * heard nearby.
+     */
+    private ChatSpeechRange range = ChatSpeechRange.TALK;
     private boolean malformed;
 
     public LostTalesChatSendPacket() {}
@@ -258,10 +267,12 @@ public final class LostTalesChatSendPacket implements IMessage {
             this.forwardOf = buffer.readLong();
             this.typed = LostTalesPacketCodec.readUtf8String(buffer,
                     ChatTypedText.MAX_UTF8_BYTES);
+            this.range = ChatSpeechRange.fromCode(buffer.readUnsignedByte());
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.range = ChatSpeechRange.TALK;
             this.action = false;
             this.quotesUnkept = false;
             this.targetCharacterId = null;
@@ -325,6 +336,7 @@ public final class LostTalesChatSendPacket implements IMessage {
         buffer.writeLong(this.forwardOf);
         LostTalesPacketCodec.writeUtf8String(buffer, this.typed,
                 ChatTypedText.MAX_UTF8_BYTES);
+        buffer.writeByte(this.range.code());
     }
 
     private void validate() {
@@ -361,6 +373,10 @@ public final class LostTalesChatSendPacket implements IMessage {
                 || (this.action && !ChatAction.isValid(this.message))
                 || !ChatTypedText.isValid(this.typed)
                 || (this.forwardOf != ChatMessageIds.NONE && this.typed.length() > 0)
+                || this.range == null
+                // Only a line heard nearby is said at a range of its own.
+                || (this.range != ChatSpeechRange.TALK && !ChatSpeechRange
+                        .appliesTo(ChatChannel.fromId(this.channelId)))
                 || this.references.size() > ChatShareTokenParser.MAX_TOKENS) {
             throw new IllegalArgumentException("invalid chat request");
         }
@@ -393,6 +409,16 @@ public final class LostTalesChatSendPacket implements IMessage {
 
     /** What the player typed for the line; empty where it is its words. */
     public String getTyped() { return this.typed; }
+
+    /** The same request said at {@code range}: talk for none. */
+    public LostTalesChatSendPacket range(ChatSpeechRange range) {
+        this.range = range == null ? ChatSpeechRange.TALK : range;
+        validate();
+        return this;
+    }
+
+    /** How far the line asks to carry where it is heard nearby. */
+    public ChatSpeechRange getRange() { return this.range; }
 
     /** The same request signing as the Narrator, or not. */
     public LostTalesChatSendPacket narrating(boolean on) {

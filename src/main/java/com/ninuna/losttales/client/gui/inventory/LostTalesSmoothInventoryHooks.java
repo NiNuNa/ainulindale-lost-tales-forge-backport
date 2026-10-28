@@ -36,6 +36,11 @@ public final class LostTalesSmoothInventoryHooks {
 
     private LostTalesSmoothInventoryHooks() {}
 
+    /** Forgets the screens, the last state and every slide; as the client leaves a server. */
+    public static void clear() {
+        reset(null);
+    }
+
     /**
      * Records the vanilla click mode before it mutates the container.
      * Mode 1 is Shift-click and mode 2 is a 1-9 hotbar swap. Normal pickup,

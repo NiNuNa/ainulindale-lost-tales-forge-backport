@@ -6,7 +6,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /**
- * The closed feed shows what is happening, not what was said before this
+ * The feed shows what is happening, not what was said before this
  * player arrived. A line printed as history is stamped a whole fade old,
  * and a feed run never carries such a line back onto the clock of a line
  * said since: a run is broken wherever a message arrived a whole fade

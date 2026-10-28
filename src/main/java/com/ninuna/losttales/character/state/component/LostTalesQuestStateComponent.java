@@ -16,7 +16,7 @@ import net.minecraftforge.common.util.Constants;
 
 import java.util.Set;
 
-/** Lost Tales quests, objective progress, pins, and discovered marker state. */
+/** Lost Tales quests, objective progress, tracked quests, and discovered marker state. */
 public final class LostTalesQuestStateComponent implements CharacterStateComponent {
 
     public static final String ID = "losttales_quests";

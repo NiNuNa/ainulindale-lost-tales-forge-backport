@@ -12,6 +12,7 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipIcons;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipMarks;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.FellowshipClientRequestManager;
+import com.ninuna.losttales.client.fellowship.FellowshipMemberWords;
 import com.ninuna.losttales.client.window.BarItem;
 import com.ninuna.losttales.client.window.PageContent;
 import com.ninuna.losttales.client.window.PageSearch;
@@ -711,14 +712,13 @@ public final class FellowshipPage extends PageContent {
             }
             if (identityId.equals(snapshot.getActiveIdentityId())) {
                 words.add(I18n.format("gui.losttales.fellowship.you"));
-            } else if (row.member.getPresence() == FellowshipMemberPresence.AWAY) {
-                words.add(I18n.format("gui.losttales.fellowship.away"));
-            } else if (row.member.getPresence() == FellowshipMemberPresence.ELSEWHERE) {
-                words.add(I18n.format("gui.losttales.fellowship.playing_as",
-                        row.member.getElsewhereName()));
-            } else if (row.member.getPresence() == FellowshipMemberPresence.GHOST) {
-                // The Tab list's word for a ghost (CHAR-02, FEL-32).
-                words.add(I18n.format("gui.losttales.fellowship.ghost"));
+            } else {
+                // The same words as the HUD's (FEL-32).
+                String state = FellowshipMemberWords.of(row.member.getPresence(),
+                        row.member.getElsewhereName());
+                if (state.length() > 0) {
+                    words.add(state);
+                }
             }
             StringBuilder aside = new StringBuilder();
             for (String word : words) {
@@ -1282,8 +1282,12 @@ public final class FellowshipPage extends PageContent {
             UUID member = picked.member.getIdentityId();
             boolean memberLeads = picked.fellowship.isLeader(member);
             String makeLeader = I18n.format("gui.losttales.fellowship.make_leader");
+            // A figure nobody holds cannot lead (CHAR-36).
+            String leadRefusal = leader && picked.member.isUnheld()
+                    ? I18n.format("gui.losttales.fellowship.released_cannot_lead")
+                    : notLeader;
             items.add(orBusy(BarItem.button(MAKE_LEADER, makeLeader,
-                    new ItemStack(Items.golden_helmet)).tip(makeLeader), notLeader));
+                    new ItemStack(Items.golden_helmet)).tip(makeLeader), leadRefusal));
             if (!memberLeads) {
                 boolean guide = picked.fellowship.isGuide(member);
                 String guideWords = I18n.format(guide
@@ -1446,8 +1450,8 @@ public final class FellowshipPage extends PageContent {
                     active, fellowshipId, revision), true);
         } else if (GO_HERE.equals(id)) {
             beginRequest(ClientFellowshipMarks.ownGoHere(snapshot) != null
-                    ? FellowshipClientRequestManager.removeGoHereMarker(active)
-                    : FellowshipClientRequestManager.setGoHereMarker(active), true);
+                    ? FellowshipClientRequestManager.removeGoHereMark(active)
+                    : FellowshipClientRequestManager.setGoHereMark(active), true);
         } else if (LEAVE.equals(id) || DISBAND.equals(id)) {
             askAndDo(LEAVE.equals(id) ? "leave" : "disband", fellowship.getName(),
                     LEAVE.equals(id) ? "gui.losttales.fellowship.leave"

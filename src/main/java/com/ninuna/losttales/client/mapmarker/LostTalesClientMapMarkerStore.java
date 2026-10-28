@@ -13,11 +13,10 @@ import java.util.Map;
 import net.minecraft.client.resources.IResourceManager;
 
 /**
- * Client cache for shared/static and server-synced map markers.
- *
- * Bundled JSON markers are loaded from resources. Quest-giver markers are not
- * hard-coded in JSON; the server sends them after the player discovers a real
- * quest giver in-world.
+ * The markers this game knows: the bundled ones, read from the resources
+ * until a server sends its own snapshot, the server's snapshot
+ * while connected, and the played character's quest givers' markers,
+ * which the server sends from its quest log.
  */
 public final class LostTalesClientMapMarkerStore {
     private static volatile List<LostTalesMapMarkerData> decorativeMarkers =
@@ -116,7 +115,7 @@ public final class LostTalesClientMapMarkerStore {
         INDEX.replaceWorldMarkers(decorativeMarkers);
     }
 
-    public static synchronized void setDynamicMarkers(Collection<LostTalesMapMarkerDefinition> markers) {
+    public static synchronized void setGiverMarkers(Collection<LostTalesMapMarkerDefinition> markers) {
         Map<String, LostTalesMapMarkerData> byId = new LinkedHashMap<String, LostTalesMapMarkerData>();
         if (markers != null) {
             for (LostTalesMapMarkerDefinition marker : markers) {
@@ -163,7 +162,7 @@ public final class LostTalesClientMapMarkerStore {
         INDEX.replaceWorldMarkers(byId.values());
     }
 
-    public static synchronized void clearDynamicMarkers() {
+    public static synchronized void clearGiverMarkers() {
         INDEX.replacePersistentMarkers(
                 decorativeMarkers,
                 Collections.<LostTalesMapMarkerData>emptyList());

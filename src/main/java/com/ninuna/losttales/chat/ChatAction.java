@@ -39,8 +39,8 @@ public final class ChatAction {
      * consoles, where it is the game's command.
      */
     public static boolean takesActions(ChatChannel channel) {
-        return channel != null && channel != ChatChannel.CLIENT_CONSOLE
-                && channel != ChatChannel.SERVER_CONSOLE;
+        return channel != null && channel != ChatChannel.CONSOLE
+                && channel != ChatChannel.SERVER_LOG;
     }
 
     /**

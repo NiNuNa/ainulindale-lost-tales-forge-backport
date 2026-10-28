@@ -108,7 +108,7 @@ public final class ChatChannelSendRefusalTest {
         int operator = ChatRoleCatalog.server().byId("operator").bit();
         assertNull(ChatChannelPolicy.sendRefusal(
                 ChatChannel.OPERATOR, null, ALDRIC, operator, false, false));
-        assertTrue("the client is told to ask again for its tabs",
+        assertTrue("the client is told to ask again for its pages",
                 ChatChannelPolicy.isGateRefusal(GATE_REFUSAL));
         assertTrue(!ChatChannelPolicy.isGateRefusal(FELLOWSHIP_REFUSAL));
     }
@@ -192,28 +192,28 @@ public final class ChatChannelSendRefusalTest {
     }
 
     /**
-     * The Server Log is opened by the {@code chat.server_console.read}
+     * The Server Log is opened by the {@code chat.server_log.read}
      * capability and by nothing else: no role, no gate and no operator
      * level reaches it on their own, and holding the capability reaches
      * it whatever the config says.
      */
     @Test
-    public void theServerConsoleAsksForItsCapabilityAlone() {
+    public void theServerLogAsksForItsCapabilityAlone() {
         assertTrue("the rule is what marks the channel",
-                ChatChannelPolicy.isServerConsole(ChatChannel.SERVER_CONSOLE));
+                ChatChannelPolicy.isServerLog(ChatChannel.SERVER_LOG));
         assertTrue("no other channel takes it",
-                !ChatChannelPolicy.isServerConsole(ChatChannel.CLIENT_CONSOLE)
-                        && !ChatChannelPolicy.isServerConsole(ChatChannel.OPERATOR));
+                !ChatChannelPolicy.isServerLog(ChatChannel.CONSOLE)
+                        && !ChatChannelPolicy.isServerLog(ChatChannel.OPERATOR));
         assertEquals("a player without the capability is refused",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.SERVER_CONSOLE, null, ALDRIC, 0,
+                        ChatChannel.SERVER_LOG, null, ALDRIC, 0,
                         false, false));
         assertEquals("being an operator is not the question asked",
                 GATE_REFUSAL, ChatChannelPolicy.sendRefusal(
-                        ChatChannel.SERVER_CONSOLE, null, ALDRIC, 0,
+                        ChatChannel.SERVER_LOG, null, ALDRIC, 0,
                         true, false));
         assertNull("a reader reaches it",
-                ChatChannelPolicy.sendRefusal(ChatChannel.SERVER_CONSOLE,
+                ChatChannelPolicy.sendRefusal(ChatChannel.SERVER_LOG,
                         null, ALDRIC, 0, false, true));
     }
 
@@ -222,8 +222,8 @@ public final class ChatChannelSendRefusalTest {
      * back to them alone, and no capability stands between them and it.
      */
     @Test
-    public void theClientConsoleIsEveryPlayersOwn() {
-        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.CLIENT_CONSOLE, null,
+    public void theConsoleIsEveryPlayersOwn() {
+        assertNull(ChatChannelPolicy.sendRefusal(ChatChannel.CONSOLE, null,
                 ALDRIC, 0, false, false));
     }
 

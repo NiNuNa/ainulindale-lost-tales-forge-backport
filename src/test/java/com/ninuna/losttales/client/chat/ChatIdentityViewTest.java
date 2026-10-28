@@ -105,15 +105,15 @@ public final class ChatIdentityViewTest {
         roster();
         String plain = ChatChannel.FELLOWSHIP.getDisplayName();
         UUID grey = new UUID(4L, 4L);
-        ConversationPage tab = ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString());
+        ConversationPage page = ConversationPage.of(ChatChannel.FELLOWSHIP, grey.toString());
         ClientChatIdentitySelection.accept(sync(grey, 0x123456));
         assertEquals(plain, ClientChatChannelState.displayName(ChatChannel.FELLOWSHIP));
-        assertNotEquals(plain, ClientChatChannelState.displayName(tab));
-        assertTrue(ClientChatChannelState.isAvailable(tab));
-        assertFalse("the channel has no plain tab",
+        assertNotEquals(plain, ClientChatChannelState.displayName(page));
+        assertTrue(ClientChatChannelState.isAvailable(page));
+        assertFalse("the channel has no plain page",
                 ClientChatChannelState.isAvailable(ConversationPage.of(ChatChannel.FELLOWSHIP)));
         choose(ConversationPage.of(ChatChannel.GLOBAL), BEREN);
-        assertTrue(ClientChatChannelState.isAvailable(tab));
+        assertTrue(ClientChatChannelState.isAvailable(page));
     }
 
     /**
@@ -145,7 +145,7 @@ public final class ChatIdentityViewTest {
     }
 
     /**
-     * One tab per person, each copy its own person: a copy speaking as
+     * One page per person, each copy its own person: a copy speaking as
      * Aldric shows the conversation Steve has with Aldric, one speaking as
      * Beren the one with Beren, and Aldric's lines stay out of Beren's.
      */
@@ -235,29 +235,33 @@ public final class ChatIdentityViewTest {
         assertEquals(ChatChannel.FELLOWSHIP, ClientChatChannelState.getSelected().getChannel());
     }
 
+    /** Only words said aloud float (CHAT-58): a faction's line never does, read or not. */
     @Test
-    public void bubblesRespectTheFactionsReadAndIgnoreAccountChannels() {
+    public void bubblesNeverFloatForAFactionOrAnAccountChannel() {
         roster();
         UUID speaker = new UUID(10L, 20L);
         LostTalesChatMessagePacket packet =
                 ChatPacketFixtures.line(ChatChannel.FACTION, "Friend", "Steve", "Hello")
                         .sender(speaker).colors(0, 0).build().withScope(ROHAN);
-        ChatSpeechBubbles.receive(packet);
-        assertTrue(ChatSpeechBubbles.isEmpty());
         choose(ConversationPage.of(ChatChannel.FACTION), BEREN);
         ChatSpeechBubbles.receive(packet);
-        assertFalse(ChatSpeechBubbles.isEmpty());
+        assertTrue(ChatSpeechBubbles.isEmpty());
         ChatSpeechBubbles.clear();
         for (ChatChannel channel : new ChatChannel[] {ChatChannel.OOC, ChatChannel.OPERATOR,
-                ChatChannel.CLIENT_CONSOLE}) {
+                ChatChannel.CONSOLE}) {
             ChatSpeechBubbles.receive(ChatPacketFixtures.line(channel, "Steve", "Steve", "Hello")
                     .sender(speaker).colors(0, 0).build());
         }
         assertTrue(ChatSpeechBubbles.isEmpty());
     }
 
+    /**
+     * Only a line heard nearby floats over its speaker (CHAT-58): Global,
+     * a faction's, a fellowship's and a whisper were never said where the
+     * speaker stands.
+     */
     @Test
-    public void everyRoleplayingChannelProducesBubblesForItsRecipient() {
+    public void onlyALineHeardNearbyProducesABubble() {
         roster();
         UUID fellowship = new UUID(1L, 2L);
         ClientChatIdentitySelection.accept(sync(fellowship, 0));
@@ -271,8 +275,15 @@ public final class ChatIdentityViewTest {
                             : channel == ChatChannel.FELLOWSHIP ? fellowship.toString() : "")
                     .withConversation(ALDRIC, null);
             ChatSpeechBubbles.receive(packet);
-            assertFalse(channel.getId(), ChatSpeechBubbles.isEmpty());
+            assertEquals(channel.getId(), channel != ChatChannel.PROXIMITY,
+                    ChatSpeechBubbles.isEmpty());
         }
+        // A line said nearby floats, and stays while a copy speaks as another.
+        ChatSpeechBubbles.clear();
+        ChatSpeechBubbles.receive(ChatPacketFixtures.line(ChatChannel.PROXIMITY,
+                "Friend", "Steve", "Hello").sender(new UUID(10L, 20L)).colors(0, 0)
+                .build().withConversation(ALDRIC, null));
+        assertFalse(ChatSpeechBubbles.isEmpty());
         choose(ConversationPage.of(ChatChannel.GLOBAL), BEREN);
         assertFalse("a copy speaking as another touches nothing over the heads",
                 ChatSpeechBubbles.isEmpty());
@@ -348,7 +359,7 @@ public final class ChatIdentityViewTest {
 
     /**
      * A faction's talk is one conversation per faction. The row keeps one
-     * Faction tab, and each copy of it shows the talk of the faction its
+     * Faction page, and each copy of it shows the talk of the faction its
      * identity is in — never another's.
      */
     @Test
@@ -357,7 +368,7 @@ public final class ChatIdentityViewTest {
         ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
         ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
-        assertNotEquals("the two conversations are two tabs", gondor, rohan);
+        assertNotEquals("the two conversations are two pages", gondor, rohan);
 
         // Speaking as Aldric: the row stands for Gondor's talk.
         assertEquals(gondor, ConversationPage.viewed(row));
@@ -377,7 +388,7 @@ public final class ChatIdentityViewTest {
 
     /**
      * A conversation's unread state is found by the row that stands for
-     * it. The line arrives under its own conversation tab while the
+     * it. The line arrives under its own conversation page while the
      * window, the tab bar and the renderer all ask about the row, so the
      * two have to be one key or the divider is written where nothing
      * reads it.
@@ -387,9 +398,9 @@ public final class ChatIdentityViewTest {
         roster();
         ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
-        assertNotEquals("the line's tab is not the row's", gondor, row);
+        assertNotEquals("the line's page is not the row's", gondor, row);
 
-        // A faction line arrives while another tab is in front.
+        // A faction line arrives while another page is in front.
         ClientChatChannelViews.record(41, gondor,
                 ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
 
@@ -451,7 +462,7 @@ public final class ChatIdentityViewTest {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         assertEquals(global, ConversationPage.viewed(global));
         choose(global, BEREN);
-        assertEquals("still the one tab, still its one conversation",
+        assertEquals("still the one page, still its one conversation",
                 global, ConversationPage.viewed(global));
         assertTrue(ChatLineFilter.of(global).accepts(global));
     }
@@ -482,8 +493,8 @@ public final class ChatIdentityViewTest {
 
     /**
      * Every character of this player in a faction reads the same
-     * conversation. The tab is named by the faction, so a second Gondor
-     * character sees Gondor's talk rather than an empty tab that keeps
+     * conversation. The page is named by the faction, so a second Gondor
+     * character sees Gondor's talk rather than an empty page that keeps
      * counting unread.
      */
     @Test
@@ -545,20 +556,20 @@ public final class ChatIdentityViewTest {
     }
 
     /**
-     * A conversation is not a tab a window holds: the row entry is, and
+     * A conversation is not a page a window holds: the row entry is, and
      * that is what the layout is asked about.
      */
     @Test
     public void aConversationBelongsToItsChannelsRowEntry() {
         ConversationPage row = ConversationPage.of(ChatChannel.FACTION);
         assertEquals(row, ConversationPage.row(ConversationPage.of(ChatChannel.FACTION, GONDOR)));
-        assertEquals("an unscoped tab is its own row",
+        assertEquals("an unscoped page is its own row",
                 ConversationPage.of(ChatChannel.GLOBAL),
                 ConversationPage.row(ConversationPage.of(ChatChannel.GLOBAL)));
         ConversationPage whisper = ConversationPage.whisper("Steve", "Faramir", keyOf(ALDRIC));
         assertEquals("a whisper conversation belongs to the person's row entry",
                 ConversationPage.whisper("Steve", "Faramir"), ConversationPage.row(whisper));
-        assertEquals("an NPC tab is its own row", ConversationPage.npc("Gandalf"),
+        assertEquals("an NPC page is its own row", ConversationPage.npc("Gandalf"),
                 ConversationPage.row(ConversationPage.npc("Gandalf")));
     }
 
@@ -566,10 +577,10 @@ public final class ChatIdentityViewTest {
      * A conversation round-trips through its id, and an id written when
      * a conversation was named by a character names none now, so a
      * layout file holding one drops it rather than restoring a second
-     * Faction tab beside the row entry.
+     * Faction page beside the row entry.
      */
     @Test
-    public void aScopedTabRoundTripsThroughItsIdAndACharacterKeyedOneDoesNot() {
+    public void aScopedPageRoundTripsThroughItsIdAndACharacterKeyedOneDoesNot() {
         ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
         assertEquals("faction|in:" + ROHAN, rohan.id());
         assertEquals(rohan, ConversationPage.fromId(rohan.id()));
@@ -580,23 +591,23 @@ public final class ChatIdentityViewTest {
                 ConversationPage.fromId("faction|own:" + keyOf(BEREN)));
     }
 
-    /** The closed feed shows what the character played reads, whoever the copies speak as. */
+    /** The feed shows what the character played reads, whoever the copies speak as. */
     @Test
     public void theFeedShowsWhatTheCharacterPlayedReads() {
         roster();
         choose(ConversationPage.of(ChatChannel.FACTION), BEREN);
         ConversationPage gondor = ConversationPage.of(ChatChannel.FACTION, GONDOR);
         ConversationPage rohan = ConversationPage.of(ChatChannel.FACTION, ROHAN);
-        assertTrue(ChatLayout.feedTabs().contains(gondor));
-        assertFalse(ChatLayout.feedTabs().contains(rohan));
+        assertTrue(ChatLayout.feedPages().contains(gondor));
+        assertFalse(ChatLayout.feedPages().contains(rohan));
         assertTrue(ChatLayout.feedFilter().accepts(gondor));
         assertFalse(ChatLayout.feedFilter().accepts(rohan));
     }
 
     /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
-    private static void scroll(ConversationPage tab, int lines, int totalLines, double roomLines) {
-        double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
-        ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
+    private static void scroll(ConversationPage page, int lines, int totalLines, double roomLines) {
+        double current = ClientChatChannelViews.getScroll(page, totalLines, roomLines);
+        ClientChatChannelViews.scrollTo(page, current + lines, totalLines, roomLines);
     }
 
     /** The server's answer: the character played in one fellowship whose name follows its id. */

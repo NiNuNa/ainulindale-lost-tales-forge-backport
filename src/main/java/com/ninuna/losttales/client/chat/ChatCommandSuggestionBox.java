@@ -9,7 +9,7 @@ import java.util.List;
 import net.minecraft.client.gui.FontRenderer;
 
 /**
- * The command tab-completion list, shown above the input like the emoji
+ * The command page-completion list, shown above the input like the emoji
  * and mention completions instead of printed into the chat: the
  * candidates are composition UI, and a popup leaves nothing in the
  * history or the feed. Unlike its siblings this box is fed explicitly —

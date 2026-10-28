@@ -31,8 +31,9 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
 /**
- * Version-specific bridge into LOTR's native fast-travel target, countdown,
- * cooldown, safety, and teleport implementation.
+ * Waystone travel through LOTR's own fast travel: its target, countdown,
+ * cooldown, safety checks and teleport. A journey is checked as it is
+ * asked for and again every tick of the countdown.
  */
 public final class LostTalesLotrWaystoneTravelAdapter {
     private static final int[][] ADJACENT_OFFSETS = {
@@ -138,8 +139,8 @@ public final class LostTalesLotrWaystoneTravelAdapter {
     }
 
     /**
-     * Called once per server player tick. This is the final authority while
-     * LOTR's own countdown is active.
+     * Checks the player's journey again, every tick of LOTR's countdown,
+     * and calls it off with a line in the chat where a check fails.
      */
     public static void revalidatePending(
             EntityPlayerMP player, LOTRPlayerData lotrData) {
@@ -253,9 +254,10 @@ public final class LostTalesLotrWaystoneTravelAdapter {
     }
 
     /**
-     * Gives native LOTR fast travel the same adjacent arrival used by the
-     * waystone destination screen. Unlinked map markers retain LOTR's normal
-     * target coordinates.
+     * Where LOTR's own fast travel to a waystone arrives: where its house
+     * says, else beside the waystone, as waystone travel arrives. Null for
+     * a marker with no waystone standing, which keeps LOTR's own target,
+     * and where no spot is safe.
      */
     public static LOTRCustomWaypoint createSafeDestinationWaypoint(
             EntityPlayerMP player, LostTalesMapMarkerRecord destination) {

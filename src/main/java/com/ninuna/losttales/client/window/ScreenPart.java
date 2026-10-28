@@ -172,7 +172,7 @@ public abstract class ScreenPart {
     }
 
     /** What the {@code +} says under the pointer; null leaves it to another part. */
-    public String restoreTip() {
+    public String newPageTip() {
         return null;
     }
 

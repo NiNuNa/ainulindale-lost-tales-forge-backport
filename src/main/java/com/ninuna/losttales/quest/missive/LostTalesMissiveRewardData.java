@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Reward payload for generated missives. Values intentionally mirror quest JSON reward keys. */
+/** A missive's pay, under the reward keys a quest file uses (QUEST-33). */
 public final class LostTalesMissiveRewardData {
     private final Map<String, String> rewards;
 

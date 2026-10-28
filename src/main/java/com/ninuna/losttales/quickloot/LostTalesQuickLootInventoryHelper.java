@@ -20,13 +20,10 @@ import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 
 /**
- * Shared resolver for the Quick Loot HUD.
- *
- * <p>Keeping client and server resolution in one common helper prevents small
- * differences between the HUD target, the server snapshot, and the server drop
- * request.  That matters for legacy 1.7.10 blocks like the two-block
- * loutrophoros and vanilla double chests, where the clicked block coordinates
- * are not always the same thing as the inventory that should be read.</p>
+ * The container quick loot reads: one helper for the panel, the server's
+ * look and the server's take, so all three find the same inventory. The
+ * block looked at is not always it: the top half of a tall urn stands for
+ * its bottom half, and a double chest is both chests.
  */
 public final class LostTalesQuickLootInventoryHelper {
     public static final double MAX_INTERACTION_DISTANCE_SQ = 64.0D;
@@ -34,8 +31,11 @@ public final class LostTalesQuickLootInventoryHelper {
 
     private static Method vanillaChestResolver;
     private static boolean lookedUpVanillaChestResolver;
-    /** Set on the server thread while {@link #mayUseAsRightClick} asks quietly. */
-    private static boolean askingQuietly;
+    /**
+     * Set while {@link #mayUseAsRightClick} asks quietly, for the thread asking
+     * alone: a game's client thread never reads its own server's question.
+     */
+    private static final ThreadLocal<Boolean> ASKING_QUIETLY = new ThreadLocal<Boolean>();
 
     private LostTalesQuickLootInventoryHelper() {}
 
@@ -150,21 +150,21 @@ public final class LostTalesQuickLootInventoryHelper {
      */
     public static boolean mayUseAsRightClick(EntityPlayerMP player, int x, int y,
                                              int z, boolean quietly) {
-        boolean wasQuiet = askingQuietly;
-        askingQuietly = quietly;
+        Boolean wasQuiet = ASKING_QUIETLY.get();
+        ASKING_QUIETLY.set(Boolean.valueOf(quietly));
         try {
             PlayerInteractEvent event = ForgeEventFactory.onPlayerInteract(
                     player, PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK,
                     x, y, z, sideFacing(player, x, y, z), player.worldObj);
             return !event.isCanceled() && event.useBlock != Event.Result.DENY;
         } finally {
-            askingQuietly = wasQuiet;
+            ASKING_QUIETLY.set(wasQuiet);
         }
     }
 
     /** Whether the right-click being handled is only {@link #mayUseAsRightClick} asking quietly. */
     public static boolean isAskingQuietly() {
-        return askingQuietly;
+        return Boolean.TRUE.equals(ASKING_QUIETLY.get());
     }
 
     /** The face of the block at x, y, z turned most toward the player. */
@@ -197,10 +197,10 @@ public final class LostTalesQuickLootInventoryHelper {
     }
 
     /**
-     * Uses vanilla's own chest resolver when available.  In 1.7.10 MCP this is
-     * exposed as func_149951_m and handles both merged double chests and vanilla
-     * "blocked chest" checks. Reflection keeps this helper resilient to mapping
-     * name differences in custom development workspaces.
+     * The chest as vanilla's own resolver ({@code func_149951_m}, which keeps
+     * that name in the dev workspace too) reads it: a double chest as one,
+     * and none where a cat or a block above shuts it. Null where the call
+     * fails.
      */
     private static IInventory resolveVanillaChest(BlockChest block, Method method, World world, int x, int y, int z) {
         try {

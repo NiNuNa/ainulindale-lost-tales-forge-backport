@@ -35,7 +35,7 @@ public final class DiscordGatewayProtocol {
     public static final int OP_HEARTBEAT_ACK = 11;
     /**
      * GUILDS, GUILD_MESSAGES, GUILD_MESSAGE_REACTIONS, GUILD_MESSAGE_TYPING
-     * and MESSAGE_CONTENT: what reading bound channels, the reactions on
+     * and MESSAGE_CONTENT: what reading linked channels, the reactions on
      * them and who is typing there needs. Only MESSAGE_CONTENT is
      * privileged.
      */
@@ -121,11 +121,13 @@ public final class DiscordGatewayProtocol {
     static final int MAX_GATEWAY_URL_LENGTH = 256;
 
     private final String token;
-    private int intents;
-    private long sequence = -1L;
+    /** Read by the server thread too, while the member lists ask. */
+    private volatile int intents;
+    /** Read by the heartbeat thread too, as is {@link #heartbeatAcknowledged}. */
+    private volatile long sequence = -1L;
     private String sessionId = "";
     private String resumeGatewayUrl = "";
-    private boolean heartbeatAcknowledged = true;
+    private volatile boolean heartbeatAcknowledged = true;
 
     public DiscordGatewayProtocol(String token, int intents) {
         this.token = token == null ? "" : token;

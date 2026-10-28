@@ -60,6 +60,11 @@ public final class FellowshipMemberSnapshot {
         return this.ownerId;
     }
 
+    /** Whether the member is a released figure, held by nobody (CHAR-36). */
+    public boolean isUnheld() {
+        return FellowshipMember.UNHELD.equals(this.ownerId);
+    }
+
     public String getCharacterName() {
         return this.characterName;
     }

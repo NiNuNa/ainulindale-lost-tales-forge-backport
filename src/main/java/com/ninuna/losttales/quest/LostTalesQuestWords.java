@@ -20,7 +20,7 @@ import net.minecraft.util.StatCollector;
  * {@code .description}, an objective under {@code .objective.<id>}, what
  * an optional one achieved adds under {@code .outcome.<id>}, a journal
  * line under {@code .journal.<stage id>} and a line of its conversation
- * under {@code .dialogue.<line>}. The quest files leave
+ * under {@code .conversation.<line>}. The quest files leave
  * those words out; the English lines fill the definition as it is read
  * ({@link #bundled}), so the server's own uses and a line the game has
  * no translation for still read in English. A missive is worded by its
@@ -59,8 +59,8 @@ public final class LostTalesQuestWords {
         return keyPrefix(questId) + ".journal." + stageId;
     }
 
-    public static String dialogueKey(String questId, String line) {
-        return keyPrefix(questId) + ".dialogue." + line;
+    public static String conversationKey(String questId, String line) {
+        return keyPrefix(questId) + ".conversation." + line;
     }
 
     /** A bundled quest's line for what an optional objective achieved adds to its History (QUEST-15). */
@@ -196,10 +196,10 @@ public final class LostTalesQuestWords {
             fill(rules, LostTalesQuestRules.RUMOUR_PREFIX + "line", english,
                     rumourKey(id));
         }
-        Map<String, String> dialogue =
-                new LinkedHashMap<String, String>(quest.getDialogue());
-        for (String line : LostTalesQuestDialogue.LINES) {
-            fill(dialogue, line, english, dialogueKey(id, line));
+        Map<String, String> conversation =
+                new LinkedHashMap<String, String>(quest.getConversation());
+        for (String line : LostTalesQuestConversation.LINES) {
+            fill(conversation, line, english, conversationKey(id, line));
         }
         String title = quest.getTitle();
         if (title == null || title.trim().length() == 0 || title.equals(id)) {
@@ -211,7 +211,7 @@ public final class LostTalesQuestWords {
                 quest.isRepeatable(), quest.isRestartable(),
                 quest.getStartMode(), quest.getPrerequisites(),
                 quest.getRewards(), quest.getInteraction(), quest.getMarkers(),
-                journal, dialogue, quest.getWorld(), stages, true,
+                journal, conversation, quest.getWorld(), stages, true,
                 quest.getWords(), rules);
     }
 

@@ -11,7 +11,7 @@ import net.minecraft.client.gui.GuiNewChat;
  * trimmed to. {@code GuiNewChat.func_146237_a} keeps at most a hundred
  * messages and a hundred wrapped lines, a literal the coremod replaces
  * with {@link #capacity()}, so a long session stays scrollable in every
- * channel tab. The bound is the config's, kept inside
+ * channel page. The bound is the config's, kept inside
  * {@link #MIN_CAPACITY} and {@link #MAX_CAPACITY} whatever the file
  * says. Without the patch vanilla's hundred applies and the property is
  * never set.

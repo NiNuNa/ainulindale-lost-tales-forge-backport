@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Private runtime positions of the members of the fellowship travelled with. */
+/** Where the members of the fellowship travelled with stand, as one player is sent them. */
 public final class FellowshipTrackingSnapshot {
 
     private final UUID ownerId;

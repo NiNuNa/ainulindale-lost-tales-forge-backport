@@ -12,8 +12,8 @@ import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 import com.ninuna.losttales.permission.LostTalesCapability;
@@ -50,12 +50,17 @@ public final class ChatChannelPolicy {
 
         /** The recipients' account ids, in delivery order. */
         public List<UUID> recipientIds() {
-            List<UUID> ids = new ArrayList<UUID>(this.recipients.size());
-            for (EntityPlayerMP recipient : this.recipients) {
-                ids.add(recipient.getUniqueID());
-            }
-            return ids;
+            return idsOf(this.recipients);
         }
+    }
+
+    /** The players' account ids, in their order. */
+    private static List<UUID> idsOf(List<EntityPlayerMP> players) {
+        List<UUID> ids = new ArrayList<UUID>(players.size());
+        for (EntityPlayerMP player : players) {
+            ids.add(player.getUniqueID());
+        }
+        return ids;
     }
 
     /**
@@ -67,7 +72,7 @@ public final class ChatChannelPolicy {
         /** Whether the reader holds the server's operator level. */
         boolean isOperator();
 
-        /** Whether the reader holds {@code chat.server_console.read}. */
+        /** Whether the reader holds {@code chat.server_log.read}. */
         boolean readsConsole();
 
         /** The account's own roles: what an out-of-character gate is passed with. */
@@ -90,7 +95,7 @@ public final class ChatChannelPolicy {
      *                 which is what reaches a staff channel the config
      *                 names no gate for; see {@link #staffOnly}
      * @param consoleReader whether the sender holds
-     *                 {@code chat.server_console.read}, which is what reaches
+     *                 {@code chat.server_log.read}, which is what reaches
      *                 the server's console; see {@link #readsConsole}
      */
     public static String sendRefusal(ChatChannel channel, Fellowship fellowship, UUID playedId,
@@ -135,7 +140,7 @@ public final class ChatChannelPolicy {
      * Whether the channel is the server's own console, which a
      * capability opens rather than a role gate.
      */
-    public static boolean isServerConsole(ChatChannel channel) {
+    public static boolean isServerLog(ChatChannel channel) {
         return channel != null
                 && channel.getRecipientRule() == ChatRecipientRule.CONSOLE_READERS;
     }
@@ -173,7 +178,7 @@ public final class ChatChannelPolicy {
         if (staffOnly(channel, gates)) {
             return reader.isOperator();
         }
-        if (isServerConsole(channel) && !reader.readsConsole()) {
+        if (isServerLog(channel) && !reader.readsConsole()) {
             return false;
         }
         return gates.canRead(ChatRolePresentation.isInCharacter(channel)
@@ -187,14 +192,14 @@ public final class ChatChannelPolicy {
         if (staffOnly(channel, gates)) {
             return LostTalesPermissions.isOperator(player);
         }
-        if (isServerConsole(channel) && !readsConsole(player)) {
+        if (isServerLog(channel) && !readsConsole(player)) {
             return false;
         }
         return gates.canSend(ChatRolePresentation.isInCharacter(channel)
                 ? roles : ChatAccountRoleResolver.resolve(player, null), channel);
     }
 
-    /** Whether the refusal is the role gate's, so the client's tabs should be told again. */
+    /** Whether the refusal is the role gate's, so the client's pages should be told again. */
     public static boolean isGateRefusal(String refusal) {
         return "chat.losttales.channel.role_unavailable".equals(refusal);
     }
@@ -211,13 +216,22 @@ public final class ChatChannelPolicy {
      */
     public static Routing route(EntityPlayerMP sender, ChatChannel channel, Fellowship fellowship,
                                 String factionId) {
+        return route(sender, channel, fellowship, factionId, ChatSpeechRange.TALK);
+    }
+
+    /**
+     * As above, a line heard nearby said at {@code range} (CHAT-37): it
+     * reaches those in the speaker's world within that range's blocks.
+     */
+    public static Routing route(EntityPlayerMP sender, ChatChannel channel, Fellowship fellowship,
+                                String factionId, ChatSpeechRange range) {
         List<EntityPlayerMP> recipients = new ArrayList<EntityPlayerMP>();
         List<EntityPlayerMP> online = onlinePlayers();
         ChatChannelGates gates = ChatChannelGates.current();
         boolean gated = gates.isGated(channel);
         boolean staffOnly = staffOnly(channel, gates);
         ChatRecipientRule rule = channel.getRecipientRule();
-        double proximity = proximityDistanceSquared();
+        double proximity = distanceSquared(range);
         for (EntityPlayerMP candidate : online) {
             if (candidate == null || candidate.getUniqueID() == null) {
                 continue;
@@ -259,9 +273,8 @@ public final class ChatChannelPolicy {
                 recipients.add(candidate);
             }
         }
-        Routing routing = new Routing(recipients, null);
         return new Routing(recipients,
-                audienceFor(channel, fellowship, factionId, routing.recipientIds()));
+                audienceFor(channel, fellowship, factionId, idsOf(recipients)));
     }
 
     /**
@@ -310,7 +323,6 @@ public final class ChatChannelPolicy {
             case FACTION:
                 return ChatHistory.Audience.faction(factionId, readGated);
             case SELF:
-                return ChatHistory.Audience.accounts(recipientIds, false);
             default:
                 return ChatHistory.Audience.accounts(recipientIds, false);
         }
@@ -331,7 +343,7 @@ public final class ChatChannelPolicy {
 
     /** Whether the player may read the Server Log. */
     public static boolean readsConsole(EntityPlayerMP player) {
-        return LostTalesPermissions.has(player, LostTalesCapability.CHAT_SERVER_CONSOLE_READ);
+        return LostTalesPermissions.has(player, LostTalesCapability.CHAT_SERVER_LOG_READ);
     }
 
     /**
@@ -437,8 +449,9 @@ public final class ChatChannelPolicy {
         return roles;
     }
 
-    private static double proximityDistanceSquared() {
-        double radius = Math.max(1.0D, LostTalesConfig.chatProximityRadius);
+    /** How far, squared, a line said at {@code range} carries; talk for none. */
+    private static double distanceSquared(ChatSpeechRange range) {
+        double radius = (range == null ? ChatSpeechRange.TALK : range).blocks();
         return radius * radius;
     }
 

@@ -452,7 +452,6 @@ public final class CharacterValidator {
         return CharacterValidationResult.success();
     }
 
-    /** A name as stored: NFC, trimmed, one space between words. */
     /**
      * Whether a name has a character name's shape: 2-32 characters of the
      * allowed ones once tidied. What it may not be (a lore figure's, a
@@ -466,6 +465,7 @@ public final class CharacterValidator {
                 && CharacterNames.inOneScript(name);
     }
 
+    /** A name as stored: NFC, trimmed, one space between words. */
     public static String normalizeName(String input) {
         return normalizeWhitespace(input);
     }
@@ -635,11 +635,21 @@ public final class CharacterValidator {
         return value != null && value.length() > 0 && value.length() <= MAX_IDENTIFIER_LENGTH;
     }
 
+    /**
+     * Whether every character of a name is one the game draws: a letter, a
+     * digit, a space, {@code -}, {@code '} or {@code ’}, with at least one
+     * letter. The game's font has no letter past U+FFFF and draws such a
+     * letter as nothing, and the Hangul fillers are blank, so a name holding
+     * one would read as another name or as none.
+     */
     private static boolean containsOnlyAllowedNameCharacters(String value) {
         boolean containsLetter = false;
         for (int offset = 0; offset < value.length();) {
             int codePoint = value.codePointAt(offset);
             offset += Character.charCount(codePoint);
+            if (codePoint > Character.MAX_VALUE || isBlankLetter(codePoint)) {
+                return false;
+            }
             if (Character.isLetter(codePoint)) {
                 containsLetter = true;
                 continue;
@@ -651,5 +661,11 @@ public final class CharacterValidator {
             return false;
         }
         return containsLetter;
+    }
+
+    /** The Hangul fillers: letters to Unicode, drawn blank. */
+    private static boolean isBlankLetter(int codePoint) {
+        return codePoint == 0x115F || codePoint == 0x1160
+                || codePoint == 0x3164 || codePoint == 0xFFA0;
     }
 }

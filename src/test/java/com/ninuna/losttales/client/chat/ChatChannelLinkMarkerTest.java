@@ -10,20 +10,20 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * A channel link carries its colour, the tab it opens and the line it
+ * A channel link carries its colour, the page it opens and the line it
  * lands on through the marker, and nothing else reads as one.
  */
 public final class ChatChannelLinkMarkerTest {
 
     @Test
-    public void aLinkRoundTripsItsTabColourAndLine() {
+    public void aLinkRoundTripsItsPageColourAndLine() {
         ChatComponentText run = ChatChannelLinkMarker.apply(
                 new ChatComponentText("#Faction"), 0x577F9D,
                 "faction|scope:gondor", -12);
         assertTrue(ChatChannelLinkMarker.isMarker(run));
         ChatChannelLinkMarker.Data data = ChatChannelLinkMarker.decode(run);
         assertEquals(0x577F9D, data.color);
-        assertEquals("faction|scope:gondor", data.tabId);
+        assertEquals("faction|scope:gondor", data.pageId);
         assertEquals(-12, data.chatLineId);
         assertEquals(Integer.valueOf(0x577F9D),
                 ChatChannelLinkMarker.colorOf(run));
@@ -32,7 +32,7 @@ public final class ChatChannelLinkMarkerTest {
                 new ChatComponentText("#Steve"), 0xA0DDD3,
                 "whisper:Steve|Aragorn|own:b0000000-0000-0000-0000-00000000000b", 0);
         assertEquals("whisper:Steve|Aragorn|own:b0000000-0000-0000-0000-00000000000b",
-                ChatChannelLinkMarker.decode(whisper).tabId);
+                ChatChannelLinkMarker.decode(whisper).pageId);
         assertEquals(0, ChatChannelLinkMarker.decode(whisper).chatLineId);
     }
 
@@ -43,7 +43,7 @@ public final class ChatChannelLinkMarkerTest {
         ChatChannelLinkMarker.Data data = ChatChannelLinkMarker.decode(name);
         assertEquals(1757522000000L, data.messageId);
         assertEquals(0, data.chatLineId);
-        assertEquals("all", data.tabId);
+        assertEquals("all", data.pageId);
         assertTrue(data.linksMessage());
         assertFalse(ChatChannelLinkMarker.isIconSlot(name));
         // The bubble's slot: the same link on the two reserved spaces.
@@ -52,7 +52,7 @@ public final class ChatChannelLinkMarkerTest {
                 0x577F9D, "all", 1757522000000L);
         assertTrue(ChatChannelLinkMarker.isIconSlot(slot));
         assertTrue(ChatChannelLinkMarker.sameLink(name, slot));
-        // Two spaces linking to the tab alone are not a bubble.
+        // Two spaces linking to the page alone are not a bubble.
         ChatComponentText plainSlot = ChatChannelLinkMarker.apply(
                 new ChatComponentText(ChatChannelLinkMarker.ICON_SLOT),
                 0x577F9D, "all", 0);
@@ -78,7 +78,7 @@ public final class ChatChannelLinkMarkerTest {
         assertFalse(ChatChannelLinkMarker.isMarker(plain));
         assertNull(ChatChannelLinkMarker.decode(plain));
         assertNull(ChatChannelLinkMarker.colorOf(plain));
-        // An empty tab id marks nothing.
+        // An empty page id marks nothing.
         ChatComponentText empty = ChatChannelLinkMarker.apply(
                 new ChatComponentText("#"), 0, "", 1);
         assertFalse(ChatChannelLinkMarker.isMarker(empty));

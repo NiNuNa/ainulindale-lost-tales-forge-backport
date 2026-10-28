@@ -143,7 +143,7 @@ public final class LostTalesChatServiceNarratorTest {
     }
 
     @Test
-    public void theServerConsoleNamesWhoNarratedAndWhere() {
+    public void theServerLogNamesWhoNarratedAndWhere() {
         long id = ChatMessageIdAllocator.next();
         LostTalesChatService.noteNarration("Steve", ChatChannel.GLOBAL, "", id,
                 null);

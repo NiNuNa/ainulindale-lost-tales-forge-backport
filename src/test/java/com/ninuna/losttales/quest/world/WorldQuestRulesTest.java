@@ -101,7 +101,8 @@ public final class WorldQuestRulesTest {
 
     private static LostTalesQuestDefinition parse(String json) {
         return com.ninuna.losttales.quest.LostTalesQuestDefinitionJsonParser.parseQuest(
-                new java.io.StringReader(json), "quests/test.json");
+                new java.io.StringReader(json), "quests/test.json",
+                new java.util.ArrayList<String>());
     }
 
     private static List<String> warnings(String json) {

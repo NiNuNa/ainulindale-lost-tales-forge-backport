@@ -2,10 +2,12 @@ package com.ninuna.losttales.network.packet;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatUnseenVoice;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
 import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
+import java.util.UUID;
 
 /**
  * Server-to-client: someone is, or has stopped, typing into a channel
@@ -13,11 +15,15 @@ import io.netty.buffer.ByteBuf;
  * (the character's in role-play channels, the account's otherwise, the
  * Narrator's while they narrate, which the receiving game names in its
  * own words) and, for a whisper, the account name of the partner whose
- * tab it belongs in. Presence is short-lived on the client: a state that
- * is not refreshed expires on its own, so a lost stop never leaves a ghost.
+ * tab it belongs in. It names the typist by their account and the
+ * character they type as, so an ignore and the dots over a head go by the
+ * same ids a line does (CHAT-61); the Narrator and an unseen voice name
+ * nobody (CHAT-11, CHAT-84). Presence is short-lived on the client: a
+ * state that is not refreshed expires on its own, so a lost stop never
+ * leaves a ghost.
  */
 public final class LostTalesChatTypingSyncPacket implements IMessage {
-    private static final int MAX_PACKET_BYTES = 512;
+    private static final int MAX_PACKET_BYTES = 560;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_NAME_BYTES = 128;
 
@@ -30,6 +36,12 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     private boolean typing;
     /** Whether the typist speaks as the Narrator. */
     private boolean narrator;
+    /** The typist's account; null for nobody named, the Narrator and an unseen voice. */
+    private UUID accountId;
+    /** The character the typist types as; null for the account and for nobody named. */
+    private UUID characterId;
+    /** Whether the typist is an unseen voice, which names nobody (CHAT-84). */
+    private boolean unseen;
     private boolean malformed;
 
     public LostTalesChatTypingSyncPacket() {}
@@ -66,10 +78,16 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
             this.typing = buffer.readBoolean();
             this.scopeValue = LostTalesPacketCodec.readUtf8String(buffer, 128);
             this.recipientIdentity = LostTalesPacketCodec.readUtf8String(buffer, 36);
+            this.accountId = LostTalesPacketCodec.readNullableUuid(buffer);
+            this.characterId = LostTalesPacketCodec.readNullableUuid(buffer);
+            this.unseen = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             validate();
         } catch (RuntimeException exception) {
             this.malformed = true;
+            this.accountId = null;
+            this.characterId = null;
+            this.unseen = false;
             this.channelId = "";
             this.partner = "";
             this.identityName = "";
@@ -94,6 +112,9 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
         buffer.writeBoolean(this.typing);
         LostTalesPacketCodec.writeUtf8String(buffer, this.scopeValue, 128);
         LostTalesPacketCodec.writeUtf8String(buffer, this.recipientIdentity, 36);
+        LostTalesPacketCodec.writeNullableUuid(buffer, this.accountId);
+        LostTalesPacketCodec.writeNullableUuid(buffer, this.characterId);
+        buffer.writeBoolean(this.unseen);
     }
 
     private void validate() {
@@ -110,9 +131,41 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
                 || (channel == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || (channel != ChatChannel.WHISPER
-                        && this.partner.length() > 0)) {
+                        && this.partner.length() > 0)
+                // A character is someone's: it comes with its account.
+                || (this.characterId != null && this.accountId == null)
+                // The Narrator and an unseen voice name nobody.
+                || ((this.narrator || this.unseen)
+                        && (this.accountId != null || this.characterId != null))
+                || (this.unseen && (this.narrator || channel == ChatChannel.WHISPER
+                        || !ChatUnseenVoice.NAME.equals(this.identityName)))) {
             throw new IllegalArgumentException("invalid chat typing sync");
         }
+    }
+
+    /**
+     * The same notice naming its typist by {@code accountId} and the
+     * character {@code characterId} they type as, null for the account.
+     */
+    public LostTalesChatTypingSyncPacket from(UUID accountId, UUID characterId) {
+        this.accountId = accountId;
+        this.characterId = accountId == null ? null : characterId;
+        validate();
+        return this;
+    }
+
+    /**
+     * The same notice for a typist who is an unseen voice: signed by the
+     * unseen voice and naming nobody (CHAT-84).
+     */
+    public static LostTalesChatTypingSyncPacket unseenVoice(ChatChannel channel,
+                                                            boolean typing,
+                                                            String scopeValue) {
+        LostTalesChatTypingSyncPacket packet = new LostTalesChatTypingSyncPacket(
+                channel, "", ChatUnseenVoice.NAME, false, typing, scopeValue, "");
+        packet.unseen = true;
+        packet.validate();
+        return packet;
     }
 
     public ChatChannel getChannel() {
@@ -126,6 +179,12 @@ public final class LostTalesChatTypingSyncPacket implements IMessage {
     public boolean isNarrator() { return this.narrator; }
     public String getScopeValue() { return this.scopeValue; }
     public String getRecipientIdentity() { return this.recipientIdentity; }
+    /** The typist's account; null where the notice names nobody. */
+    public UUID getAccountId() { return this.accountId; }
+    /** The character the typist types as; null for the account and for nobody. */
+    public UUID getCharacterId() { return this.characterId; }
+    /** Whether the typist is an unseen voice, named in each game's own words. */
+    public boolean isUnseen() { return this.unseen; }
     public boolean isTyping() { return this.typing; }
     public boolean isMalformed() { return this.malformed; }
 

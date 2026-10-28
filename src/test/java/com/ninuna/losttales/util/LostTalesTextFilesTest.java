@@ -44,6 +44,17 @@ public final class LostTalesTextFilesTest {
     }
 
     @Test
+    public void aLineBreakInsideALineNeverWritesALineOfItsOwn() throws IOException {
+        File file = temporaryFolder.newFile("marks.txt");
+
+        assertTrue(LostTalesTextFiles.writeLines(file,
+                Arrays.asList("server\tview\nother\tview\r\t9")));
+
+        assertEquals(Arrays.asList("server\tview other\tview \t9"),
+                LostTalesTextFiles.readLines(file, Integer.MAX_VALUE));
+    }
+
+    @Test
     public void aReadStopsAtItsLimitAndAMissingFileReadsAsNone() throws IOException {
         File file = temporaryFolder.newFile("layout.txt");
         FileOutputStream output = new FileOutputStream(file);

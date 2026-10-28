@@ -29,7 +29,7 @@ import net.minecraft.util.IChatComponent;
  * followed.</p>
  *
  * <p>Only a layout of the same messages moves this way. A message
- * arriving or leaving, or another tab's messages coming in, is a cut:
+ * arriving or leaving, or another page's messages coming in, is a cut:
  * the newest message has an entrance of its own, and a row already on
  * its way finishes its trip. The draw halts every trip while the view is
  * scrolled away from the newest line, where the scroll keeps the line

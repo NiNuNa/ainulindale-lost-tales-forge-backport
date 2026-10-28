@@ -4,7 +4,7 @@ import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-/** Immutable world-level ownership state for one lore-character identity. */
+/** Who holds one lore figure, under which character id, and when it was claimed and released. */
 public final class LoreCharacterOwnershipRecord {
 
     public static final int CURRENT_DATA_VERSION = 1;

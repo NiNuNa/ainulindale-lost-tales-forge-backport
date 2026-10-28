@@ -28,6 +28,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockCocoa;
 import net.minecraft.block.BlockCrops;
@@ -147,12 +148,17 @@ public final class CountEvents {
             return LostTalesConfig.playersCountForCombat;
         }
         if (target instanceof EntityTameable && ((EntityTameable) target).isTamed()
-                && attacker.getCommandSenderName().equals(
-                        ((EntityTameable) target).func_152113_b())) {
+                && isOwner(((EntityTameable) target).func_152113_b(), attacker.getUniqueID())) {
             return false;
         }
         return target instanceof IMob || target.getAttributeMap()
                 .getAttributeInstance(SharedMonsterAttributes.attackDamage) != null;
+    }
+
+    /** Whether a tamed animal's owner, as 1.7.10 keeps it (a UUID in text), is this player. */
+    static boolean isOwner(String owner, UUID playerId) {
+        return owner != null && playerId != null
+                && owner.equalsIgnoreCase(playerId.toString());
     }
 
     /** The player behind a blow, struck in hand or loosed; null for anything else. */
@@ -497,8 +503,8 @@ public final class CountEvents {
             }
             if (pending.taming) {
                 if (target instanceof EntityTameable && ((EntityTameable) target).isTamed()
-                        && player.getCommandSenderName().equals(
-                                ((EntityTameable) target).func_152113_b())) {
+                        && isOwner(((EntityTameable) target).func_152113_b(),
+                                player.getUniqueID())) {
                     tamed(player, target);
                 }
             } else if (target instanceof EntityLivingBase) {

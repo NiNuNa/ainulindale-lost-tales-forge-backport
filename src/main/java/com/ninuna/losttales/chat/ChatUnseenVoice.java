@@ -14,7 +14,11 @@ import java.util.UUID;
  * other reader is sent it masked, signed by {@link #SENDER_ID} with no
  * account and no character behind it, as the Narrator's lines are
  * ({@link ChatNarrator}). A reply's quote of such a line, and a forward
- * of it, are masked alike.</p>
+ * of it, are masked alike. Everything around the line is masked too, for
+ * everyone but the speaker and staff: the speaker leaves the member list
+ * of a conversation heard nearby, their typing there names the unseen
+ * voice, so do their reactions to lines heard nearby, and the Server
+ * Log's report and removal entries name the speaker to staff alone.</p>
  */
 public final class ChatUnseenVoice {
     /**

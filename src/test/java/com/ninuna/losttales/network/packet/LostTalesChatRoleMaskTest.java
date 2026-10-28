@@ -58,7 +58,7 @@ public final class LostTalesChatRoleMaskTest {
         buffer = Unpooled.buffer();
         tagged.toBytes(buffer);
         ByteBuf truncated = buffer.readSlice(
-                buffer.readableBytes() - scopeTailBytes("") - 1);
+                buffer.readableBytes() - LostTalesChatPacketTest.scopeTailBytes("") - 1);
         decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(truncated);
         assertTrue(decoded.isMalformed());
@@ -143,39 +143,9 @@ public final class LostTalesChatRoleMaskTest {
         roled.toBytes(buffer);
         LostTalesChatMessagePacket decoded = new LostTalesChatMessagePacket();
         decoded.fromBytes(buffer.slice(0, buffer.readableBytes()
-                - scopeTailBytes("") - 4
+                - LostTalesChatPacketTest.scopeTailBytes("") - 4
                 - 3 * IDENTITY_ID_TAIL_BYTES));
         assertTrue(decoded.isMalformed());
         assertEquals(0, decoded.getRoles());
-    }
-
-    /**
-     * How many bytes the conversation a line belongs to takes at the end
-     * of the payload. Measured rather than assumed, so a test that walks
-     * back from the end of a packet keeps saying what it means when
-     * another field is appended after this one.
-     */
-    private static int scopeTailBytes(String scopeValue) {
-        ByteBuf probe = Unpooled.buffer();
-        LostTalesPacketCodec.writeUtf8String(probe, scopeValue, 128);
-        // Behind the scope, for a line quoting nothing: the empty quote
-        // of a line nobody named (author, words, colour), then the
-        // quote's head, a server line's component and its named
-        // players, every one of them empty.
-        LostTalesPacketCodec.writeUtf8String(probe, "", 256);
-        LostTalesPacketCodec.writeUtf8String(probe, "", 297);
-        probe.writeInt(0);
-        probe.writeBoolean(false);
-        probe.writeLong(0L);
-        probe.writeLong(0L);
-        probe.writeBoolean(false);
-        LostTalesPacketCodec.writeUtf8String(probe, "", 128);
-        LostTalesPacketCodec.writeUtf8String(probe, "", 8192);
-        probe.writeInt(0);
-        // And the reactions, none, and the tab a command's answer is
-        // filed under, none.
-        probe.writeInt(0);
-        LostTalesPacketCodec.writeUtf8String(probe, "", 384);
-        return probe.readableBytes();
     }
 }

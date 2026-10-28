@@ -178,7 +178,7 @@ public final class HudLayoutFiles {
         } else if (!id.matches(LostTalesConfig.HUD_LAYOUT_ID)) {
             warnings.add("the id '" + id + "' is not lower-case letters, digits, - and _"
                     + " within 64 characters");
-        } else if (LostTalesConfig.HUD_PRESET_CUSTOM.equals(id)) {
+        } else if (LostTalesConfig.HUD_LAYOUT_CUSTOM.equals(id)) {
             warnings.add("takes the id custom, which keeps the panels where the player put them");
         }
         List<String> panels = LostTalesConfig.hudElements();

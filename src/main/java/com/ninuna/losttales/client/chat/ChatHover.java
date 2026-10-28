@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import com.ninuna.losttales.client.window.WindowHover;
 
 /**
@@ -28,6 +28,8 @@ public final class ChatHover extends WindowHover {
         /** The bar strip of a window other than the one typed in. */
         OTHER_BAR,
         CHARACTER_BUTTON,
+        /** The range button of a copy heard nearby (CHAT-37). */
+        RANGE_BUTTON,
         INDICATOR,
         SEND_BUTTON,
         TOOLBAR_TOGGLE,
@@ -62,7 +64,7 @@ public final class ChatHover extends WindowHover {
      */
     int markLineId;
     LostTalesChatOverlayRenderer.Hit line;
-    LostTalesChatHoverCard.Found person;
+    LostTalesChatCard.Found person;
     /** On a member list, the member whose row it is; null on the list around them. */
     com.ninuna.losttales.network.packet.LostTalesChatMembersPacket.Member member;
 
@@ -99,6 +101,7 @@ public final class ChatHover extends WindowHover {
             case PICKER_LABEL:
             case OTHER_BAR:
             case CHARACTER_BUTTON:
+            case RANGE_BUTTON:
             case INDICATOR:
             case SEND_BUTTON:
             case TOOLBAR_TOGGLE:
@@ -122,9 +125,9 @@ public final class ChatHover extends WindowHover {
 
     /** The pointer's pose over it: a resize over the member list's edge, else as any hover's. */
     @Override
-    public LostTalesMapCursor.Pose pose() {
+    public LostTalesPointer.Pose pose() {
         if (this.chatKind == Kind.MEMBER_LIST_EDGE) {
-            return LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
+            return LostTalesPointer.Pose.RESIZE_HORIZONTAL;
         }
         return super.pose();
     }

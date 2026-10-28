@@ -12,7 +12,7 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
-import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.chat.ChatPageIds;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -54,10 +54,10 @@ import net.minecraft.util.IChatComponent;
  * each player on its own that is still shared news, as LOTR's
  * travelling trader is, gets one record and one id for every copy. A
  * line sent to one player that answers a command they typed is recorded
- * for that account alone, under the tab the command was typed in while
+ * for that account alone, under the page the command was typed in while
  * they may read it and in the Console otherwise
  * ({@link #onPlayerLine}), so the answer comes back with the rest of the
- * tab's history. It is charged to that account's own share of the
+ * page's history. It is charged to that account's own share of the
  * history, never to the conversation's. A line is held back only where
  * {@link #onBroadcast} and {@link #onPlayerLine} say so: a player's
  * first visit, an Invisible player's join or leave, and the operators'
@@ -249,10 +249,10 @@ public final class LostTalesServerBroadcastHook {
      * just recorded that command: it holds it already. A shared line the
      * game hands each player on its own is stamped as a broadcast is, once
      * for all its copies. A line that answers a command the player typed
-     * from a chat tab — their running command's context names the tab —
+     * from a chat page — their running command's context names the page —
      * gets an id and its named players and is recorded for that account
-     * alone, under that tab while they may read it, else in the Client
-     * Console ({@link #answerTab}). Any other line to one player — a countdown, a
+     * alone, under that page while they may read it, else in their
+     * Console ({@link #answerPage}). Any other line to one player — a countdown, a
      * notice, another mod's word — passes unrecorded: it is this player's
      * alone.
      */
@@ -279,7 +279,7 @@ public final class LostTalesServerBroadcastHook {
                 stampCopy(message, shared);
                 return message;
             }
-            if (shared != ChatChannel.CLIENT_CONSOLE) {
+            if (shared != ChatChannel.CONSOLE) {
                 return message;
             }
             String typedIn = ChatCommandContexts.answerLine(account,
@@ -287,15 +287,15 @@ public final class LostTalesServerBroadcastHook {
             if (typedIn.length() == 0) {
                 return message;
             }
-            String tabId = answerTab(typedIn,
+            String pageId = answerPage(typedIn,
                     LostTalesChatService.requesterFor(player));
-            ChatChannel channel = ChatTabIds.channelOf(tabId);
+            ChatChannel channel = ChatPageIds.channelOf(pageId);
             if (channel == null) {
-                channel = ChatChannel.CLIENT_CONSOLE;
+                channel = ChatChannel.CONSOLE;
             }
             List<UUID> self = Collections.singletonList(account);
             List<ChatNamedPlayer> named = namedPlayers(message, channel);
-            long messageId = record(message, channel, tabId, self,
+            long messageId = record(message, channel, pageId, self,
                     ChatHistory.Audience.accounts(self, false), named);
             if (messageId != ChatMessageIds.NONE) {
                 mark(message, messageId, named);
@@ -307,31 +307,31 @@ public final class LostTalesServerBroadcastHook {
     }
 
     /**
-     * The tab a command's answer is kept under: the one its client said
+     * The page a command's answer is kept under: the one its client said
      * the command was typed in, while {@code reader} may read that
      * conversation now, as a request for its older lines is asked
-     * ({@link LostTalesChatService#readsConversation}); a whisper's tab
+     * ({@link LostTalesChatService#readsConversation}); a whisper's page
      * while they may read whispers; an NPC conversation, which is the
      * player's own. Anything else — a channel they may not read, a
      * faction or fellowship they are not in, an id naming no channel —
-     * answers with no tab, and the answer is kept in the Console.
+     * answers with no page, and the answer is kept in the Console.
      */
-    static String answerTab(String typedIn, ChatHistory.Requester reader) {
-        String tabId = typedIn == null ? "" : typedIn.trim();
-        String lower = tabId.toLowerCase(Locale.ROOT);
-        if (reader == null || tabId.length() == 0) {
+    static String answerPage(String typedIn, ChatHistory.Requester reader) {
+        String pageId = typedIn == null ? "" : typedIn.trim();
+        String lower = pageId.toLowerCase(Locale.ROOT);
+        if (reader == null || pageId.length() == 0) {
             return "";
         }
-        if (lower.startsWith(ChatTabIds.NPC_PREFIX)) {
-            return tabId;
+        if (lower.startsWith(ChatPageIds.NPC_PREFIX)) {
+            return pageId;
         }
-        if (lower.startsWith(ChatTabIds.WHISPER_PREFIX)) {
+        if (lower.startsWith(ChatPageIds.WHISPER_PREFIX)) {
             return LostTalesChatService.readsConversation(reader,
-                    ChatChannel.WHISPER, "") ? tabId : "";
+                    ChatChannel.WHISPER, "") ? pageId : "";
         }
-        ChatChannel channel = ChatTabIds.channelOf(tabId);
+        ChatChannel channel = ChatPageIds.channelOf(pageId);
         return channel != null && LostTalesChatService.readsConversation(reader,
-                channel, ChatTabIds.scopeOf(tabId)) ? tabId : "";
+                channel, ChatPageIds.scopeOf(pageId)) ? pageId : "";
     }
 
     /**
@@ -350,7 +350,7 @@ public final class LostTalesServerBroadcastHook {
         }
         List<ChatNamedPlayer> named = namedPlayers(message, channel);
         long messageId = record(message, channel, "", recipients,
-                channel == ChatChannel.CLIENT_CONSOLE
+                channel == ChatChannel.CONSOLE
                         ? ChatHistory.Audience.accounts(recipients, false)
                         : ChatHistory.Audience.everyone(), named);
         if (messageId == ChatMessageIds.NONE) {
@@ -428,7 +428,7 @@ public final class LostTalesServerBroadcastHook {
 
     /**
      * Records a line of the server's own in {@code channel} for the
-     * audience, under the tab it answers when it answers one, and
+     * audience, under the page it answers when it answers one, and
      * answers its new id — or none for a line with no words or no
      * server to record it on. The history keeps the words, cleaned as
      * a message is, under the Server's name in the Console's colour,
@@ -440,7 +440,7 @@ public final class LostTalesServerBroadcastHook {
      * players who may be long gone as they were named then.
      */
     private static long record(IChatComponent message, ChatChannel channel,
-                               String tabId, List<UUID> recipients,
+                               String pageId, List<UUID> recipients,
                                ChatHistory.Audience audience,
                                List<ChatNamedPlayer> named) {
         MinecraftServer server = MinecraftServer.getServer();
@@ -457,11 +457,11 @@ public final class LostTalesServerBroadcastHook {
                 channel, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, SERVER_NAME, "",
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
-                ChatChannel.CLIENT_CONSOLE.getDisplayColor(), text,
+                ChatChannel.CONSOLE.getDisplayColor(), text,
                 System.currentTimeMillis(), "", null, "", "", 0, true,
                 messageId, ChatReplyReference.NONE, "")
                 .withServerBody(componentJson(message), named)
-                .withTabId(tabId);
+                .withPageId(pageId);
         ChatHistory.record(messageId, LostTalesChatMessagePacket.SERVER_SENDER_ID,
                 SERVER_NAME, null, record, recipients, audience);
         return messageId;

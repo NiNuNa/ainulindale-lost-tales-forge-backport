@@ -52,9 +52,9 @@ public final class ChatInputRulesTest {
         // console it is the game's command.
         assertTrue(ChatInputRules.isAction("/me waves", ChatChannel.OOC));
         assertFalse(ChatInputRules.isAction("/me waves",
-                ChatChannel.SERVER_CONSOLE));
+                ChatChannel.SERVER_LOG));
         assertFalse(ChatInputRules.isAction("/me waves",
-                ChatChannel.CLIENT_CONSOLE));
+                ChatChannel.CONSOLE));
         assertFalse(ChatInputRules.isAction("/me waves", null));
 
         assertFalse(ChatInputRules.isServerCommand("/me waves",
@@ -62,7 +62,7 @@ public final class ChatInputRulesTest {
         assertFalse(ChatInputRules.isServerCommand("/me waves",
                 ChatChannel.OOC));
         assertTrue(ChatInputRules.isServerCommand("/me waves",
-                ChatChannel.CLIENT_CONSOLE));
+                ChatChannel.CONSOLE));
         assertTrue(ChatInputRules.isServerCommand("/losttales hud",
                 ChatChannel.GLOBAL));
 

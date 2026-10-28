@@ -4,7 +4,10 @@ import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.model.FellowshipMark;
 import com.ninuna.losttales.fellowship.model.FellowshipMember;
 
-/** Result of one atomic server-side fellowship operation. */
+/**
+ * What one fellowship request came to: whether it changed anything, the
+ * fellowship, member and mark it touched, or why it was refused.
+ */
 public final class FellowshipOperationResult {
 
     private final boolean successful;

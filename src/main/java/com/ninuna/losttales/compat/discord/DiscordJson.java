@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
+import com.ninuna.losttales.util.LostTalesWords;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -241,7 +242,7 @@ public final class DiscordJson {
      * but Discord's own image host is ever named.
      */
     static String avatarUrl(String userId, String avatarHash) {
-        if (!DiscordChannelBindings.isSnowflake(userId) || avatarHash == null
+        if (!DiscordChannelLinks.isSnowflake(userId) || avatarHash == null
                 || !avatarHash.matches("(?:a_)?[0-9a-f]{1,64}")) {
             return "";
         }
@@ -477,7 +478,7 @@ public final class DiscordJson {
     /**
      * The guild and id of a channel, read from the channel object the
      * bot is answered with, or null for anything else — a channel with
-     * no guild (a whisper) included, since nothing is bound there.
+     * no guild (a whisper) included, since nothing is linked there.
      */
     public static ChannelInfo parseChannelInfo(String json) {
         return channelInfo(parseObject(json), "id");
@@ -809,14 +810,15 @@ public final class DiscordJson {
      * The body of one of the server's own notices: no text, one embed
      * with the notice's colour down its edge and the notice's line on
      * the author row, the player's head beside it when there is one.
-     * Posted under the webhook's own name and picture. The author row
+     * Posted under the webhook's own name and picture, its line in
+     * {@code words}, the linked channel's. The author row
      * renders no markdown and reaches nobody's mentions; the mention
      * block is sent all the same, so the post can ping nobody whatever
      * Discord makes of it.
      */
-    public static String webhookEmbedBody(DiscordNotice notice) {
+    public static String webhookEmbedBody(DiscordNotice notice, LostTalesWords words) {
         JsonObject author = new JsonObject();
-        author.addProperty("name", notice == null ? "" : notice.getText());
+        author.addProperty("name", notice == null ? "" : notice.getText(words));
         if (notice != null && notice.getIconUrl().length() > 0) {
             author.addProperty("icon_url", notice.getIconUrl());
         }
@@ -828,9 +830,7 @@ public final class DiscordJson {
         embeds.add(embed);
         JsonObject body = new JsonObject();
         body.add("embeds", embeds);
-        JsonObject allowedMentions = new JsonObject();
-        allowedMentions.add("parse", new JsonArray());
-        body.add("allowed_mentions", allowedMentions);
+        body.add("allowed_mentions", noMentions());
         return body.toString();
     }
 
@@ -922,7 +922,7 @@ public final class DiscordJson {
         if (pinged != null && !pinged.isEmpty()) {
             JsonArray users = new JsonArray();
             for (String userId : pinged) {
-                if (DiscordChannelBindings.isSnowflake(userId)) {
+                if (DiscordChannelLinks.isSnowflake(userId)) {
                     users.add(new JsonPrimitive(userId));
                 }
             }
@@ -960,21 +960,17 @@ public final class DiscordJson {
 
     /**
      * The address of a webhook Discord just made, from its id and token;
-     * empty when the reply holds no such pair.
+     * empty when the reply holds no such pair, or none a link's entry
+     * would read back ({@link DiscordChannelLinks#isDiscordWebhook}).
      */
     public static String parseCreatedWebhookUrl(String json) {
         JsonObject object = parseObject(json);
         if (object == null) {
             return "";
         }
-        String id = string(object, "id");
-        String token = string(object, "token");
-        if (id.length() == 0 || id.length() > 24 || token.length() == 0
-                || token.length() > 128 || !id.matches("\\d+")
-                || !token.matches("[A-Za-z0-9_-]+")) {
-            return "";
-        }
-        return "https://discord.com/api/webhooks/" + id + "/" + token;
+        String url = "https://discord.com/api/webhooks/" + string(object, "id")
+                + "/" + string(object, "token");
+        return DiscordChannelLinks.isDiscordWebhook(url) ? url : "";
     }
 
     private static JsonObject noMentions() {

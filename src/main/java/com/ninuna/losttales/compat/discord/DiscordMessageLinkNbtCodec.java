@@ -18,12 +18,12 @@ import net.minecraftforge.common.util.Constants;
  * Versioned NBT codec for the Discord bridge's memory in the world save:
  * the message links, each game message the bridge carried, oldest first,
  * with every Discord copy it has — the copy's Discord id, the channel it
- * is in, the binding it was posted through and the reply header it
+ * is in, the link it was posted through and the reply header it
  * opened with — and the topics, each kept channel's words Discord last
  * took and when it took the last two writes.
  *
  * <p>No webhook URL is ever written, since a webhook URL is a
- * credential: the binding id stands in for it. Every copy is written
+ * credential: the link id stands in for it. Every copy is written
  * under the Discord channel it is in ({@code channel:<id>}), which every
  * link names; a copy known by anything else is left out, and on read a
  * destination that is not a channel is refused, so a URL cannot pass for
@@ -42,12 +42,12 @@ final class DiscordMessageLinkNbtCodec {
     static final int CURRENT_TOPIC_DATA_VERSION = 1;
     /** Safety bound on messages read back; entries past it are quarantined. */
     static final int MAX_ENTRIES = DiscordMessageLinks.MAX_LINKS;
-    /** The most copies one message may name: it has one per binding of its channel. */
+    /** The most copies one message may name: it has one per link of its channel. */
     static final int MAX_COPIES_PER_ENTRY = 64;
     /** The longest reply header kept; Discord takes no longer message. */
     static final int MAX_HEADER_LENGTH = 2000;
-    /** The longest binding id kept. */
-    static final int MAX_BINDING_ID_LENGTH = 128;
+    /** The longest link id kept. */
+    static final int MAX_CHANNEL_LINK_ID_LENGTH = 128;
     /** Safety bound on topics read back; topics past it are quarantined. */
     static final int MAX_TOPICS = DiscordTopicMemory.MAX_CHANNELS;
     /** The longest topic kept: Discord takes no longer one. */
@@ -66,7 +66,7 @@ final class DiscordMessageLinkNbtCodec {
     private static final String TAG_COPIES = "Copies";
     private static final String TAG_DISCORD_ID = "DiscordId";
     private static final String TAG_DESTINATION = "Destination";
-    private static final String TAG_BINDING = "Binding";
+    private static final String TAG_CHANNEL_LINK = "ChannelLink";
     private static final String TAG_HEADER = "Header";
 
     private static final String TAG_CHANNEL_ID = "ChannelId";
@@ -133,7 +133,7 @@ final class DiscordMessageLinkNbtCodec {
      */
     static boolean isTopic(DiscordTopicMemory.SavedTopic topic) {
         return topic != null
-                && DiscordChannelBindings.isSnowflake(topic.channelId)
+                && DiscordChannelLinks.isSnowflake(topic.channelId)
                 && topic.words.length() > 0
                 && topic.words.length() <= MAX_TOPIC_LENGTH
                 && topic.lastWrite > 0L
@@ -173,12 +173,12 @@ final class DiscordMessageLinkNbtCodec {
     }
 
     /**
-     * One copy, or null for one a read would refuse. Its binding is
+     * One copy, or null for one a read would refuse. Its link is
      * written only when it reads back as one.
      */
     private static NBTTagCompound writeCopy(DiscordMessageLinks.SavedCopy copy) {
-        String binding = isBindingId(copy.bindingId) ? copy.bindingId : "";
-        if (!DiscordChannelBindings.isSnowflake(copy.discordId)
+        String channelLink = isChannelLinkId(copy.channelLinkId) ? copy.channelLinkId : "";
+        if (!DiscordChannelLinks.isSnowflake(copy.discordId)
                 || !isChannelDestination(copy.destination)
                 || copy.header.length() > MAX_HEADER_LENGTH) {
             return null;
@@ -186,7 +186,7 @@ final class DiscordMessageLinkNbtCodec {
         NBTTagCompound tag = new NBTTagCompound();
         tag.setString(TAG_DISCORD_ID, copy.discordId);
         tag.setString(TAG_DESTINATION, copy.destination);
-        tag.setString(TAG_BINDING, binding);
+        tag.setString(TAG_CHANNEL_LINK, channelLink);
         tag.setString(TAG_HEADER, copy.header);
         return tag;
     }
@@ -301,7 +301,7 @@ final class DiscordMessageLinkNbtCodec {
      */
     private static String topicFailure(NBTTagCompound raw) {
         if (!raw.hasKey(TAG_CHANNEL_ID, Constants.NBT.TAG_STRING)
-                || !DiscordChannelBindings.isSnowflake(raw.getString(TAG_CHANNEL_ID))) {
+                || !DiscordChannelLinks.isSnowflake(raw.getString(TAG_CHANNEL_ID))) {
             return "invalid_topic_channel";
         }
         if (!raw.hasKey(TAG_WORDS, Constants.NBT.TAG_STRING)
@@ -363,7 +363,7 @@ final class DiscordMessageLinkNbtCodec {
         for (int index = 0; index < copies.tagCount(); index++) {
             NBTTagCompound copy = copies.getCompoundTagAt(index);
             if (!copy.hasKey(TAG_DISCORD_ID, Constants.NBT.TAG_STRING)
-                    || !DiscordChannelBindings.isSnowflake(copy.getString(TAG_DISCORD_ID))) {
+                    || !DiscordChannelLinks.isSnowflake(copy.getString(TAG_DISCORD_ID))) {
                 return EntryReadResult.failure("invalid_discord_id");
             }
             String discordId = copy.getString(TAG_DISCORD_ID);
@@ -371,14 +371,14 @@ final class DiscordMessageLinkNbtCodec {
                 return EntryReadResult.failure("invalid_destination");
             }
             String destination = copy.getString(TAG_DESTINATION);
-            // The writer writes every field, a Discord line's empty binding
+            // The writer writes every field, a Discord line's empty link
             // and a headerless post's empty header too.
-            if (!copy.hasKey(TAG_BINDING, Constants.NBT.TAG_STRING)) {
-                return EntryReadResult.failure("invalid_binding");
+            if (!copy.hasKey(TAG_CHANNEL_LINK, Constants.NBT.TAG_STRING)) {
+                return EntryReadResult.failure("invalid_channel_link");
             }
-            String binding = copy.getString(TAG_BINDING);
-            if (binding.length() > 0 && !isBindingId(binding)) {
-                return EntryReadResult.failure("invalid_binding");
+            String channelLink = copy.getString(TAG_CHANNEL_LINK);
+            if (channelLink.length() > 0 && !isChannelLinkId(channelLink)) {
+                return EntryReadResult.failure("invalid_channel_link");
             }
             if (!isChannelDestination(destination)) {
                 return EntryReadResult.failure("invalid_destination");
@@ -397,7 +397,7 @@ final class DiscordMessageLinkNbtCodec {
                 return EntryReadResult.failure("duplicate_discord_id");
             }
             read.add(new DiscordMessageLinks.SavedCopy(discordId, destination,
-                    binding, header));
+                    channelLink, header));
         }
         return EntryReadResult.success(new DiscordMessageLinks.SavedLink(
                 raw.getLong(TAG_MESSAGE_ID), read));
@@ -406,17 +406,17 @@ final class DiscordMessageLinkNbtCodec {
     /** Whether a destination names a Discord channel by id. */
     static boolean isChannelDestination(String value) {
         return value != null && value.startsWith(CHANNEL_PREFIX)
-                && DiscordChannelBindings.isSnowflake(value.substring(CHANNEL_PREFIX.length()));
+                && DiscordChannelLinks.isSnowflake(value.substring(CHANNEL_PREFIX.length()));
     }
 
     /**
-     * Whether a value may be kept as a binding id: letters, digits and
-     * the separators a binding's key and ordinal are made of. No slash
+     * Whether a value may be kept as a link id: letters, digits and
+     * the separators a link's key and ordinal are made of. No slash
      * is among them, so no URL can pass for one.
      */
-    static boolean isBindingId(String value) {
+    static boolean isChannelLinkId(String value) {
         if (value == null || value.length() == 0
-                || value.length() > MAX_BINDING_ID_LENGTH) {
+                || value.length() > MAX_CHANNEL_LINK_ID_LENGTH) {
             return false;
         }
         for (int index = 0; index < value.length(); index++) {

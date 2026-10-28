@@ -6,7 +6,7 @@ import com.ninuna.losttales.fellowship.sync.FellowshipStatusSnapshot;
 
 /**
  * The health and availability of the travelling fellowship's members, as
- * last sent. It is never authoritative.
+ * the server last sent them.
  */
 public final class ClientFellowshipMemberStatusCache {
 

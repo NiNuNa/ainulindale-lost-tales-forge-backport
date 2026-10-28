@@ -18,25 +18,29 @@ import com.ninuna.losttales.fellowship.sync.FellowshipStatusSnapshot;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 import cpw.mods.fml.common.FMLLog;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Sends each player the health and availability of the members of the
  * fellowship they travel with, and of no other. A member's world goes with
  * it only while the member's place is shared ({@link FellowshipPlaces}).
- * The logical server is the sole source of runtime status data.
  */
 public final class FellowshipMemberStatusSyncManager {
 
     private static final Map<UUID, SentState> SENT_STATES =
             new HashMap<UUID, SentState>();
+    /** The recipients whose last send failed, so a fault is logged once. */
+    private static final Set<UUID> FAILED = new HashSet<UUID>();
 
     private static long serverTicks;
 
@@ -64,7 +68,7 @@ public final class FellowshipMemberStatusSyncManager {
         }
         for (EntityPlayerMP recipient : recipients) {
             if (LostTalesServerPlayers.isServerPlayer(recipient)) {
-                sendForPlayer(recipient, view, true);
+                sendSafely(recipient, view, true);
             }
         }
     }
@@ -72,11 +76,13 @@ public final class FellowshipMemberStatusSyncManager {
     public static synchronized void clearPlayer(UUID ownerId) {
         if (ownerId != null) {
             SENT_STATES.remove(ownerId);
+            FAILED.remove(ownerId);
         }
     }
 
     public static synchronized void clear() {
         SENT_STATES.clear();
+        FAILED.clear();
         serverTicks = 0L;
     }
 
@@ -86,7 +92,25 @@ public final class FellowshipMemberStatusSyncManager {
             return;
         }
         for (FellowshipOnlineView.Online online : view.online.all()) {
-            sendForPlayer(online.player, view, force);
+            sendSafely(online.player, view, force);
+        }
+    }
+
+    /**
+     * {@link #sendForPlayer}, a fault kept to its one recipient: logged the
+     * first time it fails for them, not on every pass after.
+     */
+    private static void sendSafely(EntityPlayerMP recipient, ServerView view,
+                                   boolean force) {
+        UUID ownerId = recipient.getUniqueID();
+        try {
+            sendForPlayer(recipient, view, force);
+            FAILED.remove(ownerId);
+        } catch (RuntimeException exception) {
+            if (FAILED.add(ownerId)) {
+                FMLLog.warning("[%s] Unable to send fellowship member status to %s: %s",
+                        LostTalesMetaData.MOD_ID, ownerId, exception.toString());
+            }
         }
     }
 
@@ -192,8 +216,8 @@ public final class FellowshipMemberStatusSyncManager {
                         ? player.dimension : FellowshipMemberStatusSnapshot.NO_DIMENSION,
                 health,
                 maximumHealth,
-                player.getEquipmentInSlot(4),
-                player.getHeldItem());
+                view.helmetOf(player),
+                view.heldItemOf(player));
     }
 
     private static FellowshipStatusSnapshot copyWithSequence(
@@ -232,9 +256,9 @@ public final class FellowshipMemberStatusSyncManager {
 
         if (characterData.isReadOnlyForNewerVersion()
                 || !fellowshipData.areCharacterReferencesValidated()) {
-            // Login and authoritative fellowship operations perform the full
-            // referential-integrity pass. Do not rescan every stored roster on
-            // each health update; defer runtime status until that pass succeeds.
+            // Nothing goes until a login or a fellowship request has checked
+            // the members against the rosters; this pass runs too often to
+            // check them itself.
             return null;
         }
 
@@ -246,6 +270,8 @@ public final class FellowshipMemberStatusSyncManager {
         private final FellowshipOnlineView online;
         /** Whether each player's place is shared under a rule that is on, read once a pass. */
         private final Map<UUID, Boolean> sharedByOwner = new HashMap<UUID, Boolean>();
+        /** Each player's helmet and held item as the status carries them, bounded once a pass. */
+        private final Map<UUID, ItemStack[]> gearByOwner = new HashMap<UUID, ItemStack[]>();
 
         private ServerView(FellowshipWorldData fellowshipData,
                            FellowshipOnlineView online) {
@@ -266,6 +292,28 @@ public final class FellowshipMemberStatusSyncManager {
                 this.sharedByOwner.put(player.getUniqueID(), shared);
             }
             return shared.booleanValue();
+        }
+
+        private ItemStack helmetOf(EntityPlayerMP player) {
+            return gearOf(player)[0];
+        }
+
+        private ItemStack heldItemOf(EntityPlayerMP player) {
+            return gearOf(player)[1];
+        }
+
+        /** The player's helmet and held item, each held to the wire's bound. */
+        private ItemStack[] gearOf(EntityPlayerMP player) {
+            ItemStack[] gear = this.gearByOwner.get(player.getUniqueID());
+            if (gear == null) {
+                gear = new ItemStack[] {
+                        FellowshipMemberStatusSyncPacket.bounded(
+                                player.getEquipmentInSlot(4)),
+                        FellowshipMemberStatusSyncPacket.bounded(player.getHeldItem())
+                };
+                this.gearByOwner.put(player.getUniqueID(), gear);
+            }
+            return gear;
         }
     }
 

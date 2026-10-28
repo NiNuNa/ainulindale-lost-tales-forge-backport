@@ -1132,6 +1132,52 @@ public final class LostTalesClassTransformerTest {
                 LostTalesClassTransformer.DEATH_MESSAGE_ACTIVE_PROPERTY));
     }
 
+    /**
+     * The server's player drops the worn ring at death as well (ACC-05):
+     * its own {@code onDeath} never calls {@code EntityPlayer}'s, so the
+     * capture goes in there, after the inventory is dropped and while
+     * Forge's capture is still open, once however often the class is
+     * patched, beside the death-message patch on the same method.
+     */
+    @Test
+    public void theServerPlayerDropsTheRingWithItsThings() throws Exception {
+        System.clearProperty(
+                LostTalesClassTransformer.ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY);
+        ClassNode player = transformAgain(
+                "net.minecraft.entity.player.EntityPlayerMP");
+        assertEquals(1, countStaticHooks(player, "onDeath",
+                ACCESSORY_DEATH_HOOK_OWNER, "captureAccessoryDrop"));
+        MethodNode death = findMethod(player, "onDeath");
+        assertEquals("(Lnet/minecraft/util/DamageSource;)V", death.desc);
+        assertTrue(callFollows(death, "net/minecraft/entity/player/InventoryPlayer",
+                "dropAllItems", ACCESSORY_DEATH_HOOK_OWNER, "captureAccessoryDrop"));
+        AbstractInsnNode hook = null;
+        for (AbstractInsnNode instruction = death.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof MethodInsnNode
+                    && "captureAccessoryDrop".equals(((MethodInsnNode)instruction).name)) {
+                hook = instruction;
+            }
+        }
+        // The hook is handed the player and closes nothing itself: the
+        // capture closes right after it.
+        assertEquals(Opcodes.ALOAD, previousCode(hook).getOpcode());
+        AbstractInsnNode load = nextCode(hook);
+        AbstractInsnNode zero = nextCode(load);
+        AbstractInsnNode close = nextCode(zero);
+        assertEquals(Opcodes.ALOAD, load.getOpcode());
+        assertEquals(Opcodes.ICONST_0, zero.getOpcode());
+        assertTrue(close instanceof FieldInsnNode);
+        assertEquals(Opcodes.PUTFIELD, close.getOpcode());
+        assertEquals("captureDrops", ((FieldInsnNode)close).name);
+        assertTrue(Boolean.getBoolean(
+                LostTalesClassTransformer.ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY));
+        assertTrue(containsStaticHook(player, "onDeath", HOOK_OWNER,
+                "resolveDeathMessage"));
+        System.clearProperty(
+                LostTalesClassTransformer.ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY);
+    }
+
     @Test
     public void lotrMapTooltipsUseSynchronizedRoleplayName()
             throws Exception {

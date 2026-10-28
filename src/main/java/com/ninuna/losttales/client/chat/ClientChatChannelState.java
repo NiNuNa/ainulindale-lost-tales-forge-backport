@@ -17,6 +17,7 @@ import com.ninuna.losttales.chat.ChatChannelGates;
 import com.ninuna.losttales.chat.ChatChannelIconSpec;
 import com.ninuna.losttales.chat.ChatChannelScope;
 import com.ninuna.losttales.chat.ChatRecipientRule;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.client.character.ClientCharacterAppearanceCache;
 import com.ninuna.losttales.client.character.ClientCharacterRosterCache;
@@ -37,7 +38,7 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.StatCollector;
 
 /**
- * Remembers the selected tab for this session. Server gates control visibility;
+ * Remembers the selected page for this session. Server gates control visibility;
  * membership channels remain visible but read-only without a membership.
  * All roleplaying conversations follow the shared chat identity.
  */
@@ -65,7 +66,7 @@ public final class ClientChatChannelState {
     private static final LinkedHashMap<ConversationPage, Integer> PARTNER_COLORS =
             new LinkedHashMap<ConversationPage, Integer>();
     /**
-     * How a conversation's tab names its partner: the identity their
+     * How a conversation's page names its partner: the identity their
      * last line wore, the account in brackets behind it when the two
      * differ. Remembered like the colours, from their lines alone.
      */
@@ -110,8 +111,11 @@ public final class ClientChatChannelState {
     private static int accountRoleMask;
     private static final Map<UUID, Integer> CHARACTER_ROLES =
             new HashMap<UUID, Integer>();
-    /** The server's Proximity radius in blocks; zero until it says. */
+    /** The server's talk range in blocks; zero until it says. */
     private static int proximityRadius;
+    /** The server's whisper and shout ranges in blocks; zero until it says. */
+    private static int whisperRange;
+    private static int shoutRange;
     /**
      * The gates before the server's first word: what a fresh server file
      * states, read for a player with no role — the Operator channel
@@ -157,7 +161,7 @@ public final class ClientChatChannelState {
             new HashMap<String, Integer>();
     private static final Map<String, UUID> ROLE_HOLDER_CHARACTERS =
             new HashMap<String, UUID>();
-    /** What was sent from each tab, for the arrows to recall there. */
+    /** What was sent from each page, for the arrows to recall there. */
     private static final ChatSentHistory SENT_HISTORY = new ChatSentHistory();
 
     private ClientChatChannelState() {}
@@ -172,34 +176,34 @@ public final class ClientChatChannelState {
      * used. Asked for a conversation no window holds as it is, the copy of
      * it used last takes the input.
      */
-    public static synchronized void select(ConversationPage tab) {
-        ConversationPage held = heldCopyOf(tab);
-        choose(isSelectable(held) ? held : fallbackTab());
+    public static synchronized void select(ConversationPage page) {
+        ConversationPage held = heldCopyOf(page);
+        choose(isSelectable(held) ? held : fallbackPage());
     }
 
     /**
      * Moves the input to a conversation while a page covers the one last
      * used, which is kept for the chat key.
      */
-    public static synchronized void lendInput(ConversationPage tab) {
-        ConversationPage held = heldCopyOf(tab);
+    public static synchronized void lendInput(ConversationPage page) {
+        ConversationPage held = heldCopyOf(page);
         if (isSelectable(held)) {
             selected = held;
         }
     }
 
     /**
-     * The copy of the tab's row entry a window holds: the tab itself while
-     * a window holds it, else the copy of it used last; the tab as it came
+     * The copy of the page's row entry a window holds: the page itself while
+     * a window holds it, else the copy of it used last; the page as it came
      * when no copy is open.
      */
-    private static ConversationPage heldCopyOf(ConversationPage tab) {
-        ConversationPage row = ConversationPage.row(tab);
+    private static ConversationPage heldCopyOf(ConversationPage page) {
+        ConversationPage row = ConversationPage.row(page);
         if (row == null || WindowLayout.holds(row)) {
-            return tab;
+            return page;
         }
         ConversationPage held = ConversationPage.from(WindowLayout.lastUsed(row));
-        return held == null ? tab : held;
+        return held == null ? page : held;
     }
 
     /** Something was typed where the input is: that conversation is the last used, a console aside. */
@@ -228,24 +232,24 @@ public final class ClientChatChannelState {
         return isSelectable(lastUsed) ? lastUsed : null;
     }
 
-    private static void choose(ConversationPage tab) {
-        selected = tab;
-        if (!tab.isConsole()) {
-            lastUsed = tab;
+    private static void choose(ConversationPage page) {
+        selected = page;
+        if (!page.isConsole()) {
+            lastUsed = page;
             lastUsedKnown = true;
         }
     }
 
     /**
      * Available conversations open in some window, pages left out, in
-     * window and tab order.
+     * window and page order.
      */
-    public static synchronized List<ConversationPage> getOpenTabs() {
+    public static synchronized List<ConversationPage> getOpenPages() {
         ArrayList<ConversationPage> result = new ArrayList<ConversationPage>();
         for (WindowPage each : WindowLayout.order()) {
-            ConversationPage tab = ConversationPage.from(each);
-            if (tab != null && isAvailable(tab)) {
-                result.add(tab);
+            ConversationPage page = ConversationPage.from(each);
+            if (page != null && isAvailable(page)) {
+                result.add(page);
             }
         }
         return result;
@@ -253,31 +257,31 @@ public final class ClientChatChannelState {
 
     public static synchronized void ensureAvailable() {
         if (!isSelectable(selected)) {
-            selected = fallbackTab();
+            selected = fallbackPage();
         }
     }
 
     /**
      * Available to this player and open in a window as this very copy, and
-     * a conversation: a page is never the tab typed into.
+     * a conversation: a page is never the page typed into.
      */
-    public static synchronized boolean isSelectable(ConversationPage tab) {
-        return tab != null && isAvailable(tab)
-                && WindowLayout.holds(ConversationPage.row(tab));
+    public static synchronized boolean isSelectable(ConversationPage page) {
+        return page != null && isAvailable(page)
+                && WindowLayout.holds(ConversationPage.row(page));
     }
 
     /**
-     * Whether the player may close the tab: it is open and its window is
-     * unlocked. Nothing is held back — the last tab of the last window
+     * Whether the player may close the page: it is open and its window is
+     * unlocked. Nothing is held back — the last page of the last window
      * closes like any other, and the screen shows its empty state.
      */
-    public static synchronized boolean isClosable(ConversationPage tab) {
-        return WindowLayout.isClosable(tab);
+    public static synchronized boolean isClosable(ConversationPage page) {
+        return WindowLayout.isClosable(page);
     }
 
     /**
-     * Closes the tab under {@link #isClosable} and moves the selection
-     * off it if it was selected: onto the tab its window brings forward
+     * Closes the page under {@link #isClosable} and moves the selection
+     * off it if it was selected: onto the page its window brings forward
      * in its place, the one to its right or else to its left, so the
      * input stays where the player was working and no other window comes
      * forward for it. A page brought forward keeps the front, and the
@@ -285,22 +289,22 @@ public final class ClientChatChannelState {
      * emptied by the close hands the selection elsewhere. Closing never
      * mutes: the channel keeps receiving and keeps its own choice.
      */
-    public static synchronized boolean close(ConversationPage tab) {
-        Window window = WindowLayout.windowOf(tab);
-        boolean wasSelected = tab != null && tab.equals(selected);
-        if (!isClosable(tab) || !ChatLayout.close(tab)) {
+    public static synchronized boolean close(ConversationPage page) {
+        Window window = WindowLayout.windowOf(page);
+        boolean wasSelected = page != null && page.equals(selected);
+        if (!isClosable(page) || !ChatLayout.close(page)) {
             return false;
         }
         if (wasSelected) {
             ConversationPage neighbour = neighbourIn(window);
-            choose(neighbour != null ? neighbour : fallbackTab());
+            choose(neighbour != null ? neighbour : fallbackPage());
         }
         ensureAvailable();
         return true;
     }
 
     /**
-     * The conversation that takes a closed tab's place in its window: the
+     * The conversation that takes a closed page's place in its window: the
      * one the window brought forward, else any selectable one it holds;
      * null when the window is gone or holds nothing selectable.
      */
@@ -322,7 +326,7 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Whether the tab's history is readable and its tab shown. A
+     * Whether the page's history is readable and its page shown. A
      * conversation is shown only while some copy reads as the identity it
      * is held as, or the character played is it: what the player said as
      * one character is not on screen while nothing reads as it. Its lines
@@ -332,25 +336,25 @@ public final class ClientChatChannelState {
      * scoped one included — one row entry, each copy showing the
      * conversation it reads. A fellowship's conversation is its own row
      * entry, shown while the character played is in it; the Fellowship
-     * channel has no plain tab.
+     * channel has no plain page.
      */
-    public static synchronized boolean isAvailable(ConversationPage tab) {
-        if (tab == null || !isAvailable(tab.getChannel())) {
+    public static synchronized boolean isAvailable(ConversationPage page) {
+        if (page == null || !isAvailable(page.getChannel())) {
             return false;
         }
-        if (tab.getChannel() == ChatChannel.FELLOWSHIP) {
-            return ClientChatIdentitySelection.fellowship(tab.getOwnerKey()) != null;
+        if (page.getChannel() == ChatChannel.FELLOWSHIP) {
+            return ClientChatIdentitySelection.fellowship(page.getOwnerKey()) != null;
         }
-        if (tab.isNpc() || tab.getOwnerKey().length() == 0) {
+        if (page.isNpc() || page.getOwnerKey().length() == 0) {
             // A row entry stands for whichever conversation is read.
             return true;
         }
         // A conversation held as one identity shows while that identity
         // is read: a whisper by the identity itself, a scoped channel by
         // the conversation one of the identities read is in.
-        return tab.isWhisper()
-                ? ClientChatIdentities.isRead(tab.getOwnerKey())
-                : readsScope(tab.getChannel(), tab.getOwnerKey());
+        return page.isWhisper()
+                ? ClientChatIdentities.isRead(page.getOwnerKey())
+                : readsScope(page.getChannel(), page.getOwnerKey());
     }
 
     /** Whether the character played or a copy reads the conversation {@code scope} of a scoped channel. */
@@ -365,7 +369,7 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Whether the channel's tab is shown and its history readable: every
+     * Whether the channel's page is shown and its history readable: every
      * open channel always, a gated one while its access is held, and
      * Fellowship only while the character played is in a fellowship.
      */
@@ -387,7 +391,7 @@ public final class ClientChatChannelState {
      * The channels the seeded gates leave open to a player with no role.
      * The Server Log is left out whatever the gates say: a
      * capability opens it, and only the server knows who holds one, so
-     * its tab waits for the server's word rather than showing for a
+     * its page waits for the server's word rather than showing for a
      * frame to everybody.
      */
     private static java.util.Set<String> seededGates(boolean read) {
@@ -434,14 +438,14 @@ public final class ClientChatChannelState {
         return java.util.Collections.unmodifiableSet(copy);
     }
 
-    public static synchronized boolean canSend(ConversationPage tab) {
-        return isAvailable(tab) && canSend(tab.getChannel());
+    public static synchronized boolean canSend(ConversationPage page) {
+        return isAvailable(page) && canSend(page.getChannel());
     }
 
     /**
      * Sending requires the server's send gate on a channel that is shown:
      * role gates, the Operator channel's included, are answered by the
-     * sendable mask the server sent, and membership by the tab being
+     * sendable mask the server sent, and membership by the page being
      * there at all. Every identity is in a faction, Unaligned by default,
      * so the Faction channel asks nothing more.
      */
@@ -452,28 +456,28 @@ public final class ClientChatChannelState {
 
     /**
      * A conversation is named in the colour the other party speaks in —
-     * an NPC's faction colour, a player's own name colour — so the tab,
+     * an NPC's faction colour, a player's own name colour — so the page,
      * its icon and its lines read as one. The colour their last line wore
      * is the surest; before they have said anything this session a
      * player's conversation takes the colour their name wears in
      * character — the faction's of the character it is with, as the
      * client knows it, or the plain ivory of an account — never a colour
      * of the channel's own: a whisper is the colour of the person it is
-     * with. Every other tab
+     * with. Every other page
      * takes its channel's colour.
      */
-    public static synchronized int displayColor(ConversationPage tab) {
-        if (tab == null) {
+    public static synchronized int displayColor(ConversationPage page) {
+        if (page == null) {
             return LostTalesUiInk.IVORY;
         }
-        Integer partner = PARTNER_COLORS.get(partnerKey(tab));
+        Integer partner = PARTNER_COLORS.get(partnerKey(page));
         if (partner != null) {
             return partner.intValue();
         }
-        if (tab.isWhisper() && !tab.isNpc()) {
-            return partnerNameColor(tab);
+        if (page.isWhisper() && !page.isNpc()) {
+            return partnerNameColor(page);
         }
-        return displayColor(tab.getChannel(), tab.getOwnerKey());
+        return displayColor(page.getChannel(), page.getOwnerKey());
     }
 
     /**
@@ -499,7 +503,7 @@ public final class ClientChatChannelState {
                 ? ClientChatIdentitySelection.fellowship(scope) : null;
     }
 
-    /** Whether a channel and scope name one faction's chat rather than the Faction tab. */
+    /** Whether a channel and scope name one faction's chat rather than the Faction page. */
     private static boolean isFaction(ChatChannel channel, String scope) {
         return channel == ChatChannel.FACTION && scope != null
                 && scope.length() > 0;
@@ -512,11 +516,11 @@ public final class ClientChatChannelState {
      * among the partner's — and the chat's plain ivory for an account, or
      * for a character the client cannot place.
      */
-    private static int partnerNameColor(ConversationPage tab) {
+    private static int partnerNameColor(ConversationPage page) {
         int plain = com.ninuna.losttales.chat.ChatRolePresentation
                 .unassignedColor();
-        UUID characterId = PARTNER_CHARACTER_IDS.get(partnerKey(tab));
-        String identity = tab.getPartnerIdentity();
+        UUID characterId = PARTNER_CHARACTER_IDS.get(partnerKey(page));
+        String identity = page.getPartnerIdentity();
         for (CharacterAppearance appearance
                 : ClientCharacterAppearanceCache.snapshot().values()) {
             if (appearance == null || !appearance.hasCharacter()) {
@@ -524,7 +528,7 @@ public final class ClientChatChannelState {
             }
             boolean same = characterId != null
                     ? characterId.equals(appearance.getCharacterId())
-                    : tab.getPartner().equalsIgnoreCase(
+                    : page.getPartner().equalsIgnoreCase(
                             appearance.getAccountName())
                             && identity != null
                             && identity.equalsIgnoreCase(
@@ -539,15 +543,15 @@ public final class ClientChatChannelState {
 
     /**
      * Remembers the colour the other party's name is drawn in, for the
-     * conversation's own tab. Only their lines say it: the player's own
+     * conversation's own page. Only their lines say it: the player's own
      * copy of a whisper carries the player's colour, not theirs.
      */
-    public static synchronized void rememberPartnerColor(ConversationPage tab,
+    public static synchronized void rememberPartnerColor(ConversationPage page,
                                                          int color) {
-        if (tab == null || (!tab.isWhisper() && !tab.isNpc())) {
+        if (page == null || (!page.isWhisper() && !page.isNpc())) {
             return;
         }
-        PARTNER_COLORS.put(partnerKey(tab), Integer.valueOf(color & 0xFFFFFF));
+        PARTNER_COLORS.put(partnerKey(page), Integer.valueOf(color & 0xFFFFFF));
         while (PARTNER_COLORS.size() > MAX_PARTNER_COLORS) {
             Iterator<ConversationPage> oldest = PARTNER_COLORS.keySet().iterator();
             oldest.next();
@@ -557,16 +561,16 @@ public final class ClientChatChannelState {
 
     /**
      * Remembers the identity the partner's last line wore, so the
-     * person's tab names them the way they speak: the character's name
+     * person's page names them the way they speak: the character's name
      * alone, never the account behind it.
      */
-    public static synchronized void rememberPartnerName(ConversationPage tab,
+    public static synchronized void rememberPartnerName(ConversationPage page,
                                                         String identityName) {
-        if (tab == null || !tab.isWhisper() || identityName == null
+        if (page == null || !page.isWhisper() || identityName == null
                 || identityName.length() == 0) {
             return;
         }
-        PARTNER_NAMES.put(partnerKey(tab), identityName);
+        PARTNER_NAMES.put(partnerKey(page), identityName);
         while (PARTNER_NAMES.size() > MAX_PARTNER_COLORS) {
             Iterator<ConversationPage> oldest = PARTNER_NAMES.keySet().iterator();
             oldest.next();
@@ -578,16 +582,16 @@ public final class ClientChatChannelState {
      * Remembers which character of the other party a conversation is
      * with; null forgets, for a conversation with their account.
      */
-    public static synchronized void rememberPartnerCharacterId(ConversationPage tab,
+    public static synchronized void rememberPartnerCharacterId(ConversationPage page,
                                                                UUID characterId) {
-        if (tab == null || !tab.isWhisper() || tab.isNpc()) {
+        if (page == null || !page.isWhisper() || page.isNpc()) {
             return;
         }
         if (characterId == null) {
-            PARTNER_CHARACTER_IDS.remove(partnerKey(tab));
+            PARTNER_CHARACTER_IDS.remove(partnerKey(page));
             return;
         }
-        PARTNER_CHARACTER_IDS.put(partnerKey(tab), characterId);
+        PARTNER_CHARACTER_IDS.put(partnerKey(page), characterId);
         while (PARTNER_CHARACTER_IDS.size() > MAX_PARTNER_COLORS) {
             Iterator<ConversationPage> oldest = PARTNER_CHARACTER_IDS.keySet().iterator();
             oldest.next();
@@ -596,8 +600,8 @@ public final class ClientChatChannelState {
     }
 
     /** The id of the character a conversation is with; null for their account, or unknown. */
-    public static synchronized UUID partnerCharacterIdOf(ConversationPage tab) {
-        return tab == null ? null : PARTNER_CHARACTER_IDS.get(partnerKey(tab));
+    public static synchronized UUID partnerCharacterIdOf(ConversationPage page) {
+        return page == null ? null : PARTNER_CHARACTER_IDS.get(partnerKey(page));
     }
 
     public static synchronized int displayColor(ChatChannel channel) {
@@ -614,22 +618,22 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Visible label for a tab: the partner's name for a whisper — the
+     * Visible label for a page: the partner's name for a whisper — the
      * identity their last line wore, when one is remembered — and for
      * one faction's conversation that faction's name.
      */
-    public static synchronized String displayName(ConversationPage tab) {
-        if (tab == null) {
+    public static synchronized String displayName(ConversationPage page) {
+        if (page == null) {
             return "";
         }
-        if (tab.isWhisper()) {
-            String remembered = PARTNER_NAMES.get(partnerKey(tab));
+        if (page.isWhisper()) {
+            String remembered = PARTNER_NAMES.get(partnerKey(page));
             // The identity is what the conversation is with; the account
             // behind it is never shown beside it.
             return remembered != null ? remembered
-                    : tab.getPartnerIdentity();
+                    : page.getPartnerIdentity();
         }
-        return displayName(tab.getChannel(), tab.getOwnerKey());
+        return displayName(page.getChannel(), page.getOwnerKey());
     }
 
     /**
@@ -774,9 +778,23 @@ public final class ClientChatChannelState {
         return accountRoleMask | (own == null ? 0 : own.intValue());
     }
 
-    /** The server's Proximity radius, for how far speech bubbles reach. */
+    /** The server's talk range alone, the others alike: how far speech bubbles reach. */
     public static synchronized void setProximityRadius(int radius) {
-        proximityRadius = Math.max(0, radius);
+        setSpeechRanges(radius, radius, radius);
+    }
+
+    /** The server's speech ranges (CHAT-37): how far speech carries and its bubbles reach. */
+    public static synchronized void setSpeechRanges(int whisper, int talk,
+                                                    int shout) {
+        whisperRange = Math.max(0, whisper);
+        proximityRadius = Math.max(0, talk);
+        shoutRange = Math.max(0, shout);
+    }
+
+    /** How far a line said at {@code range} carries, in blocks; zero until the server says. */
+    public static synchronized int rangeBlocks(ChatSpeechRange range) {
+        return range == ChatSpeechRange.WHISPER ? whisperRange
+                : range == ChatSpeechRange.SHOUT ? shoutRange : proximityRadius;
     }
 
     /** The icons the server puts on its channels; see {@link ChatChannelIcons#install}. */
@@ -827,7 +845,7 @@ public final class ClientChatChannelState {
 
     /**
      * The conversations the server links to Discord, by the names their
-     * tabs read ({@code Global Chat}, {@code Gondor Chat}), in the order
+     * pages read ({@code Global Chat}, {@code Gondor Chat}), in the order
      * the server stated them; empty for none.
      */
     public static synchronized List<String> discordLinkedNames() {
@@ -842,18 +860,18 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Whether what is said in a tab crosses to Discord: its channel is
-     * linked, and for Faction chat the faction the tab shows now.
+     * Whether what is said in a page crosses to Discord: its channel is
+     * linked, and for Faction chat the faction the page shows now.
      */
-    public static synchronized boolean isLinkedToDiscord(ConversationPage tab) {
-        if (tab == null || tab.getChannel() == null || DISCORD_LINKS.isEmpty()) {
+    public static synchronized boolean isLinkedToDiscord(ConversationPage page) {
+        if (page == null || page.getChannel() == null || DISCORD_LINKS.isEmpty()) {
             return false;
         }
-        ChatChannel channel = tab.getChannel();
+        ChatChannel channel = page.getChannel();
         String name = ChatCodeNames.of(channel,
                 channel != ChatChannel.FACTION ? ""
-                        : tab.getOwnerKey().length() > 0 ? tab.getOwnerKey()
-                        : scopeKeyRead(tab));
+                        : page.getOwnerKey().length() > 0 ? page.getOwnerKey()
+                        : scopeKeyRead(page));
         return name != null && DISCORD_LINKS.contains(name);
     }
 
@@ -1050,19 +1068,19 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Remembers the selected tab's unsent input so closing the screen,
-     * switching tabs or losing the connection does not lose it.
+     * Remembers the selected page's unsent input so closing the screen,
+     * switching pages or losing the connection does not lose it.
      */
     public static synchronized void setDraft(String text) {
         setDraft(selected, text);
     }
 
     /**
-     * Remembers a tab's unsent input where the client is now
+     * Remembers a page's unsent input where the client is now
      * ({@link ClientChatDrafts}); empty text forgets it.
      */
-    public static synchronized void setDraft(ConversationPage tab, String text) {
-        ClientChatDrafts.set(ClientChatSession.currentKey(), tab, text);
+    public static synchronized void setDraft(ConversationPage page, String text) {
+        ClientChatDrafts.set(ClientChatSession.currentKey(), page, text);
     }
 
     public static synchronized String getDraft() {
@@ -1073,8 +1091,8 @@ public final class ClientChatChannelState {
      * What a whisper partner's colour, name and character are kept by: the
      * person's row entry, the same for every copy of the conversation.
      */
-    private static ConversationPage partnerKey(ConversationPage tab) {
-        ConversationPage row = ConversationPage.row(tab);
+    private static ConversationPage partnerKey(ConversationPage page) {
+        ConversationPage row = ConversationPage.row(page);
         return row == null ? null : row.conversation();
     }
 
@@ -1082,8 +1100,8 @@ public final class ClientChatChannelState {
      * Remembers a line sent from a copy of a conversation, for the arrows
      * to recall there and nowhere else.
      */
-    public static synchronized void recordSent(ConversationPage tab, String text) {
-        SENT_HISTORY.record(ConversationPage.row(tab), text);
+    public static synchronized void recordSent(ConversationPage page, String text) {
+        SENT_HISTORY.record(ConversationPage.row(page), text);
     }
 
     /** A copy opening anew has no draft and has sent nothing. */
@@ -1093,28 +1111,28 @@ public final class ClientChatChannelState {
     }
 
     /**
-     * Walks a tab's sent lines: Up is {@code -1}, Down {@code +1}. The
+     * Walks a page's sent lines: Up is {@code -1}, Down {@code +1}. The
      * text the field should now hold, or null when nothing changes.
      */
-    public static synchronized String recallSent(ConversationPage tab, int direction,
+    public static synchronized String recallSent(ConversationPage page, int direction,
                                                  String fieldText) {
-        return SENT_HISTORY.step(ConversationPage.row(tab), direction,
+        return SENT_HISTORY.step(ConversationPage.row(page), direction,
                 fieldText);
     }
 
-    /** Ends a walk through sent lines: sending, or leaving the tab, does this. */
+    /** Ends a walk through sent lines: sending, or leaving the page, does this. */
     public static synchronized void endSentBrowse() {
         SENT_HISTORY.endBrowse();
     }
 
-    /** Drops every conversation tab's sent lines along with the conversations. */
+    /** Drops every conversation page's sent lines along with the conversations. */
     public static synchronized void forgetConversationHistory() {
         SENT_HISTORY.forgetConversations();
     }
 
-    /** A tab's unsent input where the client is now; empty when it has none. */
-    public static synchronized String getDraft(ConversationPage tab) {
-        return ClientChatDrafts.get(ClientChatSession.currentKey(), tab);
+    /** A page's unsent input where the client is now; empty when it has none. */
+    public static synchronized String getDraft(ConversationPage page) {
+        return ClientChatDrafts.get(ClientChatSession.currentKey(), page);
     }
 
     public static synchronized void clear() {
@@ -1132,6 +1150,8 @@ public final class ClientChatChannelState {
         accountRoleMask = 0;
         CHARACTER_ROLES.clear();
         proximityRadius = 0;
+        whisperRange = 0;
+        shoutRange = 0;
         readableChannels = DEFAULT_READABLE;
         sendableChannels = DEFAULT_SENDABLE;
         ROLE_HOLDERS.clear();
@@ -1150,8 +1170,8 @@ public final class ClientChatChannelState {
      * identity it speaks as, or the fellowship the character played
      * travels with.
      */
-    public static synchronized String scopeKeyRead(ConversationPage tab) {
-        return tab == null ? "" : scopeKeyRead(tab.getChannel(), tab);
+    public static synchronized String scopeKeyRead(ConversationPage page) {
+        return page == null ? "" : scopeKeyRead(page.getChannel(), page);
     }
 
     /**
@@ -1170,7 +1190,7 @@ public final class ClientChatChannelState {
         return scopeOfIdentity(channel, ClientChatIdentities.viewIdentityKey(copy));
     }
 
-    /** The conversation the character played reads on the channel: what the closed feed shows. */
+    /** The conversation the character played reads on the channel: what the feed shows. */
     public static synchronized String playedScopeKey(ChatChannel channel) {
         if (channel == null || !channel.isScoped()) {
             return "";
@@ -1264,11 +1284,11 @@ public final class ClientChatChannelState {
     /**
      * Without a character the player lands where they can actually talk:
      * Global when it is open and sendable, else OOC when open (account
-     * conversation, always sendable), else the first open tab they can
+     * conversation, always sendable), else the first open page they can
      * send to, else the first open readable one; with nothing open at
      * all, the catalogue default.
      */
-    private static ConversationPage fallbackTab() {
+    private static ConversationPage fallbackPage() {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
         if (isSelectable(global) && canSend(global)) {
             return global;
@@ -1277,10 +1297,10 @@ public final class ClientChatChannelState {
         if (isSelectable(ooc)) {
             return ooc;
         }
-        List<ConversationPage> open = getOpenTabs();
-        for (ConversationPage tab : open) {
-            if (canSend(tab)) {
-                return tab;
+        List<ConversationPage> open = getOpenPages();
+        for (ConversationPage page : open) {
+            if (canSend(page)) {
+                return page;
             }
         }
         if (!open.isEmpty()) {

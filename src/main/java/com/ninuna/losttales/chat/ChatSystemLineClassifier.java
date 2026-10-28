@@ -10,10 +10,10 @@ import net.minecraft.util.IChatComponent;
  * announcements go where their subject belongs: an achievement or a death
  * happens to a character, so it is roleplay news in Global, naming the
  * character; a join or a leave is an account coming or going, so it is
- * out-of-character news in OOC, naming the account. The other lines the
- * whole server sees — {@code /say}, {@code /me}, a travelling trader —
- * are conversation everyone shares and go to Global too. The server's
- * welcome to a new player waits in OOC. Everything else
+ * out-of-character news in OOC, naming the account. {@code /say} and a
+ * travelling trader go to Global too. The game's {@code /me} from a
+ * console or a command block, the server's welcome to a new player and a
+ * world quest's start go to OOC (CHAT-37). Everything else
  * (command output, fast-travel countdowns, LOTR notices, other mods'
  * lines, plain text components) is the player's private console. The
  * server's Discord bridge asks the finer question of {@link #kindOf}:
@@ -95,7 +95,7 @@ public final class ChatSystemLineClassifier {
         }
         String key = translationKey(message);
         if (key == null) {
-            return ChatChannel.CLIENT_CONSOLE;
+            return ChatChannel.CONSOLE;
         }
         ChatChannel announced = channelOf(kindOfKey(key));
         if (announced != null) {
@@ -108,7 +108,7 @@ public final class ChatSystemLineClassifier {
                 || EMOTE_KEY.equals(key)) {
             return ChatChannel.OOC;
         }
-        return ChatChannel.CLIENT_CONSOLE;
+        return ChatChannel.CONSOLE;
     }
 
     /**

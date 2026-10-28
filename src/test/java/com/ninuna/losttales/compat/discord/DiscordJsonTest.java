@@ -105,7 +105,7 @@ public final class DiscordJsonTest {
     public void noticesAreOneEmbedWithTheLineOnTheAuthorRow() {
         JsonObject body = new JsonParser().parse(DiscordJson.webhookEmbedBody(
                 DiscordServerNotices.playerDied("Steve fell from a high place",
-                        "https://heads/Steve"))).getAsJsonObject();
+                        "https://heads/Steve"), EnglishWords.INSTANCE)).getAsJsonObject();
         assertFalse(body.has("content"));
         assertFalse(body.has("username"));
         assertEquals(1, body.getAsJsonArray("embeds").size());
@@ -121,8 +121,8 @@ public final class DiscordJsonTest {
 
         // No picture, no icon field; the colour is never negative.
         JsonObject plain = new JsonParser().parse(DiscordJson.webhookEmbedBody(
-                DiscordServerNotices.playerJoined(EnglishWords.INSTANCE, "Steve",
-                        ""))).getAsJsonObject();
+                DiscordServerNotices.playerJoined("Steve", ""),
+                EnglishWords.INSTANCE)).getAsJsonObject();
         JsonObject plainEmbed = plain.getAsJsonArray("embeds").get(0)
                 .getAsJsonObject();
         assertFalse(plainEmbed.getAsJsonObject("author").has("icon_url"));

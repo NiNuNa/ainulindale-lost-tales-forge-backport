@@ -8,7 +8,7 @@ import com.ninuna.losttales.character.storage.CharacterNbtCodec;
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
-/** Durable metadata and player-state copy retained across lore-character owners. */
+/** A copy of a lore figure's record and saved life, kept between holders. */
 public final class LoreCharacterVaultEntry {
 
     private final String loreCharacterId;

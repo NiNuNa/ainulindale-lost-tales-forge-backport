@@ -62,8 +62,8 @@ public final class ChatActionTest {
         assertTrue(ChatAction.takesActions(ChatChannel.OOC));
         assertTrue(ChatAction.takesActions(ChatChannel.OPERATOR));
         assertTrue(ChatAction.takesActions(ChatChannel.WHISPER));
-        assertFalse(ChatAction.takesActions(ChatChannel.CLIENT_CONSOLE));
-        assertFalse(ChatAction.takesActions(ChatChannel.SERVER_CONSOLE));
+        assertFalse(ChatAction.takesActions(ChatChannel.CONSOLE));
+        assertFalse(ChatAction.takesActions(ChatChannel.SERVER_LOG));
         assertFalse(ChatAction.takesActions(null));
     }
 }

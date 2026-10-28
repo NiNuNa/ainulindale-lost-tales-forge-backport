@@ -26,7 +26,7 @@ import net.minecraft.item.ItemStack;
  * The bundled deeds as LOTR achievements (PROG-11): each in a Lost Tales
  * category of LOTR's achievement screen, announced as LOTR announces its
  * own, and, where its file asks, unlocking a LOTR title picked in LOTR's
- * title menu (Nils, 2026-10-19). Made once as the mod loads, on both
+ * title menu. Made once as the mod loads, on both
  * sides in the bundled files' order, so client and server agree on every
  * id; a server's own deeds are none of this.
  */

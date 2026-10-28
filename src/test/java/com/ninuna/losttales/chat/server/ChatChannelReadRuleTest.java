@@ -61,12 +61,12 @@ public final class ChatChannelReadRuleTest {
     }
 
     @Test
-    public void theServerConsoleIsItsReaders() {
+    public void theServerLogIsItsReaders() {
         ChatChannelGates open = ChatChannelGates.defaults();
         assertTrue(ChatChannelPolicy.canRead(reader(false, true, 0),
-                ChatChannel.SERVER_CONSOLE, 0, open));
+                ChatChannel.SERVER_LOG, 0, open));
         assertFalse(ChatChannelPolicy.canRead(reader(true, false, 0),
-                ChatChannel.SERVER_CONSOLE, 0, open));
+                ChatChannel.SERVER_LOG, 0, open));
     }
 
     @Test

@@ -28,21 +28,21 @@ public final class LostTalesQuestMarkerHelper {
         }
 
         for (Map.Entry<String, String> entry : quest.getMarkers().entrySet()) {
-            if (!isDynamicQuestGiverMarkerKey(entry.getKey())) {
+            if (!isQuestGiverMarkerKey(entry.getKey())) {
                 addMarkerIds(ids, entry.getValue());
             }
         }
         return ids;
     }
 
-    public static List<String> collectDynamicQuestGiverMarkerIds(LostTalesQuestDefinition quest) {
+    public static List<String> collectQuestGiverMarkerIds(LostTalesQuestDefinition quest) {
         ArrayList<String> ids = new ArrayList<String>();
         if (quest == null || quest.getMarkers().isEmpty()) {
             return ids;
         }
 
         for (Map.Entry<String, String> entry : quest.getMarkers().entrySet()) {
-            if (isDynamicQuestGiverMarkerKey(entry.getKey())) {
+            if (isQuestGiverMarkerKey(entry.getKey())) {
                 addMarkerIds(ids, entry.getValue());
             }
         }
@@ -54,7 +54,7 @@ public final class LostTalesQuestMarkerHelper {
      * where the player meets the giver. Every other key names markers that
      * stand where the marker files put them.
      */
-    public static boolean isDynamicQuestGiverMarkerKey(String key) {
+    public static boolean isQuestGiverMarkerKey(String key) {
         return GIVER_KEY.equals(key);
     }
 

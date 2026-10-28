@@ -62,6 +62,8 @@ public final class FellowshipReleasedFigureTest {
         FellowshipWorldData data = new FellowshipWorldData(FellowshipWorldData.DATA_NAME);
         Fellowship grey = company(data);
         // Beren joined before Celeb, but nobody holds him.
+        assertTrue(grey.transferLeadership(FellowshipService.successorOf(data, grey,
+                aldric.getIdentityId(), ANY)));
         grey.removeMember(aldric.getIdentityId());
         assertEquals(celeb.getIdentityId(), grey.getLeader().getIdentityId());
     }

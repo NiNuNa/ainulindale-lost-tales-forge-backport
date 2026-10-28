@@ -34,7 +34,7 @@ public final class ThirdPersonCrosshairRenderer extends Gui {
                 && minecraft.gameSettings != null
                 && !minecraft.gameSettings.hideGUI
                 && LostTalesThirdPersonConfig.enableChargeTierFeedback
-                && ThirdPersonChargeFeedbackController
+                && ChargeFeedbackController
                 .getDisplayTier() > 0;
         if (!useThirdPersonCamera && !drawChargeIndicator) {
             reset();
@@ -70,7 +70,7 @@ public final class ThirdPersonCrosshairRenderer extends Gui {
         if (drawChargeIndicator) {
             INSTANCE.drawChargeIndicator(
                     width / 2, height / 2,
-                    ThirdPersonChargeFeedbackController
+                    ChargeFeedbackController
                             .getDisplayTier());
         }
     }

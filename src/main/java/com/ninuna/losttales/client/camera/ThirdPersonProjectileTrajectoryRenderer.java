@@ -35,7 +35,7 @@ public final class ThirdPersonProjectileTrajectoryRenderer {
             return;
         }
         ballistics = ballistics.scaleLaunchSpeed(
-                ThirdPersonChargeFeedbackController
+                ChargeFeedbackController
                         .getVelocityMultiplier());
         MovingObjectPosition target = ThirdPersonProjectileAimController
                 .resolveTarget(minecraft, partialTicks);

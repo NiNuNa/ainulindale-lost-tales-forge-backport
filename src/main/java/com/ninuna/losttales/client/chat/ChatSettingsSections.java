@@ -178,6 +178,25 @@ public final class ChatSettingsSections {
             });
             look.add(size("chatSpeakerSize"));
             look.add(size("chatQuoteSize"));
+            // How a line heard nearby shows how far its speaker stood
+            // (CHAT-37); a new choice lays every window's lines out again.
+            look.add(new Settings.ModChoice("chatDistanceSizes",
+                    Settings.optionName("chatDistanceSizes"),
+                    new String[] {LostTalesConfig.CHAT_DISTANCE_THREE_SIZES,
+                            LostTalesConfig.CHAT_DISTANCE_SIZES_AND_FAINTER,
+                            LostTalesConfig.CHAT_DISTANCE_OFF},
+                    "gui.losttales.chat.settings.distance_sizes.") {
+                @Override
+                protected String get() {
+                    return LostTalesConfig.normalizeDistanceSizes(
+                            LostTalesConfig.chatDistanceSizes);
+                }
+
+                @Override
+                protected void set(String word) {
+                    LostTalesConfig.chatDistanceSizes = word;
+                }
+            });
             look.add(new Settings.ModSwitch("enableChatMessageGrouping",
                     Settings.optionName("enableChatMessageGrouping")) {
                 @Override
@@ -360,6 +379,22 @@ public final class ChatSettingsSections {
             @Override
             protected void set(double value) {
                 LostTalesConfig.npcConversationsOpen = (int)Math.round(value);
+            }
+        });
+        // The range a Proximity copy speaks at until its button picks
+        // another (CHAT-37).
+        messages.add(new Settings.ModChoice("chatSpeechRange",
+                Settings.optionName("chatSpeechRange"),
+                com.ninuna.losttales.chat.ChatSpeechRange.ids(),
+                "gui.losttales.chat.range.") {
+            @Override
+            protected String get() {
+                return ChatSpeechRanges.settingRange().id;
+            }
+
+            @Override
+            protected void set(String word) {
+                LostTalesConfig.chatSpeechRange = word;
             }
         });
         messages.add(new Settings.ModSwitch("showChatSpeechBubbles",
@@ -623,8 +658,7 @@ public final class ChatSettingsSections {
                     "gui.losttales.chat.settings.ignored.stop");
             for (ClientChatIgnores.Ignored ignored : ClientChatIgnores.ignored()) {
                 rows.add(new MenuWindow.Entry(ignored.identity
-                        ? IGNORED_IDENTITY_PREFIX + ignored.accountId + ":"
-                                + ignored.name
+                        ? IGNORED_IDENTITY_PREFIX + ignored.characterId
                         : IGNORED_ACCOUNT_PREFIX + ignored.accountId,
                         ignored.identity ? StatCollector.translateToLocalFormatted(
                                 "gui.losttales.chat.settings.ignored.identity",
@@ -644,34 +678,31 @@ public final class ChatSettingsSections {
             if (id.startsWith(IGNORED_ACCOUNT_PREFIX)) {
                 if (!back) {
                     stopIgnoring(id.substring(IGNORED_ACCOUNT_PREFIX.length()),
-                            null, entry.label);
+                            false, entry.label);
                 }
                 return true;
             }
             if (id.startsWith(IGNORED_IDENTITY_PREFIX)) {
-                String rest = id.substring(IGNORED_IDENTITY_PREFIX.length());
-                int colon = rest.indexOf(':');
-                if (colon > 0 && !back) {
-                    String name = rest.substring(colon + 1);
-                    stopIgnoring(rest.substring(0, colon), name, name);
+                if (!back) {
+                    stopIgnoring(id.substring(IGNORED_IDENTITY_PREFIX.length()),
+                            true, entry.label);
                 }
                 return true;
             }
             return false;
         }
 
-        /** Stops ignoring an account, or one identity of it when {@code identity} is named. */
-        private void stopIgnoring(String accountId, String identity,
-                                  String shown) {
-            UUID account;
+        /** Stops ignoring an account, or one character by its id when {@code character} says so. */
+        private void stopIgnoring(String id, boolean character, String shown) {
+            UUID named;
             try {
-                account = UUID.fromString(accountId);
+                named = UUID.fromString(id);
             } catch (IllegalArgumentException unreadable) {
                 return;
             }
-            boolean stopped = identity == null
-                    ? ClientChatIgnores.unignore(account)
-                    : ClientChatIgnores.unignoreIdentity(account, identity);
+            boolean stopped = character
+                    ? ClientChatIgnores.unignoreCharacter(named)
+                    : ClientChatIgnores.unignore(named);
             if (stopped) {
                 this.notices.showNotice(StatCollector.translateToLocalFormatted(
                         "gui.losttales.chat.unignored", shown));

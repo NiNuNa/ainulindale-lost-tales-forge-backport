@@ -12,8 +12,10 @@ public final class AccessoryRecoveryService {
     private AccessoryRecoveryService() {}
 
     public static boolean recover(EntityPlayer player) {
+        // A dead player's inventory is not copied to the one who respawns,
+        // so nothing is handed back into it.
         if (player == null || player.worldObj == null || player.worldObj.isRemote
-                || player.inventory == null || player.isDead) {
+                || player.inventory == null || !player.isEntityAlive()) {
             return false;
         }
         AccessoryPlayerData data = AccessoryPlayerData.getOrCreate(player);

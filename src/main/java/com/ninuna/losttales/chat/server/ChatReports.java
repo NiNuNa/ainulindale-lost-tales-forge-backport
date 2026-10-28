@@ -62,9 +62,11 @@ public final class ChatReports {
                 message.scope, messageId);
         ChatConsoleEvent.Report report;
         try {
+            // An unseen voice's speaker is named to staff alone (CHAT-84).
             report = new ChatConsoleEvent.Report(reason, note, messageId,
                     message.author, message.authorColor, message.excerpt,
-                    link == null ? "#" + message.channel.getId() : link);
+                    link == null ? "#" + message.channel.getId() : link)
+                    .withStaffAuthor(message.staffAuthor);
         } catch (IllegalArgumentException unfit) {
             tell(reporter, "chat.losttales.report.refused");
             return;

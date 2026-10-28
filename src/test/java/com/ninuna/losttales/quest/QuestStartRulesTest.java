@@ -220,19 +220,19 @@ public final class QuestStartRulesTest {
 
     private static LostTalesQuestDefinition quest(String startMode,
                                                   boolean offered) {
-        Map<String, String> dialogue = offered
-                ? Collections.singletonMap(LostTalesQuestDialogue.OFFER,
+        Map<String, String> conversation = offered
+                ? Collections.singletonMap(LostTalesQuestConversation.OFFER,
                         "Will you help me?")
                 : Collections.<String, String>emptyMap();
         return new LostTalesQuestDefinition(ID, "Start", "", false, false,
                 startMode, null, null,
                 Collections.singletonMap("entity", "losttales.Nia"), null,
-                null, dialogue, null, stages(), false, null, null);
+                null, conversation, null, stages(), false, null, null);
     }
 
     private static LostTalesQuestDefinition missive() {
         return new LostTalesQuestDefinition(
-                "losttales:missive/generated/dim0_1_2_3/100_0", "", "", true,
+                "losttales:missive/dim0_1_2_3/100_0", "", "", true,
                 true, LostTalesQuestDefinition.START_MODE_LOCKED, null, null,
                 null, null, null, null, null, stages(), false,
                 Collections.singletonMap(MissiveWords.TITLE, "materials_wanted"),

@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.window;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 import com.ninuna.losttales.client.gui.animation.LostTalesGuiAnimationSample;
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import com.ninuna.losttales.gui.style.LostTalesUiTheme;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,7 +65,7 @@ public final class WindowGestures {
         boolean holdsPointer();
 
         /** How the pointer looks while it runs; null for the look of what it is over. */
-        LostTalesMapCursor.Pose pose();
+        LostTalesPointer.Pose pose();
     }
 
     /** Distance from another window's edge at which a carried window lines up with it. */
@@ -729,20 +729,20 @@ public final class WindowGestures {
     }
 
     /** The pointer an edge is shown with: across it, or along its corner. */
-    public static LostTalesMapCursor.Pose cursorPose(ResizeEdge edge) {
+    public static LostTalesPointer.Pose cursorPose(ResizeEdge edge) {
         switch (edge) {
             case LEFT:
             case RIGHT:
-                return LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
+                return LostTalesPointer.Pose.RESIZE_HORIZONTAL;
             case TOP:
             case BOTTOM:
-                return LostTalesMapCursor.Pose.RESIZE_VERTICAL;
+                return LostTalesPointer.Pose.RESIZE_VERTICAL;
             case TOP_RIGHT:
             case BOTTOM_LEFT:
                 // The sheet's diagonal runs bottom-left to top-right.
-                return LostTalesMapCursor.Pose.RESIZE_DIAGONAL;
+                return LostTalesPointer.Pose.RESIZE_DIAGONAL;
             default:
-                return LostTalesMapCursor.Pose.RESIZE_ANTI_DIAGONAL;
+                return LostTalesPointer.Pose.RESIZE_ANTI_DIAGONAL;
         }
     }
 
@@ -757,7 +757,7 @@ public final class WindowGestures {
         WindowFrame frame = target.frame;
         WindowLayout.raise(frame.windowId);
         this.host.selectWindow(window);
-        if (ContentView.isOn(window)) {
+        if (Borderless.isOn(window)) {
             return;
         }
         if (outOfItsOwnBox(window)) {
@@ -1179,7 +1179,7 @@ public final class WindowGestures {
      */
     public void armWindowDrag(WindowFrame frame, int mouseX, int mouseY) {
         WindowLayout.raise(frame.windowId);
-        if (ContentView.isOn(WindowLayout.window(frame.windowId))) {
+        if (Borderless.isOn(WindowLayout.window(frame.windowId))) {
             // A window its page fills stands where it is until it has its
             // row, strip and bar back.
             return;

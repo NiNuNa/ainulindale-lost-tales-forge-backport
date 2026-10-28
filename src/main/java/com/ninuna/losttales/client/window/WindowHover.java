@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 
 /**
  * What is under the pointer on the window screen: the one answer a
@@ -77,7 +77,7 @@ public class WindowHover {
     /** On a sub-window, the sub-window; null anywhere else. */
     public SubWindow subWindow;
     /** The control of a dent the point is on; null for the bare dent. */
-    ContentViewDent.Part dentPart;
+    BorderlessDent.Part dentPart;
     /** On a page, whether it is the split's other page rather than the one in front. */
     public boolean otherSide;
     /** On a sub-window's resize band, the edge. */
@@ -177,7 +177,7 @@ public class WindowHover {
         }
         switch (this.tabHit.kind) {
             case CLOSE:
-            case RESTORE:
+            case NEW_PAGE:
             case WINDOW_FULLSCREEN:
             case WINDOW_CLOSE:
             case GRIP:
@@ -188,7 +188,7 @@ public class WindowHover {
     }
 
     /** The pointer's pose over it: a resize over an edge, the hand where a press acts. */
-    public LostTalesMapCursor.Pose pose() {
+    public LostTalesPointer.Pose pose() {
         if (this.kind == Kind.RESIZE && this.resize != null) {
             return WindowGestures.cursorPose(this.resize.edge);
         }
@@ -196,10 +196,10 @@ public class WindowHover {
             return WindowGestures.cursorPose(this.subEdge);
         }
         if (this.kind == Kind.DIVIDER && this.frame != null && this.frame.split != null) {
-            return this.frame.split.isStacked() ? LostTalesMapCursor.Pose.RESIZE_VERTICAL
-                    : LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
+            return this.frame.split.isStacked() ? LostTalesPointer.Pose.RESIZE_VERTICAL
+                    : LostTalesPointer.Pose.RESIZE_HORIZONTAL;
         }
-        return acts() ? LostTalesMapCursor.Pose.HAND
-                : LostTalesMapCursor.Pose.ARROW;
+        return acts() ? LostTalesPointer.Pose.HAND
+                : LostTalesPointer.Pose.ARROW;
     }
 }

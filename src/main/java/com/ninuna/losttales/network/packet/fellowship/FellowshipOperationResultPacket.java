@@ -12,7 +12,7 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
-/** Structured result for one fellowship mutation request. */
+/** The server's answer to one fellowship request: done or refused, and why. */
 public final class FellowshipOperationResultPacket implements IMessage {
 
     private int requestId;
@@ -92,6 +92,9 @@ public final class FellowshipOperationResultPacket implements IMessage {
             this.fellowshipDisbanded = buffer.readBoolean();
             this.errorId = FellowshipErrorId.fromId(LostTalesPacketCodec.readUtf8String(
                     buffer, FellowshipPacketCodec.MAX_ERROR_ID_BYTES));
+            if (this.errorId == null) {
+                throw new FellowshipPacketCodec.DecodeException("unknown error id");
+            }
             this.fellowshipRevision = buffer.readLong();
             this.stateFollows = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);

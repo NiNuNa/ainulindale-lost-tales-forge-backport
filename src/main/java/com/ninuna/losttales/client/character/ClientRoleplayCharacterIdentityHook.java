@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.character;
 import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.character.sync.CharacterAppearance;
 
-/** Client-only labels for UI paths that bypass normal entity nameplates. */
+/** A player's character name for the places that draw a name without the nameplate. */
 public final class ClientRoleplayCharacterIdentityHook {
     private ClientRoleplayCharacterIdentityHook() {}
 

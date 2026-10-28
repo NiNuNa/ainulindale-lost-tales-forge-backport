@@ -22,7 +22,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.StatCollector;
 
 /**
- * Builds the journal and HUD view without transferring quest ownership.
+ * Every quest the journal, the tracker and the markers show, from every source.
  *
  * <p>The tracker HUD, the compass and the world markers each ask for the
  * list while a frame is being drawn, and a well-travelled character
@@ -167,7 +167,7 @@ public final class ClientQuestCatalog {
                 quest.getId(), LostTalesQuestWords.title(quest), "",
                 categoryName(LostTalesQuestCategory.of(quest)),
                 LostTalesQuestWords.description(quest), status,
-                LostTalesClientQuestProgressStore.isQuestPinned(quest.getId()),
+                LostTalesClientQuestProgressStore.isQuestTracked(quest.getId()),
                 progress == null ? 0
                         : LostTalesQuestObjectiveSelection
                         .getCurrentStageIndex(quest, progress) + 1,
@@ -274,9 +274,7 @@ public final class ClientQuestCatalog {
             }
             QuestRumourPlace place =
                     LostTalesClientQuestProgressStore.getRumourPlace(questId);
-            String where = place == null ? ""
-                    : StatCollector.translateToLocalFormatted(
-                            "gui.losttales.quest.rumour.place", place.shownName());
+            String where = place == null ? "" : placeLine(place);
             rumours.add(new ClientQuestEntry(ClientQuestEntry.Source.LOST_TALES,
                     questId, LostTalesQuestWords.title(quest), where,
                     categoryName(LostTalesQuestCategory.RUMOURS),
@@ -290,12 +288,27 @@ public final class ClientQuestCatalog {
     }
 
     /**
-     * The rumours the map pins (QUEST-20): of quests not taken, each at a
+     * Where a rumour points, in the reader's words: the marker's name
+     * (<i>The rumour points to Bree.</i>), or a bare place's coordinates
+     * (<i>The rumour points to a place at 120, -340.</i>).
+     */
+    static String placeLine(QuestRumourPlace place) {
+        if (place.isMarker()) {
+            return StatCollector.translateToLocalFormatted(
+                    "gui.losttales.quest.rumour.place", place.shownName());
+        }
+        return StatCollector.translateToLocalFormatted("gui.losttales.quest.rumour.place.at",
+                String.valueOf((long) Math.floor(place.getX())),
+                String.valueOf((long) Math.floor(place.getZ())));
+    }
+
+    /**
+     * The rumours the map marks (QUEST-20): of quests not taken, each at a
      * place not found yet, with the title of the quest it leads to. A
      * place found stands as its own marker instead.
      */
-    public static List<RumourPin> rumourPins() {
-        List<RumourPin> pins = new ArrayList<RumourPin>();
+    public static List<RumourMarker> rumourMarkers() {
+        List<RumourMarker> markers = new ArrayList<RumourMarker>();
         for (QuestRumourPlace place : LostTalesClientQuestProgressStore.getRumourPlaces()) {
             LostTalesQuestDefinition quest =
                     LostTalesClientQuestDefinitionStore.getQuest(place.getQuestId());
@@ -305,17 +318,17 @@ public final class ClientQuestCatalog {
                             place.getMarkerId())) {
                 continue;
             }
-            pins.add(new RumourPin(place, LostTalesQuestWords.title(quest)));
+            markers.add(new RumourMarker(place, LostTalesQuestWords.title(quest)));
         }
-        return pins;
+        return markers;
     }
 
     /** A rumour's place on the map and the title of the quest it leads to. */
-    public static final class RumourPin {
+    public static final class RumourMarker {
         private final QuestRumourPlace place;
         private final String title;
 
-        RumourPin(QuestRumourPlace place, String title) {
+        RumourMarker(QuestRumourPlace place, String title) {
             this.place = place;
             this.title = title == null ? "" : title;
         }

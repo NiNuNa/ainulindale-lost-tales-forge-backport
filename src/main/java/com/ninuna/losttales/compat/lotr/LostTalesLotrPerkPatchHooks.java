@@ -15,7 +15,7 @@ import net.minecraft.network.NetHandlerPlayServer;
 
 /**
  * Where the coremod's patches of LOTR call in for the perks that change
- * what LOTR keeps itself (Nils, 2026-10-19): Friend of the Wise's larger
+ * what LOTR keeps itself (PROG-14): Friend of the Wise's larger
  * alignment gains, Daggerwork's sooner strikes, Fair Dealer's prices,
  * and Repair and Master Smith at LOTR's anvil, which a repair taken
  * there also counts toward Smithing through. Every hook hands back what

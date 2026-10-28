@@ -6,6 +6,7 @@ import java.util.Random;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
@@ -35,7 +36,6 @@ public class LostTalesBlockUrnTall extends LostTalesBlockUrnBase {
     public void onBlockPlacedBy(World world, int i, int j, int k, EntityLivingBase entity, ItemStack itemStack) {
         super.onBlockPlacedBy(world, i, j, k, entity, itemStack);
         world.setBlock(i, j + 1, k, this, UPPER_PART_METADATA, 2);
-        this.configurePlacedTileEntity(world, i, j + 1, k, entity);
     }
 
     @Override
@@ -62,6 +62,17 @@ public class LostTalesBlockUrnTall extends LostTalesBlockUrnBase {
         } else {
             return super.getItemDropped(meta, random, fortune);
         }
+    }
+
+    /** The upper half holds nothing: the vessel is its lower half's. */
+    @Override
+    public boolean hasTileEntity(int metadata) {
+        return metadata != UPPER_PART_METADATA;
+    }
+
+    @Override
+    public TileEntity createNewTileEntity(World world, int metadata) {
+        return metadata == UPPER_PART_METADATA ? null : super.createNewTileEntity(world, metadata);
     }
 
     @Override

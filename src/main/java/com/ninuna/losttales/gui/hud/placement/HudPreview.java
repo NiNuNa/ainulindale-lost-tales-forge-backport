@@ -6,7 +6,7 @@ import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.fellowship.LostTalesFellowshipHudRenderer;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
 import com.ninuna.losttales.gui.hud.mapmarker.LostTalesMapMarkerHudRenderer;
-import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
+import com.ninuna.losttales.gui.hud.quest.LostTalesQuestTrackerRenderer;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiClip;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
@@ -197,7 +197,7 @@ final class HudPreview {
             LostTalesCompassHudRenderer.render(minecraft, partialTicks);
             LostTalesMapMarkerHudRenderer.render(minecraft, partialTicks);
             LostTalesFellowshipHudRenderer.render(minecraft, partialTicks);
-            LostTalesQuestHudRenderer.render(minecraft, partialTicks);
+            LostTalesQuestTrackerRenderer.render(minecraft, partialTicks);
         } catch (RuntimeException failure) {
             if (!failureTold) {
                 failureTold = true;

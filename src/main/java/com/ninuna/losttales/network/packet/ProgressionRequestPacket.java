@@ -16,7 +16,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * the Skills page (PROG-06), or to reset one skill's perks at the statue
  * they stand at (PROG-12). The server trusts neither id nor place: it
  * checks the played character, the perk's needs and points, the statue's
- * block, reach and sight and the price itself.
+ * block, the player's reach and the price itself.
  */
 public final class ProgressionRequestPacket implements IMessage {
     public static final int TAKE_PERK = 0;

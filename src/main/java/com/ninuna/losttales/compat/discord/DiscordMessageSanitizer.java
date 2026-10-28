@@ -127,7 +127,8 @@ public final class DiscordMessageSanitizer {
      * a name's own character there, and the name is plain words
      * ({@link #placeName}). A mention whose name is not known reads as
      * {@code @user}, {@code @role} or {@code #channel} in {@code words},
-     * the server's: it stands inside the member's own words. Each mention
+     * those of the link the message came from: it stands inside the
+     * member's own words, which every reader gets alike. Each mention
      * is read once, so a name put in is never read as a mention again.
      */
     public static String inbound(String content, Map<String, String> mentionNames,
@@ -197,8 +198,9 @@ public final class DiscordMessageSanitizer {
      * {@code said} and {@code forwarded} are already {@link #inbound}'s;
      * the words give way first when all of it is longer than a chat line,
      * and the link goes before a file name does. The two marks are the
-     * lang file's: the line's text has them in {@code words}, the
-     * server's, and its pieces keep them as marks each game translates.
+     * lang file's: the line's text has them in {@code words}, English for
+     * the history and the logs, and its pieces keep them as marks each
+     * game, and each linked Discord channel, words for itself.
      */
     static DiscordInboundLine inboundWithAttachments(LostTalesWords words,
                                                      String said, String forwarded,
@@ -585,7 +587,7 @@ public final class DiscordMessageSanitizer {
     /**
      * The line a webhook post opens with when the game message is a
      * forward: Discord's small subtext, a forward arrow, and in the
-     * server's words the conversation the message was said in by its code
+     * linked channel's words the conversation the message was said in by its code
      * name and its author in bold. {@code link} is the game's
      * {@code #code/id}; the id means nothing on Discord and is left off.
      */
@@ -678,9 +680,11 @@ public final class DiscordMessageSanitizer {
 
     /**
      * Drops formatting codes (the section sign and the letter after it),
-     * control characters other than whitespace, and what remains of
-     * emoji the registry does not carry: surrogates, joiners, and
-     * variation selectors, none of which the chat's font can show.
+     * control characters other than whitespace, direction marks, and what
+     * remains of emoji the registry does not carry: surrogates, joiners,
+     * and variation selectors, none of which the chat's font can show.
+     * A direction mark left in a name or a file's name would make the
+     * chat refuse the whole line.
      */
     private static String stripUnsendable(String text) {
         StringBuilder kept = new StringBuilder(text.length());
@@ -695,7 +699,8 @@ public final class DiscordMessageSanitizer {
                 continue;
             }
             if (Character.isSurrogate(character) || character == '\u200D'
-                    || character == '\uFE0F') {
+                    || character == '\uFE0F'
+                    || ChatMessageValidator.isDirectionMark(character)) {
                 continue;
             }
             kept.append(character);

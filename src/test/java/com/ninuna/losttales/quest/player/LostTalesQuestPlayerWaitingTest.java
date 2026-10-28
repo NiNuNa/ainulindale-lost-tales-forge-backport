@@ -125,7 +125,7 @@ public final class LostTalesQuestPlayerWaitingTest {
     @Test
     public void aMissiveStaysWhileItsRewardsWait() {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
-        String prefix = "losttales:missive/generated/dim0_1_64_1/";
+        String prefix = "losttales:missive/dim0_1_64_1/";
         String waiting = prefix + "waiting";
         finishMissive(data, waiting, 0L);
         data.addWaitingRewards(waiting, Collections.singletonList(
@@ -141,7 +141,7 @@ public final class LostTalesQuestPlayerWaitingTest {
     }
 
     private static void finishMissive(LostTalesQuestPlayerData data, String id, long time) {
-        assertTrue(data.rememberDynamicQuestDefinition(new LostTalesQuestDefinition(id,
+        assertTrue(data.rememberMissiveDefinition(new LostTalesQuestDefinition(id,
                 "Bounty", "", false, false, LostTalesQuestDefinition.START_MODE_LOCKED,
                 null, Collections.singletonMap("coins", "5"), null, null, null, null,
                 null, Collections.singletonList(new LostTalesQuestStageDefinition("10",

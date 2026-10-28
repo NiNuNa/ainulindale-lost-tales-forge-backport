@@ -13,6 +13,8 @@ import java.util.List;
  * The wire form of a server config entry and of a change, shared by the
  * snapshot and the apply packets. Every string and count is bounded, and
  * a value that does not fit is a decode error rather than a truncation.
+ * An entry too long for the page goes marked so and without its values
+ * (DATA-16), so a long list never keeps the page from loading.
  */
 final class ServerConfigPacketCodec {
 
@@ -32,8 +34,11 @@ final class ServerConfigPacketCodec {
         LostTalesPacketCodec.writeUtf8String(buffer, entry.getKey(), MAX_KEY_BYTES);
         buffer.writeByte(entry.getType().getCode());
         buffer.writeBoolean(entry.isList());
-        writeValues(buffer, entry.getValues());
-        writeValues(buffer, entry.getDefaults());
+        buffer.writeBoolean(entry.isTooLong());
+        if (!entry.isTooLong()) {
+            writeValues(buffer, entry.getValues());
+            writeValues(buffer, entry.getDefaults());
+        }
         LostTalesPacketCodec.writeUtf8String(buffer, entry.getMinValue(), MAX_BOUND_BYTES);
         LostTalesPacketCodec.writeUtf8String(buffer, entry.getMaxValue(), MAX_BOUND_BYTES);
         buffer.writeBoolean(entry.isSecret());
@@ -53,8 +58,9 @@ final class ServerConfigPacketCodec {
             throw new LostTalesPacketCodec.DecodeException("unknown config value type");
         }
         boolean list = buffer.readBoolean();
-        List<String> values = readValues(buffer);
-        List<String> defaults = readValues(buffer);
+        boolean tooLong = buffer.readBoolean();
+        List<String> values = tooLong ? null : readValues(buffer);
+        List<String> defaults = tooLong ? null : readValues(buffer);
         String minimum = LostTalesPacketCodec.readUtf8String(buffer, MAX_BOUND_BYTES);
         String maximum = LostTalesPacketCodec.readUtf8String(buffer, MAX_BOUND_BYTES);
         boolean secret = buffer.readBoolean();
@@ -65,6 +71,10 @@ final class ServerConfigPacketCodec {
         }
         if (category.length() == 0 || key.length() == 0) {
             throw new LostTalesPacketCodec.DecodeException("blank config key");
+        }
+        if (tooLong) {
+            return ServerConfigEntry.tooLongForThePage(category, key, type, list, minimum,
+                    maximum, secret, valid);
         }
         return new ServerConfigEntry(category, key, type, list, values, defaults,
                 minimum, maximum, secret, valid);

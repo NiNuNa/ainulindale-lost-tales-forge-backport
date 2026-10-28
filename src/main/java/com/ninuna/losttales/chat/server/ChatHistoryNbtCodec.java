@@ -5,6 +5,7 @@ import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatReportReason;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatNamedPlayer;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
@@ -44,10 +45,11 @@ public final class ChatHistoryNbtCodec {
     public static final int CURRENT_ROOT_DATA_VERSION = 1;
     /**
      * The one entry layout this codec writes and reads, with or without
-     * reactions and whatever their emoji, and with the readers of a
-     * quote heard nearby where a reply has them.
+     * reactions and whatever their emoji, with the readers of a quote
+     * heard nearby where a reply has them, and with the readers who read
+     * a line heard nearby larger or smaller where it has them.
      */
-    public static final int CURRENT_ENTRY_DATA_VERSION = 6;
+    public static final int CURRENT_ENTRY_DATA_VERSION = 7;
     /** Safety bound on kept lines read back; entries past it are quarantined. */
     public static final int MAX_ENTRIES = ChatHistory.MAX_KEPT;
 
@@ -72,6 +74,11 @@ public final class ChatHistoryNbtCodec {
     private static final String TAG_AUDIENCE_GATED = "Gated";
     private static final String TAG_REACTIONS = "Reactions";
     private static final String TAG_QUOTE_READERS = "QuoteReaders";
+    private static final String TAG_NEAR_READERS = "NearReaders";
+    private static final String TAG_FAR_READERS = "FarReaders";
+    private static final String TAG_REACTOR_UNSEEN = "Unseen";
+    private static final String TAG_EVENT_STAFF_TEXT = "StaffText";
+    private static final String TAG_REPORT_STAFF_AUTHOR = "StaffAuthor";
     private static final String TAG_REACTION_EMOJI = "Emoji";
     private static final String TAG_REACTION_REACTORS = "Reactors";
     private static final String TAG_REACTOR_ID = "Id";
@@ -165,6 +172,9 @@ public final class ChatHistoryNbtCodec {
             tag.setString(TAG_EVENT_ACTOR, event.getActor());
             tag.setString(TAG_EVENT_TEXT, event.getText());
             tag.setString(TAG_EVENT_CONTEXT, event.getContext());
+            if (event.getStaffText().length() > 0) {
+                tag.setString(TAG_EVENT_STAFF_TEXT, event.getStaffText());
+            }
             if (event.getActorIdentity() != null) {
                 NbtTags.writeUuid(tag, TAG_EVENT_ACTOR_ID,
                         event.getActorIdentity().getPlayerId());
@@ -207,6 +217,11 @@ public final class ChatHistoryNbtCodec {
         String actor = raw.getString(TAG_EVENT_ACTOR);
         String text = raw.getString(TAG_EVENT_TEXT);
         String context = raw.getString(TAG_EVENT_CONTEXT);
+        String staffText = raw.getString(TAG_EVENT_STAFF_TEXT);
+        if (staffText.length() > ChatConsoleEvent.MAX_TEXT_LENGTH) {
+            failureReason[0] = "invalid_event";
+            return null;
+        }
         if (id <= 0L || kind == null || severity == null
                 || actor.length() > ChatConsoleEvent.MAX_ACTOR_LENGTH
                 || text.trim().length() == 0
@@ -232,7 +247,8 @@ public final class ChatHistoryNbtCodec {
             return null;
         }
         return new ChatConsoleEvent(id, raw.getLong(TAG_EVENT_TIMESTAMP),
-                kind, severity, actor, text, context, actorIdentity, report);
+                kind, severity, actor, text, context, actorIdentity, report)
+                .withStaffText(staffText);
     }
 
     private static NBTTagCompound writeReport(ChatConsoleEvent.Report report) {
@@ -244,6 +260,9 @@ public final class ChatHistoryNbtCodec {
         tag.setInteger(TAG_REPORT_AUTHOR_COLOR, report.getAuthorColor());
         tag.setString(TAG_REPORT_EXCERPT, report.getExcerpt());
         tag.setString(TAG_REPORT_LINK, report.getLink());
+        if (report.getStaffAuthor().length() > 0) {
+            tag.setString(TAG_REPORT_STAFF_AUTHOR, report.getStaffAuthor());
+        }
         return tag;
     }
 
@@ -259,9 +278,11 @@ public final class ChatHistoryNbtCodec {
         String author = raw.getString(TAG_REPORT_AUTHOR);
         String excerpt = raw.getString(TAG_REPORT_EXCERPT);
         String link = raw.getString(TAG_REPORT_LINK);
+        String staffAuthor = raw.getString(TAG_REPORT_STAFF_AUTHOR);
         if (reason == null || !raw.hasKey(TAG_REPORT_MESSAGE, Constants.NBT.TAG_LONG)
                 || note.length() > ChatConsoleEvent.Report.MAX_NOTE_LENGTH
                 || author.length() > ChatConsoleEvent.Report.MAX_AUTHOR_LENGTH
+                || staffAuthor.length() > ChatConsoleEvent.Report.MAX_AUTHOR_LENGTH
                 || excerpt.length() > ChatReplyReference.MAX_EXCERPT_CHARACTERS
                 || link.length() > ChatConsoleEvent.Report.MAX_LINK_LENGTH) {
             return null;
@@ -269,7 +290,8 @@ public final class ChatHistoryNbtCodec {
         try {
             return new ChatConsoleEvent.Report(reason, note,
                     raw.getLong(TAG_REPORT_MESSAGE), author,
-                    raw.getInteger(TAG_REPORT_AUTHOR_COLOR), excerpt, link);
+                    raw.getInteger(TAG_REPORT_AUTHOR_COLOR), excerpt, link)
+                    .withStaffAuthor(staffAuthor);
         } catch (IllegalArgumentException unfit) {
             return null;
         }
@@ -425,6 +447,12 @@ public final class ChatHistoryNbtCodec {
         if (entry.quoteReaders != null) {
             tag.setTag(TAG_QUOTE_READERS, writeUuids(entry.quoteReaders));
         }
+        if (entry.nearReaders != null) {
+            tag.setTag(TAG_NEAR_READERS, writeUuids(entry.nearReaders));
+        }
+        if (entry.farReaders != null) {
+            tag.setTag(TAG_FAR_READERS, writeUuids(entry.farReaders));
+        }
         return tag;
     }
 
@@ -448,6 +476,9 @@ public final class ChatHistoryNbtCodec {
                         reactor.getKey());
                 if (origin.length() > 0) {
                     reactorTag.setString(TAG_REACTOR_ORIGIN, origin);
+                }
+                if (reactions.isUnseen(kind.getKey(), reactor.getKey())) {
+                    reactorTag.setBoolean(TAG_REACTOR_UNSEEN, true);
                 }
                 reactors.appendTag(reactorTag);
             }
@@ -497,7 +528,10 @@ public final class ChatHistoryNbtCodec {
                         && !(isDiscordChannelId(origin)
                                 && LostTalesChatMessagePacket.isDiscordSender(id)))
                         || !reactions.restore(emoji, id,
-                                reactor.getString(TAG_REACTOR_NAME), origin)) {
+                                reactor.getString(TAG_REACTOR_NAME), origin)
+                        || (reactor.getBoolean(TAG_REACTOR_UNSEEN)
+                                && (origin.length() > 0
+                                        || !reactions.restoreUnseen(emoji, id)))) {
                     return null;
                 }
             }
@@ -608,10 +642,26 @@ public final class ChatHistoryNbtCodec {
             }
             quoteReaders = Collections.unmodifiableSet(new HashSet<UUID>(readers));
         }
+        Set<UUID> nearReaders = null;
+        Set<UUID> farReaders = null;
+        if (raw.hasKey(TAG_NEAR_READERS) || raw.hasKey(TAG_FAR_READERS)) {
+            List<UUID> near = raw.hasKey(TAG_NEAR_READERS)
+                    ? readUuids(raw, TAG_NEAR_READERS) : Collections.<UUID>emptyList();
+            List<UUID> far = raw.hasKey(TAG_FAR_READERS)
+                    ? readUuids(raw, TAG_FAR_READERS) : Collections.<UUID>emptyList();
+            // Only a line heard nearby is read larger or smaller.
+            if (near == null || far == null
+                    || !ChatSpeechRange.appliesTo(forOthers.getChannel())) {
+                return EntryReadResult.failure("invalid_distance_readers");
+            }
+            nearReaders = Collections.unmodifiableSet(new HashSet<UUID>(near));
+            farReaders = Collections.unmodifiableSet(new HashSet<UUID>(far));
+        }
         return EntryReadResult.success(new ChatHistory.Entry(authorId,
                 author.trim(), raw.getString(TAG_EXCERPT), new HashSet<UUID>(seenBy),
                 channelId, forSender, forOthers, audience,
-                raw.getLong(TAG_TIMESTAMP), reactions, quoteReaders),
+                raw.getLong(TAG_TIMESTAMP), reactions, quoteReaders,
+                nearReaders, farReaders),
                 reactions.renamedOnRestore());
     }
 

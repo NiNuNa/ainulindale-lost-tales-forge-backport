@@ -26,9 +26,11 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Server-only lifecycle and movement evidence used by the switching policy.
- * Every respawn, dimension transfer, and login advances the request epoch so
- * queued packets from an older entity/lifecycle cannot mutate the new one.
+ * What the switch policy knows of each player's session: ready or not, a
+ * respawn, change of dimension or switch under way, the last fight, the
+ * last teleport, and how long they have stood on ground. Every login,
+ * respawn and change of dimension starts a new request epoch, so a request
+ * that arrived before it is refused.
  */
 public final class CharacterLifecycleStateTracker {
 
@@ -208,6 +210,17 @@ public final class CharacterLifecycleStateTracker {
         synchronized (state) {
             return state.epoch == epoch && state.ready && !state.loggingOut
                     && !state.respawning && !state.dimensionChanging && !serverStopping;
+        }
+    }
+
+    /** Whether the request came in this session, ready or not, while it is not ending. */
+    public static boolean isRequestInSession(EntityPlayerMP player, long epoch) {
+        SessionState state = getState(player);
+        if (state == null || epoch <= 0L) {
+            return false;
+        }
+        synchronized (state) {
+            return state.epoch == epoch && !state.loggingOut && !serverStopping;
         }
     }
 

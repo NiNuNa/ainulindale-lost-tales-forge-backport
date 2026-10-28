@@ -34,7 +34,11 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
 
-/** Builds and sends private, revisioned fellowship snapshots to authorized clients. */
+/**
+ * Sends each player the state of the fellowships of the character they
+ * play, and the answers to their requests; each change reaches whoever it
+ * concerns, taken before the change.
+ */
 public final class FellowshipSyncManager {
 
     public static final int UNSOLICITED_REQUEST_ID = 0;
@@ -54,7 +58,7 @@ public final class FellowshipSyncManager {
         if (!LostTalesServerPlayers.isServerPlayer(player)) {
             return false;
         }
-        sendStatePacket(player, requestId, onlineView(player.worldObj));
+        sendStatePacket(player, requestId, new SyncView(onlineView(player.worldObj)), true);
         List<EntityPlayerMP> recipient = Collections.singletonList(player);
         FellowshipMemberStatusSyncManager.sendNow(recipient);
         FellowshipTrackingSyncManager.sendNow(recipient);
@@ -62,29 +66,40 @@ public final class FellowshipSyncManager {
     }
 
     /**
-     * Sends each player their state, unasked. Who is online, and the
-     * members' health and places, are read once for all of them.
+     * Sends each player their state, unasked. Who is online and whom the
+     * invite field offers, the invitations pruned, and the members' health
+     * and places are read once for all of them.
      */
     private static void sendStateTo(List<EntityPlayerMP> players) {
         if (players.isEmpty()) {
             return;
         }
-        FellowshipOnlineView online = onlineView(players.get(0).worldObj);
+        World world = players.get(0).worldObj;
+        SyncView view = new SyncView(onlineView(world));
+        try {
+            FellowshipService.getInstance().pruneInvitations(world);
+        } catch (RuntimeException exception) {
+            FMLLog.warning("[%s] Unable to prune fellowship invitations: %s",
+                    LostTalesMetaData.MOD_ID, exception.toString());
+        }
         for (EntityPlayerMP player : players) {
-            sendStatePacket(player, UNSOLICITED_REQUEST_ID, online);
+            sendStatePacket(player, UNSOLICITED_REQUEST_ID, view, false);
         }
         FellowshipMemberStatusSyncManager.sendNow(players);
         FellowshipTrackingSyncManager.sendNow(players);
     }
 
-    /** The fellowship state alone, built for the player from {@code online}. */
+    /**
+     * The fellowship state alone, built for the player from {@code view};
+     * the invitations pruned first unless the sync pruned them already.
+     */
     private static void sendStatePacket(EntityPlayerMP player, int requestId,
-                                        FellowshipOnlineView online) {
+                                        SyncView view, boolean prune) {
         UUID ownerId = player.getUniqueID();
         long sequence = nextSequence(ownerId);
         FellowshipInvitationState state;
         try {
-            state = FellowshipService.getInstance().getInvitationState(player);
+            state = FellowshipService.getInstance().getInvitationState(player, prune);
         } catch (Throwable throwable) {
             FMLLog.warning("[%s] Unable to build fellowship state for player %s: %s",
                     LostTalesMetaData.MOD_ID,
@@ -93,10 +108,10 @@ public final class FellowshipSyncManager {
             state = FellowshipInvitationState.failure(FellowshipErrorId.INTERNAL_ERROR);
         }
         InviteTargetCollection inviteTargets = collectInviteTargets(
-                player, state);
+                player, state, view);
         FellowshipStateSnapshot snapshot = FellowshipStateSnapshot.fromState(
                 ownerId, sequence, FellowshipService.memberLimit(), state,
-                online, lotrFellowshipIds(player.worldObj, state),
+                view.online, lotrFellowshipIds(player.worldObj, state),
                 FellowshipService.getInstance().marksSeenBy(player.worldObj, state),
                 inviteTargets.targets, inviteTargets.truncated);
         LostTalesNetworkHandler.CHANNEL.sendTo(
@@ -224,7 +239,7 @@ public final class FellowshipSyncManager {
                 }
             }
         } catch (Throwable ignored) {
-            // Fellowship membership audience is still useful if invitation data is unavailable.
+            // The members are still told if the invitations cannot be read.
         }
         return result;
     }
@@ -241,7 +256,7 @@ public final class FellowshipSyncManager {
                 result.addInvitation(invitation);
             }
         } catch (Throwable ignored) {
-            // Return the safely collected subset.
+            // Whoever was found before it failed is told.
         }
         return result;
     }
@@ -270,7 +285,7 @@ public final class FellowshipSyncManager {
                 result.addInvitation(related);
             }
         } catch (Throwable ignored) {
-            // Return the safely collected subset.
+            // Whoever was found before it failed is told.
         }
         return result;
     }
@@ -417,11 +432,13 @@ public final class FellowshipSyncManager {
         }
     }
 
+    /** Forgets the sequences and presence changes, and which unreadable lead limits were logged. */
     public static void clear() {
         SEQUENCES.clear();
         synchronized (FellowshipSyncManager.class) {
             PRESENCE_CHANGED.clear();
         }
+        FellowshipLeadLimits.clear();
     }
 
     private static long nextSequence(UUID ownerId) {
@@ -445,37 +462,44 @@ public final class FellowshipSyncManager {
 
     /**
      * The online players, as the characters they play, for one who leads or
-     * guides a fellowship with room: whom the invite field offers. Each
-     * fellowship leaves out its own members and those it invited already,
-     * on the page; the server refuses those either way.
+     * guides a fellowship with room: whom the invite field offers, from the
+     * list {@code view} reads once for the whole sync. Each fellowship
+     * leaves out its own members and those it invited already, on the
+     * page; the server refuses those either way.
      */
     private static InviteTargetCollection collectInviteTargets(
-            EntityPlayerMP receiver, FellowshipInvitationState state) {
+            EntityPlayerMP receiver, FellowshipInvitationState state, SyncView view) {
         if (!LostTalesServerPlayers.isServerPlayer(receiver) || state == null
                 || !state.isSuccessful() || state.getActiveIdentityId() == null
                 || !managesOneWithRoom(state)) {
             return InviteTargetCollection.empty();
         }
+        return InviteTargetCollection.offeredTo(view.inviteTargets(),
+                receiver.getUniqueID(), state.getActiveIdentityId());
+    }
 
+    /**
+     * Everyone online who plays an identity, as the invite field lists
+     * them: by character name, then account name, then account.
+     */
+    private static List<FellowshipInviteTargetSnapshot> everyoneInvitable() {
         MinecraftServer server = MinecraftServer.getServer();
         if (server == null || server.getConfigurationManager() == null) {
-            return InviteTargetCollection.empty();
+            return Collections.emptyList();
         }
         List<?> onlinePlayers = server.getConfigurationManager().playerEntityList;
         if (onlinePlayers == null || onlinePlayers.isEmpty()) {
-            return InviteTargetCollection.empty();
+            return Collections.emptyList();
         }
 
         ArrayList<FellowshipInviteTargetSnapshot> candidates =
                 new ArrayList<FellowshipInviteTargetSnapshot>();
-        for (Object value : onlinePlayers) {
+        for (Object value : new ArrayList<Object>(onlinePlayers)) {
             if (!(value instanceof EntityPlayerMP)) {
                 continue;
             }
             EntityPlayerMP targetPlayer = (EntityPlayerMP) value;
-            UUID targetOwnerId = targetPlayer.getUniqueID();
-            if (!LostTalesServerPlayers.isServerPlayer(targetPlayer)
-                    || receiver.getUniqueID().equals(targetOwnerId)) {
+            if (!LostTalesServerPlayers.isServerPlayer(targetPlayer)) {
                 continue;
             }
             FellowshipService.ActiveIdentityContext target =
@@ -483,11 +507,8 @@ public final class FellowshipSyncManager {
             if (!target.isValid()) {
                 continue;
             }
-            if (state.getActiveIdentityId().equals(target.gameplayId())) {
-                continue;
-            }
             candidates.add(new FellowshipInviteTargetSnapshot(
-                    targetOwnerId,
+                    targetPlayer.getUniqueID(),
                     target.gameplayId(),
                     targetPlayer.getCommandSenderName(),
                     target.displayName));
@@ -511,14 +532,25 @@ public final class FellowshipSyncManager {
                         right.getOwnerId().toString());
             }
         });
+        return candidates;
+    }
 
-        boolean truncated = candidates.size()
-                > FellowshipStateSnapshot.MAX_INVITE_TARGETS;
-        if (truncated) {
-            candidates = new ArrayList<FellowshipInviteTargetSnapshot>(
-                    candidates.subList(0, FellowshipStateSnapshot.MAX_INVITE_TARGETS));
+    /** What one sync reads once for every player it reaches. */
+    private static final class SyncView {
+        private final FellowshipOnlineView online;
+        private List<FellowshipInviteTargetSnapshot> inviteTargets;
+
+        private SyncView(FellowshipOnlineView online) {
+            this.online = online;
         }
-        return new InviteTargetCollection(candidates, truncated);
+
+        /** Everyone the invite field may offer, read the first time a receiver needs them. */
+        private List<FellowshipInviteTargetSnapshot> inviteTargets() {
+            if (this.inviteTargets == null) {
+                this.inviteTargets = everyoneInvitable();
+            }
+            return this.inviteTargets;
+        }
     }
 
     /** Whether the identity leads or guides a fellowship that still has room. */
@@ -532,9 +564,9 @@ public final class FellowshipSyncManager {
         return false;
     }
 
-    private static final class InviteTargetCollection {
-        private final List<FellowshipInviteTargetSnapshot> targets;
-        private final boolean truncated;
+    static final class InviteTargetCollection {
+        final List<FellowshipInviteTargetSnapshot> targets;
+        final boolean truncated;
 
         private InviteTargetCollection(
                 List<FellowshipInviteTargetSnapshot> targets, boolean truncated) {
@@ -548,6 +580,30 @@ public final class FellowshipSyncManager {
         private static InviteTargetCollection empty() {
             return new InviteTargetCollection(
                     Collections.<FellowshipInviteTargetSnapshot>emptyList(), false);
+        }
+
+        /**
+         * The first of {@code everyone}, in its order, that one receiver
+         * may be offered: never their own account or the identity they
+         * play. At most {@link FellowshipStateSnapshot#MAX_INVITE_TARGETS},
+         * truncated where more were left.
+         */
+        static InviteTargetCollection offeredTo(
+                List<FellowshipInviteTargetSnapshot> everyone,
+                UUID receiverOwnerId, UUID receiverIdentityId) {
+            List<FellowshipInviteTargetSnapshot> offered =
+                    new ArrayList<FellowshipInviteTargetSnapshot>();
+            for (FellowshipInviteTargetSnapshot target : everyone) {
+                if (target.getOwnerId().equals(receiverOwnerId)
+                        || target.getIdentityId().equals(receiverIdentityId)) {
+                    continue;
+                }
+                if (offered.size() >= FellowshipStateSnapshot.MAX_INVITE_TARGETS) {
+                    return new InviteTargetCollection(offered, true);
+                }
+                offered.add(target);
+            }
+            return new InviteTargetCollection(offered, false);
         }
     }
 

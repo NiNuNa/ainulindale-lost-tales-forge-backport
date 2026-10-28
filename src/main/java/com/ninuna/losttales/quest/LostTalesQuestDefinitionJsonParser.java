@@ -26,7 +26,7 @@ public final class LostTalesQuestDefinitionJsonParser {
     /** The keys a quest file's top level may hold. */
     static final Set<String> QUEST_KEYS = keys("id", "title", "description",
             "repeatable", "restartable", "startMode", "prerequisites",
-            "rewards", "interaction", "markers", "journalLog", "dialogue",
+            "rewards", "interaction", "markers", "journalLog", "conversation",
             "world", "stages", LostTalesQuestRules.RETURN_TO,
             LostTalesQuestRules.TIME_LIMIT, LostTalesQuestRules.FAIL_ON,
             LostTalesQuestRules.REPEAT_AFTER,
@@ -80,10 +80,6 @@ public final class LostTalesQuestDefinitionJsonParser {
             files.add(file);
         }
         return files;
-    }
-
-    public static LostTalesQuestDefinition parseQuest(Reader reader, String sourceFile) {
-        return parseQuest(reader, sourceFile, null);
     }
 
     /**
@@ -151,7 +147,7 @@ public final class LostTalesQuestDefinitionJsonParser {
         Map<String, String> interaction = parseStringMap(object, "interaction", quest);
         Map<String, String> markers = parseStringMap(object, "markers", quest);
         Map<String, String> journalLog = parseStringMap(object, "journalLog", quest);
-        Map<String, String> dialogue = parseStringMap(object, "dialogue", quest);
+        Map<String, String> conversation = parseStringMap(object, "conversation", quest);
         Map<String, String> world = parseStringMap(object, "world", quest);
         List<LostTalesQuestStageDefinition> stages =
                 parseStages(object.get("stages"), quest);
@@ -172,7 +168,7 @@ public final class LostTalesQuestDefinitionJsonParser {
         }
         return new LostTalesQuestDefinition(id, title, description,
                 repeatable, restartable, startMode, prerequisites, rewards,
-                interaction, markers, journalLog, dialogue, world, stages,
+                interaction, markers, journalLog, conversation, world, stages,
                 false, null, rules);
     }
 

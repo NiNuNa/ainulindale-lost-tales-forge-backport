@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -19,7 +19,7 @@ public final class WindowHoverTest {
     public void theHandIsWhereAPressActs() {
         for (WindowHover.Kind kind : new WindowHover.Kind[] {
                 WindowHover.Kind.TAB_ROW, WindowHover.Kind.SUB_WINDOW_CLOSE}) {
-            assertEquals(kind.name(), LostTalesMapCursor.Pose.HAND,
+            assertEquals(kind.name(), LostTalesPointer.Pose.HAND,
                     new WindowHover(kind).pose());
         }
     }
@@ -29,23 +29,23 @@ public final class WindowHoverTest {
         for (WindowHover.Kind kind : new WindowHover.Kind[] {
                 WindowHover.Kind.NONE, WindowHover.Kind.SUB_WINDOW,
                 WindowHover.Kind.OVERLAY}) {
-            assertEquals(kind.name(), LostTalesMapCursor.Pose.ARROW,
+            assertEquals(kind.name(), LostTalesPointer.Pose.ARROW,
                     new WindowHover(kind).pose());
         }
-        assertEquals(LostTalesMapCursor.Pose.ARROW, WindowHover.NONE.pose());
+        assertEquals(LostTalesPointer.Pose.ARROW, WindowHover.NONE.pose());
     }
 
     @Test
     public void aPageActsOnlyWhenAPressWouldDoSomething() {
         WindowHover page = new WindowHover(WindowHover.Kind.PAGE);
-        assertEquals(LostTalesMapCursor.Pose.ARROW, page.pose());
+        assertEquals(LostTalesPointer.Pose.ARROW, page.pose());
         page.acts = true;
-        assertEquals(LostTalesMapCursor.Pose.HAND, page.pose());
+        assertEquals(LostTalesPointer.Pose.HAND, page.pose());
         assertEquals("a strip of no window moves nothing",
-                LostTalesMapCursor.Pose.ARROW,
+                LostTalesPointer.Pose.ARROW,
                 new WindowHover(WindowHover.Kind.STRIP).pose());
         assertEquals("nor a sub-window's strip or grip of no sub-window",
-                LostTalesMapCursor.Pose.ARROW,
+                LostTalesPointer.Pose.ARROW,
                 new WindowHover(WindowHover.Kind.SUB_WINDOW_GRIP).pose());
     }
 
@@ -53,9 +53,9 @@ public final class WindowHoverTest {
     public void aSubWindowsEdgeResizesAsAWindowsDoes() {
         WindowHover edge = new WindowHover(WindowHover.Kind.SUB_WINDOW_RESIZE);
         edge.subEdge = WindowGestures.ResizeEdge.LEFT;
-        assertEquals(LostTalesMapCursor.Pose.RESIZE_HORIZONTAL, edge.pose());
+        assertEquals(LostTalesPointer.Pose.RESIZE_HORIZONTAL, edge.pose());
         edge.subEdge = WindowGestures.ResizeEdge.BOTTOM;
-        assertEquals(LostTalesMapCursor.Pose.RESIZE_VERTICAL, edge.pose());
+        assertEquals(LostTalesPointer.Pose.RESIZE_VERTICAL, edge.pose());
     }
 
     @Test

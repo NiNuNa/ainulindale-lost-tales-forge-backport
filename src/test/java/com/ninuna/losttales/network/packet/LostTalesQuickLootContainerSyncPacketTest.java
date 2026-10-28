@@ -51,4 +51,21 @@ public final class LostTalesQuickLootContainerSyncPacketTest {
         assertTrue(decoded.isMalformed());
         assertEquals(0, decoded.getItems().length);
     }
+
+    @Test
+    public void aLongTitleIsCutAtAWholeLetterWithinItsBound() {
+        StringBuilder title = new StringBuilder();
+        for (int i = 0; i < 300; i++) {
+            title.append("\u00e9");
+        }
+        title.append("\ud83d\ude00");
+        String fitted = LostTalesQuickLootContainerSyncPacket.fitTitle(
+                title.toString());
+
+        assertEquals(256, fitted.length());
+        assertTrue(LostTalesPacketCodec.isUtf8WithinLimit(fitted,
+                LostTalesQuickLootContainerSyncPacket.MAX_TITLE_BYTES));
+        assertEquals("Urn",
+                LostTalesQuickLootContainerSyncPacket.fitTitle("Urn"));
+    }
 }

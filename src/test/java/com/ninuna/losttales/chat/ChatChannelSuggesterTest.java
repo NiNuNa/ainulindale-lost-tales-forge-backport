@@ -59,9 +59,9 @@ public final class ChatChannelSuggesterTest {
         assertEquals(Arrays.asList(ChatChannel.OOC),
                 ChatChannelSuggester.matches("OO", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
         assertEquals("the shown name finds a channel too",
-                Arrays.asList(ChatChannel.SERVER_CONSOLE),
+                Arrays.asList(ChatChannel.SERVER_LOG),
                 ChatChannelSuggester.matches("serverl", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
-        assertEquals(Arrays.asList(ChatChannel.CLIENT_CONSOLE),
+        assertEquals(Arrays.asList(ChatChannel.CONSOLE),
                 ChatChannelSuggester.matches("cons", all, "lotr:gondor", 20, EnglishWords.INSTANCE));
         assertEquals("the Faction channel answers to its faction's name",
                 Arrays.asList(ChatChannel.FACTION),
@@ -139,13 +139,12 @@ public final class ChatChannelSuggesterTest {
         assertSame(ChatChannel.GLOBAL, ChatChannelSuggester.linkAt("#global", 0).channel);
         assertSame(ChatChannel.GLOBAL, ChatChannelSuggester.linkAt("#Global", 0).channel);
         assertSame(ChatChannel.OOC, ChatChannelSuggester.linkAt("#OOC", 0).channel);
-        assertSame(ChatChannel.CLIENT_CONSOLE,
-                ChatChannelSuggester.linkAt("#client_console", 0).channel);
+        assertSame(ChatChannel.CONSOLE,
+                ChatChannelSuggester.linkAt("#console", 0).channel);
         assertNull("the shown name is not a code name",
                 ChatChannelSuggester.linkAt("#OutofCharacter", 0));
         assertNull("the old ids are gone", ChatChannelSuggester.linkAt("#all", 0));
         assertNull(ChatChannelSuggester.linkAt("#admin", 0));
-        assertNull(ChatChannelSuggester.linkAt("#console", 0));
         assertNull("the Faction channel is named by its faction",
                 ChatChannelSuggester.linkAt("#faction", 0));
         assertNull(ChatChannelSuggester.linkAt("#nowhere", 0));

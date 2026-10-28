@@ -27,7 +27,12 @@ import java.util.regex.Pattern;
  * operator=colour:A94B54;mention:true;rank:10;op:2;icon:channel:operator
  * moderator=name:Moderator;colour:A94B54;mention:true;rank:15;op:1;faction:GONDOR@gondor.knight;grant:chat.moderate;icon:item:minecraft:iron_sword;desc:Keeps the peace.
  * </pre>
- * Options are optional and case-insensitive. A role without a name is
+ * Options are optional and case-insensitive. {@code rank:} places the
+ * role, 1 the highest and 1,000 the lowest, 20 when left out: the lower
+ * number is listed first, colours the name, and stands above the higher
+ * in the role hierarchy, where someone given {@code roles.manage} through
+ * a role manages only the roles ranked below their own highest
+ * (DATA-14). A role without a name is
  * named by its id, except a role the mod ships a name for
  * ({@link #SHIPPED_NAMES}, the seeded operator role): each game names that
  * one by its lang line, and its card describes it by the line under it,
@@ -86,6 +91,12 @@ public final class ChatRoleConfig {
             Arrays.asList("read", "send"));
     /** The prefix a member entry gives a character id rather than an account id. */
     public static final String CHARACTER_MEMBER_PREFIX = "character:";
+    /**
+     * The most members one entry names: 64 character ids and a role id of
+     * the longest keep the entry inside a line the config takes (4,096
+     * letters); a role with more is written over several entries.
+     */
+    public static final int MEMBERS_PER_LINE = 64;
     /** The id of the role a fresh file is seeded with. */
     static final String SEEDED_OPERATOR_ID = "operator";
     /**
@@ -340,7 +351,7 @@ public final class ChatRoleConfig {
     /**
      * The permissions the entries describe:
      * <pre>
-     * keeper=capability:chat.moderate;capability:chat.server_console.read
+     * keeper=capability:chat.moderate;capability:chat.server_log.read
      * </pre>
      * {@code capability:} may repeat and names a capability the code
      * registers; one naming none is skipped with a warning and the rest
@@ -738,9 +749,10 @@ public final class ChatRoleConfig {
 
     /**
      * The member entries with the role's accounts and characters
-     * replaced, or the entry removed when both are empty. Accounts are
+     * replaced, or the entries removed when both are empty. Accounts are
      * written first, then characters behind {@link #CHARACTER_MEMBER_PREFIX},
-     * each group sorted so a rewrite is stable.
+     * each group sorted so a rewrite is stable, {@link #MEMBERS_PER_LINE}
+     * to an entry; the entries of one role are read back as one.
      */
     public static List<String> withMembers(String[] entries, String roleId, Set<UUID> members,
                                            Set<UUID> characterMembers) {
@@ -759,10 +771,11 @@ public final class ChatRoleConfig {
         }
         Collections.sort(characters);
         ids.addAll(characters);
-        if (!ids.isEmpty()) {
+        for (int start = 0; start < ids.size(); start += MEMBERS_PER_LINE) {
             StringBuilder entry = new StringBuilder(roleId).append('=');
-            for (int index = 0; index < ids.size(); index++) {
-                if (index > 0) {
+            int end = Math.min(ids.size(), start + MEMBERS_PER_LINE);
+            for (int index = start; index < end; index++) {
+                if (index > start) {
                     entry.append(',');
                 }
                 entry.append(ids.get(index));

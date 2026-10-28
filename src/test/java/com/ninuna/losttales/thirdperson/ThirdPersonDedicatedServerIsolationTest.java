@@ -20,7 +20,7 @@ public final class ThirdPersonDedicatedServerIsolationTest {
             throws Exception {
         Class<?>[] commonClasses = {
                 ChargeTierCalculator.class,
-                ThirdPersonChargeItemPolicy.class,
+                ChargeItemPolicy.class,
                 ThirdPersonItemUsePolicy.class,
                 ThirdPersonProjectileItemPolicy.class,
                 LostTalesThirdPersonAimPacket.class,

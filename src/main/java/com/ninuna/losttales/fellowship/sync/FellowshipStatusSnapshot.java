@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Private runtime status snapshot for one account's active fellowship context. */
+/** The member statuses one player is sent, for the fellowship the identity they play travels with. */
 public final class FellowshipStatusSnapshot {
 
     private final UUID ownerId;
@@ -119,7 +119,7 @@ public final class FellowshipStatusSnapshot {
         return null;
     }
 
-    /** Compares authoritative content while intentionally ignoring sequence. */
+    /** Whether the two say the same, whatever their sequence numbers. */
     public boolean hasSameContent(FellowshipStatusSnapshot other) {
         if (other == null
                 || !this.ownerId.equals(other.ownerId)

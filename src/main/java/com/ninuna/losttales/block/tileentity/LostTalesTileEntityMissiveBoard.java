@@ -7,6 +7,8 @@ import com.ninuna.losttales.quest.missive.LostTalesMissiveData;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveGenerator;
 import com.ninuna.losttales.quest.missive.LostTalesMissiveNbt;
 import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
+import com.ninuna.losttales.quest.missive.MissiveNotice;
+import com.ninuna.losttales.util.LostTalesLog;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -50,7 +52,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
 
         long worldTime = this.worldObj.getTotalWorldTime();
         this.expireOldMissives(worldTime);
-        if (!LostTalesConfig.enableDynamicMissiveBoards) {
+        if (!LostTalesConfig.enableMissiveBoards) {
             return;
         }
         if (this.nextGenerationWorldTime <= 0L) {
@@ -98,8 +100,8 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
         }
 
         int room = Math.min(most - available, this.getEmptySlotCount());
-        int configuredMinBatch = Math.max(1, Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMinGeneratedPerCycle));
-        int configuredMaxBatch = Math.max(configuredMinBatch, Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMaxGeneratedPerCycle));
+        int configuredMinBatch = Math.max(1, Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMinPostedPerCycle));
+        int configuredMaxBatch = Math.max(configuredMinBatch, Math.min(INVENTORY_SIZE, LostTalesConfig.missiveBoardMaxPostedPerCycle));
         int maxBatch = Math.min(configuredMaxBatch, room);
         int minBatch = Math.min(configuredMinBatch, maxBatch);
         if (maxBatch <= 0) {
@@ -109,8 +111,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
 
         int toGenerate = minBatch;
         if (available < getMinAvailableMissives()) {
-            // Refill boards below the desired floor more eagerly, but still only
-            // in small batches so missives do not all regenerate at once.
+            // A board below its least posts its most, never every slot at once.
             toGenerate = maxBatch;
         } else if (maxBatch > minBatch) {
             toGenerate += this.worldObj.rand.nextInt(maxBatch - minBatch + 1);
@@ -154,8 +155,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
             if (missive == null || !missive.isValid()) {
                 continue;
             }
-            long generatedAt = missive.getGenerationWorldTime();
-            if (generatedAt > 0L && worldTime >= generatedAt && worldTime - generatedAt >= expirationTicks) {
+            if (MissiveNotice.isPast(missive.getGenerationWorldTime(), expirationTicks, worldTime)) {
                 this.notices[slot] = null;
                 changed = true;
             }
@@ -270,6 +270,7 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
         }
 
         NBTTagList list = nbt.getTagList("Items", 10);
+        int dropped = 0;
         for (int i = 0; i < list.tagCount(); i++) {
             NBTTagCompound itemTag = list.getCompoundTagAt(i);
             int slot = itemTag.getByte("Slot") & 255;
@@ -277,8 +278,19 @@ public class LostTalesTileEntityMissiveBoard extends TileEntity {
                 ItemStack stack = ItemStack.loadItemStackFromNBT(itemTag);
                 if (this.isMissiveLetter(stack)) {
                     this.notices[slot] = stack;
+                } else {
+                    dropped++;
                 }
             }
+        }
+        // A board holds letters alone. Any other stack in its data, one
+        // whose item no longer exists among them, is left out, logged in
+        // one line for the board.
+        if (dropped > 0) {
+            LostTalesLog.warning("The missive board at %s, %s, %s held %s"
+                    + " stacks that are no missive letter; they are gone from it",
+                    Integer.valueOf(this.xCoord), Integer.valueOf(this.yCoord),
+                    Integer.valueOf(this.zCoord), Integer.valueOf(dropped));
         }
     }
 

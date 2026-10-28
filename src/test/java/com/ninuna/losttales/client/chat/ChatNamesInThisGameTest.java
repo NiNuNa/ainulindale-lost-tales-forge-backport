@@ -24,7 +24,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * A game shows the chat's own names in its player's language: the
- * channels on their tabs and lists, a faction's chat, the Server, the
+ * channels on their pages and lists, a faction's chat, the Server, the
  * Client and the Narrator on their lines and in the member lists. What a
  * line was signed with and what a search finds by code name stay as they
  * are.

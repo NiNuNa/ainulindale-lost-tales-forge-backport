@@ -21,7 +21,7 @@ import net.minecraft.potion.PotionEffect;
 import net.minecraftforge.event.entity.player.PlayerUseItemEvent;
 
 /**
- * The cook's mark (Nils, 2026-10-19): food a cook with a Cooking perk
+ * The cook's mark (PROG-15): food a cook with a Cooking perk
  * takes from an oven, a furnace or a crafting grid carries their name,
  * and their own food stacks together. Hearty Meals and Feast work when
  * the cook eats what they cooked, Master Cook when anyone eats it.

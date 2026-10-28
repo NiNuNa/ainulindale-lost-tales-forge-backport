@@ -7,8 +7,8 @@ import com.ninuna.losttales.fellowship.sync.FellowshipStateSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipTrackingSnapshot;
 
 /**
- * Client-only, non-authoritative cache of the positions of the members of
- * the fellowship travelled with. The marks ride in the fellowship state
+ * The positions of the members of the fellowship travelled with, as the
+ * server last sent them. The marks ride in the fellowship state
  * ({@link ClientFellowshipMarks}).
  */
 public final class ClientFellowshipTrackingCache {

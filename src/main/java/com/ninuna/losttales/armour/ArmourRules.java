@@ -90,6 +90,21 @@ public final class ArmourRules {
         return left;
     }
 
+    /**
+     * Whether Soft Step keeps a sneaking wearer from a foe's pick (PROG-17):
+     * the foe stands farther than its notice range less Soft Step's share
+     * ({@code share}), and has not just been struck by the wearer, while
+     * {@code endsOnStrike}; a foe struck picks the wearer whatever the range.
+     */
+    public static boolean unnoticed(double distanceSq, double noticeRange, double share,
+                                    boolean struck, boolean endsOnStrike) {
+        if (struck && endsOnStrike) {
+            return false;
+        }
+        double notice = noticeRange * (1.0D - Math.max(0.0D, Math.min(1.0D, share)));
+        return distanceSq > notice * notice;
+    }
+
     private static double lessen(double left, PerkIndex perks, PerkEffect effect) {
         for (TakenPerk perk : perks.taken(effect)) {
             left *= 1.0D - Math.min(1.0D, perk.amount());

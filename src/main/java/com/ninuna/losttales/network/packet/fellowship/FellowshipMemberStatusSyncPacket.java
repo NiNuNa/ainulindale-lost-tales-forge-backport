@@ -2,6 +2,7 @@ package com.ninuna.losttales.network.packet.fellowship;
 
 import com.ninuna.losttales.LostTalesMod;
 import com.ninuna.losttales.network.packet.LostTalesPacketCodec;
+import com.ninuna.losttales.network.packet.character.CharacterGearPacket;
 import com.ninuna.losttales.fellowship.model.Fellowship;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberAvailability;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberStatusSnapshot;
@@ -19,8 +20,17 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Bounded server-authoritative health and availability state for one fellowship. */
+/**
+ * Each member's availability, health, helmet and held item, for the
+ * fellowship the player travels with. The HUD draws the two stacks at icon
+ * size, so each goes without its tag where Forge writes it in more than
+ * {@link #MAX_STACK_BYTES} ({@link #bounded}): a book's text never travels
+ * to every member.
+ */
 public final class FellowshipMemberStatusSyncPacket implements IMessage {
+
+    /** One stack on the wire, its tag compressed: an enchanted, named and dyed helmet fits. */
+    public static final int MAX_STACK_BYTES = 1024;
 
     private FellowshipStatusSnapshot snapshot;
     private boolean malformed;
@@ -134,6 +144,11 @@ public final class FellowshipMemberStatusSyncPacket implements IMessage {
                 ByteBufUtils.writeItemStack(buffer, status.getHeldItem());
             }
         }
+    }
+
+    /** A member's helmet or held item as the status carries it: a copy, its tag left behind past the bound. */
+    public static ItemStack bounded(ItemStack stack) {
+        return CharacterGearPacket.bounded(stack, MAX_STACK_BYTES);
     }
 
     public FellowshipStatusSnapshot getSnapshot() {

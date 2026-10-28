@@ -41,7 +41,7 @@ import net.minecraft.client.gui.FontRenderer;
  * keep from the separator ({@link #drivenTo}). The window keeps its
  * size; its words take the area's room.</p>
  *
- * <p>The closed feed has no area: its lines begin {@link #EDGE_GAP} from
+ * <p>The feed has no area: its lines begin {@link #EDGE_GAP} from
  * its edge and wear the small head beside the name. Everything that lays
  * a window out — the renderer's panel, background band, separator,
  * avatars and times, and the per-window wrapping — reads these offsets
@@ -50,7 +50,7 @@ import net.minecraft.client.gui.FontRenderer;
  */
 final class ChatTimestampColumn {
     /**
-     * The closed feed's gap at its edge: a mention's bar and two clear
+     * The feed's gap at its edge: a mention's bar and two clear
      * pixels past it.
      */
     static final int EDGE_GAP = 4;
@@ -70,11 +70,11 @@ final class ChatTimestampColumn {
      */
     static final int ITALIC_LEAN = 1;
 
-    /** The closed feed: no area at all. */
+    /** The feed: no area at all. */
     private static final ChatTimestampColumn FEED =
             new ChatTimestampColumn(false, 0, 0.0F);
 
-    /** Whether the window has the area; the closed feed has none. */
+    /** Whether the window has the area; the feed has none. */
     final boolean enabled;
     /** The area's width, from the window's edge to the separator. */
     final int width;
@@ -114,13 +114,13 @@ final class ChatTimestampColumn {
         return new ChatTimestampColumn(this.enabled, this.width, share);
     }
 
-    /** No area at all; what the closed feed always uses. */
+    /** No area at all; what the feed always uses. */
     static ChatTimestampColumn feed() {
         return FEED;
     }
 
     /**
-     * The width the closed feed's rows stand in, on a band
+     * The width the feed's rows stand in, on a band
      * {@code bandWidth} wide whose rows start {@link #EDGE_GAP} in: the
      * band less the edge gap at either end, so a row standing against the
      * right edge keeps the clear pixels a row at the left keeps, and a

@@ -14,7 +14,11 @@ import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.WorldServer;
 
-/** Server-thread authority boundary for offset-camera block actions. */
+/**
+ * Uses of the block face a player aims at over the shoulder, checked
+ * again on the server thread: reach, a clear line to that face, spawn
+ * protection and the build limit.
+ */
 public final class LostTalesThirdPersonBlockActionService {
     private static final double REACH_TOLERANCE = 0.25D;
     private static final double RAY_EXTENSION = 0.01D;

@@ -5,7 +5,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * The closed feed's alignment is one of three names, read however it was
+ * The feed's alignment is one of three names, read however it was
  * typed; anything else is the middle, which is where the lines stand
  * until the player chooses.
  */

@@ -3,7 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.config.LostTalesConfig;
 
 /**
- * Which edge the closed-chat feed's lines stand against: the left, as an
+ * Which edge the feed's lines stand against: the left, as an
  * open window's do, the right, or the middle. Only where a line stands in
  * the feed's box moves — each keeps its own shape, the channel before the
  * sender and the chevron before the words, and a message wrapped over

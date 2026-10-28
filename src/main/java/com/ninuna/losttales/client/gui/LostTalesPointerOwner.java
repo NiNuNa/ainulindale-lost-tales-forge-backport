@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.gui;
 
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 
@@ -18,5 +18,5 @@ import cpw.mods.fml.relauncher.SideOnly;
 @SideOnly(Side.CLIENT)
 public interface LostTalesPointerOwner {
     /** The pose for the frame just drawn; null for the plain arrow. */
-    LostTalesMapCursor.Pose pointerPose(int mouseX, int mouseY);
+    LostTalesPointer.Pose pointerPose(int mouseX, int mouseY);
 }

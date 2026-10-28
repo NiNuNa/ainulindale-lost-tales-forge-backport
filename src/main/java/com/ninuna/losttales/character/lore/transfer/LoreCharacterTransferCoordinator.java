@@ -38,9 +38,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Server-thread transaction coordinator for unique lore-character claims and
- * releases. A full metadata/state copy is flushed before any roster access is
- * changed, and each later phase is idempotent for startup/login recovery.
+ * Claims and releases lore figures, on the server thread. A copy of the
+ * figure and its saved life reaches disk before any roster changes, and
+ * every later step may run again, so a claim or release cut short is
+ * finished as the server starts or a player joins.
  */
 public final class LoreCharacterTransferCoordinator {
 
@@ -172,6 +173,8 @@ public final class LoreCharacterTransferCoordinator {
             }
             CharacterRoster committed = stores.characters.getRoster(
                     player.getUniqueID());
+            // A figure's life that held what the game no longer takes says so.
+            com.ninuna.losttales.character.server.SavedLifeNotices.tell(player);
             return CharacterOperationResult.success(true, committed,
                     committed == null ? null
                             : committed.getCharacter(characterId));
@@ -279,8 +282,8 @@ public final class LoreCharacterTransferCoordinator {
     }
 
     /**
-     * Completes all durable operations, including operations for offline
-     * owners. A claim needs its figure, so nothing is done until the lore
+     * Finishes every claim and release under way, an absent owner's too.
+     * A claim needs its figure, so nothing is done until the lore
      * files are read as the server starts, after its races.
      */
     public synchronized void recoverAll(World world) {
@@ -378,7 +381,14 @@ public final class LoreCharacterTransferCoordinator {
             CharacterPlayerStateRecord existing = account.getRecord(
                     transaction.getCharacterId());
             if (existing == null) {
-                account.putRecord(vault.getPlayerStateCopy());
+                // What the game no longer takes is set aside as the life
+                // comes in, as a read would (CHAR-46).
+                try {
+                    stores.playerState(transaction.getTargetOwnerId())
+                            .putRecordSettingAside(account, vault.getPlayerStateCopy());
+                } catch (IllegalStateException full) {
+                    return CharacterErrorId.LORE_CHARACTER_STATE_UNAVAILABLE;
+                }
                 stores.playerState(transaction.getTargetOwnerId())
                         .saveAccount(account);
             } else if (existing.getCurrentGeneration()
@@ -448,6 +458,9 @@ public final class LoreCharacterTransferCoordinator {
                         roster.getActiveCharacterId())) {
                     return CharacterErrorId.LORE_CHARACTER_ACTIVE;
                 }
+                CharacterErrorId kept = keepHeldLife(
+                        stores, transaction, character);
+                if (kept != CharacterErrorId.NONE) return kept;
                 // The figure keeps its places for its next holder (CHAR-36).
                 FellowshipOperationResult cleanup = FellowshipService.getInstance()
                         .releaseFigure(world, character);
@@ -465,6 +478,8 @@ public final class LoreCharacterTransferCoordinator {
             LoreCharacterTransferStorage.flush(world);
         }
         if (transaction.getStep() == 1) {
+            CharacterErrorId kept = keepHeldLife(stores, transaction, null);
+            if (kept != CharacterErrorId.NONE) return kept;
             CharacterPlayerStateWorldData stateData = stores.playerState(
                     transaction.getSourceOwnerId());
             CharacterPlayerStateAccount account = stateData.getAccount(
@@ -507,6 +522,66 @@ public final class LoreCharacterTransferCoordinator {
                 transaction.getTransactionId());
         LoreCharacterTransferStorage.flush(world);
         return CharacterErrorId.NONE;
+    }
+
+    /**
+     * Writes the figure's vault copy again from what its holder has before
+     * a release step takes it away. A release that waits leaves the figure
+     * playable, so the next holder gets the life lived meanwhile, not the
+     * one from the request. A newer saved life that does not validate
+     * keeps the release waiting.
+     */
+    private static CharacterErrorId keepHeldLife(
+            Stores stores,
+            LoreCharacterTransferRecord transaction,
+            RoleplayCharacter character) {
+        LoreCharacterVaultEntry vault = stores.transfers.getVaultEntry(
+                transaction.getLoreCharacterId());
+        if (vault == null || !vault.getCharacterId().equals(
+                transaction.getCharacterId())) {
+            return CharacterErrorId.LORE_CHARACTER_STATE_UNAVAILABLE;
+        }
+        CharacterPlayerStateAccount account = stores.playerState(
+                transaction.getSourceOwnerId()).getAccount(
+                transaction.getSourceOwnerId());
+        CharacterPlayerStateRecord state = account == null ? null
+                : account.getRecord(transaction.getCharacterId());
+        LoreCharacterVaultEntry held = heldNow(vault, character, state,
+                System.currentTimeMillis());
+        if (held == vault) return CharacterErrorId.NONE;
+        if (held.getPlayerStateCopy().getCurrentGeneration()
+                != vault.getPlayerStateCopy().getCurrentGeneration()) {
+            try {
+                CharacterPlayerStateService.getInstance().validateSnapshot(
+                        held.getPlayerStateCopy().getCurrent());
+            } catch (CharacterStateValidationException exception) {
+                return CharacterErrorId.LORE_CHARACTER_STATE_UNAVAILABLE;
+            }
+        }
+        stores.transfers.saveVault(held);
+        LoreCharacterTransferStorage.flush(stores.world);
+        return CharacterErrorId.NONE;
+    }
+
+    /**
+     * The vault copy as the holder has the figure now: its record and its
+     * saved life where they are given, the copy's own where not. The copy
+     * itself while neither is given.
+     */
+    static LoreCharacterVaultEntry heldNow(LoreCharacterVaultEntry vault,
+                                           RoleplayCharacter character,
+                                           CharacterPlayerStateRecord state,
+                                           long now) {
+        boolean newCharacter = character != null
+                && character.getCharacterId().equals(vault.getCharacterId())
+                && vault.getCapturedOwnerId().equals(character.getOwnerId());
+        boolean newState = state != null
+                && state.getCharacterId().equals(vault.getCharacterId());
+        if (!newCharacter && !newState) return vault;
+        return new LoreCharacterVaultEntry(
+                vault.getLoreCharacterId(), vault.getCapturedOwnerId(),
+                newCharacter ? character : vault.getCharacterCopy(),
+                newState ? state : vault.getPlayerStateCopy(), now);
     }
 
     /** The figure as first claimed; null while it cannot start in its file's faction. */

@@ -216,8 +216,11 @@ public final class LostTalesMapMarkerSnapshotPacket implements IMessage {
                 boolean requiresRegion = buffer.readBoolean();
                 LostTalesMapMarkerSource source =
                         LostTalesMapMarkerSource.forSerializedName(
-                                readId(buffer),
-                                LostTalesMapMarkerSource.CUSTOM_PRESET);
+                                readId(buffer), null);
+                if (source == null) {
+                    throw new LostTalesPacketCodec.DecodeException(
+                            "unknown map marker source");
+                }
                 boolean hasWaystone = buffer.readBoolean();
                 String structureType = readId(buffer);
                 int priority = buffer.readInt();

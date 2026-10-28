@@ -7,7 +7,10 @@ import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 import com.ninuna.losttales.fellowship.sync.FellowshipOperationType;
 import net.minecraft.client.resources.I18n;
 
-/** Client-only localization helper for fellowship identifiers and operation results. */
+/**
+ * The words this game shows for a fellowship request's refusal or answer,
+ * a member's colour, and a character's name with its account.
+ */
 public final class ClientFellowshipDisplayNames {
 
     private ClientFellowshipDisplayNames() {}

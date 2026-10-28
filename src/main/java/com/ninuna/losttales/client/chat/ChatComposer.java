@@ -21,7 +21,7 @@ import org.lwjgl.opengl.GL11;
  * the same gesture aimed at different ends of a message, so they share
  * the strip above the bar and never both hold it — starting one puts
  * the other down. Either belongs to the message in front of you: it is
- * cleared when it is sent, when the tab changes, and on Escape, so it
+ * cleared when it is sent, when the page changes, and on Escape, so it
  * never survives moving away from the message.
  */
 final class ChatComposer {
@@ -42,9 +42,9 @@ final class ChatComposer {
      * sender.
      */
     private ChatHeadMarker.Data replyToHead;
-    private ConversationPage replyTab;
+    private ConversationPage replyPage;
     private long editingMessageId = ChatMessageIds.NONE;
-    private ConversationPage editingTab;
+    private ConversationPage editingPage;
     /** The chip drawn this frame, for the click that dismisses it. */
     private double chipLeft;
     private double chipTop;
@@ -52,28 +52,28 @@ final class ChatComposer {
     private double chipBottom;
 
     /**
-     * Starts answering a message in its tab, the line's {@code head} as
+     * Starts answering a message in its page, the line's {@code head} as
      * it was drawn ({@link LostTalesChatPresentation#headOfLine}); whatever
      * was composed goes.
      */
-    void startReply(ConversationPage tab, long messageId, String name, String excerpt,
+    void startReply(ConversationPage page, long messageId, String name, String excerpt,
                     ChatHeadMarker.Data head) {
         this.replyToMessageId = messageId;
         this.replyToName = name == null ? "" : name;
         this.replyToExcerpt = ChatMessageValidator.oneLine(excerpt);
         this.replyToHead = head;
-        this.replyTab = tab;
+        this.replyPage = page;
     }
 
-    /** Starts rewriting a message in its tab; a reply in progress goes. */
-    void startEdit(ConversationPage tab, long messageId) {
+    /** Starts rewriting a message in its page; a reply in progress goes. */
+    void startEdit(ConversationPage page, long messageId) {
         cancelReply();
         this.editingMessageId = messageId;
-        this.editingTab = tab;
+        this.editingPage = page;
     }
 
     /**
-     * Whether a reply is being composed in the tab now selected: one
+     * Whether a reply is being composed in the page now selected: one
      * answering a message the server named, or one quoting a line
      * nobody named by its author and words alone — a client-local id
      * is one of those, anchored here for the jump and quoted by its
@@ -82,15 +82,15 @@ final class ChatComposer {
     boolean isReplying() {
         boolean named = ChatMessageIds.isServerId(this.replyToMessageId)
                 || this.replyToName.length() > 0;
-        return named && this.replyTab != null
-                && this.replyTab.equals(ClientChatChannelState.getSelected());
+        return named && this.replyPage != null
+                && this.replyPage.equals(ClientChatChannelState.getSelected());
     }
 
-    /** Whether a message is being rewritten in the tab now selected. */
+    /** Whether a message is being rewritten in the page now selected. */
     boolean isEditing() {
         return ChatMessageIds.isServerId(this.editingMessageId)
-                && this.editingTab != null
-                && this.editingTab.equals(ClientChatChannelState.getSelected());
+                && this.editingPage != null
+                && this.editingPage.equals(ClientChatChannelState.getSelected());
     }
 
     /** The message being rewritten; {@link ChatMessageIds#NONE} for none. */
@@ -142,13 +142,13 @@ final class ChatComposer {
         this.replyToName = "";
         this.replyToExcerpt = "";
         this.replyToHead = null;
-        this.replyTab = null;
+        this.replyPage = null;
     }
 
     /** Forgets the message being rewritten; the field keeps what is in it. */
     void cancelEdit() {
         this.editingMessageId = ChatMessageIds.NONE;
-        this.editingTab = null;
+        this.editingPage = null;
     }
 
     /** A message taken back is no longer being rewritten either. */
@@ -174,15 +174,15 @@ final class ChatComposer {
     }
 
     /**
-     * Composing belongs to the tab it started in: a reply or an edit
-     * aimed at another tab is dropped when this one is selected rather
+     * Composing belongs to the page it started in: a reply or an edit
+     * aimed at another page is dropped when this one is selected rather
      * than carried along.
      */
-    void onTabSelected(ConversationPage tab) {
-        if (this.replyTab != null && !this.replyTab.equals(tab)) {
+    void onPageSelected(ConversationPage page) {
+        if (this.replyPage != null && !this.replyPage.equals(page)) {
             cancelReply();
         }
-        if (this.editingTab != null && !this.editingTab.equals(tab)) {
+        if (this.editingPage != null && !this.editingPage.equals(page)) {
             cancelEdit();
         }
     }
@@ -198,9 +198,9 @@ final class ChatComposer {
                 LostTalesWords.LANG, head.senderId, head.skinId, this.replyToName);
     }
 
-    /** The tab whose strip the chip stands in, or null with nothing composed. */
-    private ConversationPage composingTab() {
-        return isEditing() ? this.editingTab : isReplying() ? this.replyTab : null;
+    /** The page whose strip the chip stands in, or null with nothing composed. */
+    private ConversationPage composingPage() {
+        return isEditing() ? this.editingPage : isReplying() ? this.replyPage : null;
     }
 
     /**
@@ -216,7 +216,7 @@ final class ChatComposer {
                      ChatFrame frame, LostTalesGuiAnimationSample opening,
                      int mouseX, int mouseY) {
         this.chipRight = 0;
-        ConversationPage composing = composingTab();
+        ConversationPage composing = composingPage();
         if (composing == null || !composing.equals(
                 ChatFrame.activeTab(window,
                         ChatFrame.visibleTabs(window)))) {

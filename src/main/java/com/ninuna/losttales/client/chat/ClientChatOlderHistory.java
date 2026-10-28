@@ -15,7 +15,7 @@ import net.minecraft.client.gui.GuiNewChat;
 
 /**
  * Loads a channel's older lines as the reader reaches the top of its
- * tab, the way a messenger pages its history in. A view scrolled to its
+ * page, the way a messenger pages its history in. A view scrolled to its
  * oldest line asks the server for the page before that line, once; the
  * answer is laid above it, and the view may ask again from its new
  * oldest line. A view whose ask changes nothing within
@@ -64,7 +64,7 @@ final class ClientChatOlderHistory {
         if (decision != Decision.ASK) {
             return false;
         }
-        // A whisper names its conversation by the tab's id — the one held
+        // A whisper names its conversation by the page's id — the one held
         // as the identity being read; a scoped channel by the conversation.
         String scope = view.isWhisper() ? ConversationPage.viewedConversation(view).id()
                 : ClientChatContextHistory.scopeOf(ConversationPage.viewedConversation(view));
@@ -130,8 +130,8 @@ final class ClientChatOlderHistory {
      * {@code messageId}. Read off the game's own unwrapped list, newest
      * first, so the answer is the list's and nothing cached.
      */
-    static Integer anchorFor(Minecraft minecraft, ConversationPage tab, long messageId) {
-        if (minecraft == null || minecraft.ingameGUI == null || tab == null
+    static Integer anchorFor(Minecraft minecraft, ConversationPage page, long messageId) {
+        if (minecraft == null || minecraft.ingameGUI == null || page == null
                 || !ChatMessageIds.isServerId(messageId)) {
             return null;
         }
@@ -140,13 +140,13 @@ final class ClientChatOlderHistory {
         if (held == null) {
             return null;
         }
-        ConversationPage view = key(tab);
+        ConversationPage view = key(page);
         for (int index = held.size() - 1; index >= 0; index--) {
             ChatLine line = held.get(index);
             if (line == null) {
                 continue;
             }
-            ConversationPage filed = ClientChatChannelViews.tabOf(line.getChatLineID());
+            ConversationPage filed = ClientChatChannelViews.pageOf(line.getChatLineID());
             if (filed == null || !view.equals(key(filed))) {
                 continue;
             }
@@ -187,7 +187,7 @@ final class ClientChatOlderHistory {
         EXHAUSTED.clear();
     }
 
-    private static ConversationPage key(ConversationPage tab) {
-        return tab == null ? null : ConversationPage.viewedConversation(tab);
+    private static ConversationPage key(ConversationPage page) {
+        return page == null ? null : ConversationPage.viewedConversation(page);
     }
 }

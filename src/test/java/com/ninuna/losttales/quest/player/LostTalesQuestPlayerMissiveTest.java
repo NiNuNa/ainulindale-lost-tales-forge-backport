@@ -2,6 +2,7 @@ package com.ninuna.losttales.quest.player;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
 import com.ninuna.losttales.quest.LostTalesQuestObjectiveDefinition;
+import com.ninuna.losttales.quest.LostTalesQuestRegistry;
 import com.ninuna.losttales.quest.LostTalesQuestStageDefinition;
 import java.util.Collections;
 import net.minecraft.nbt.NBTTagCompound;
@@ -20,7 +21,7 @@ import static org.junit.Assert.assertTrue;
  * send and switch its quest log.
  */
 public final class LostTalesQuestPlayerMissiveTest {
-    private static final String PREFIX = "losttales:missive/generated/dim0_1_64_1/";
+    private static final String PREFIX = "losttales:missive/dim0_1_64_1/";
 
     private static LostTalesQuestDefinition missive(String id) {
         return new LostTalesQuestDefinition(id, "Bounty", "Thin the wolves.",
@@ -36,7 +37,7 @@ public final class LostTalesQuestPlayerMissiveTest {
 
     private static void takeAndFinish(LostTalesQuestPlayerData data, int index) {
         String id = PREFIX + index;
-        assertTrue(data.rememberDynamicQuestDefinition(missive(id)));
+        assertTrue(data.rememberMissiveDefinition(missive(id)));
         data.startQuest(id, "10", index, 0L);
         assertTrue(data.completeQuest(id, index + 1L,
                 Collections.<String>emptySet()));
@@ -50,7 +51,7 @@ public final class LostTalesQuestPlayerMissiveTest {
             takeAndFinish(data, index);
         }
         assertEquals(LostTalesQuestPlayerData.MAX_ENDED_MISSIVES,
-                data.getDynamicQuestDefinitions().size());
+                data.getMissiveDefinitions().size());
         assertEquals(LostTalesQuestPlayerData.MAX_ENDED_MISSIVES,
                 data.getQuestHistory().size());
         assertNull("the oldest is forgotten",
@@ -66,28 +67,51 @@ public final class LostTalesQuestPlayerMissiveTest {
     @Test
     public void aMissiveThatNeverRanIsForgotten() {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
-        assertTrue(data.rememberDynamicQuestDefinition(missive(PREFIX + "unrun")));
+        assertTrue(data.rememberMissiveDefinition(missive(PREFIX + "unrun")));
         assertTrue(data.forgetEndedMissives());
-        assertTrue(data.getDynamicQuestDefinitions().isEmpty());
+        assertTrue(data.getMissiveDefinitions().isEmpty());
     }
 
     @Test
     public void aFullLogRefusesAMissiveUntilOneEnds() {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
-        for (int index = 0; index < LostTalesQuestPlayerData.MAX_DYNAMIC_QUESTS; index++) {
+        for (int index = 0; index < LostTalesQuestPlayerData.MAX_MISSIVES; index++) {
             String id = PREFIX + index;
-            assertTrue(data.rememberDynamicQuestDefinition(missive(id)));
+            assertTrue(data.rememberMissiveDefinition(missive(id)));
             data.startQuest(id, "10", 0L, 0L);
         }
         assertFalse("every missive the log holds is running",
-                data.rememberDynamicQuestDefinition(missive(PREFIX + "more")));
+                data.rememberMissiveDefinition(missive(PREFIX + "more")));
 
         assertTrue(data.abandonQuest(PREFIX + 0, "gui.losttales.quest.reason.abandoned", 5L));
         assertTrue("the ended one makes room",
-                data.rememberDynamicQuestDefinition(missive(PREFIX + "more")));
+                data.rememberMissiveDefinition(missive(PREFIX + "more")));
         assertNull(data.getQuestHistoryEntry(PREFIX + 0));
-        assertEquals(LostTalesQuestPlayerData.MAX_DYNAMIC_QUESTS,
-                data.getDynamicQuestDefinitions().size());
+        assertEquals(LostTalesQuestPlayerData.MAX_MISSIVES,
+                data.getMissiveDefinitions().size());
+    }
+
+    /** A loaded log's missives are known to the quest registry, every one of them. */
+    @Test
+    public void aLoadedLogsMissivesAreRegistered() {
+        LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
+        String running = PREFIX + "running";
+        assertTrue(data.rememberMissiveDefinition(missive(running)));
+        data.startQuest(running, "10", 1L, 0L);
+        takeAndFinish(data, 2);
+        NBTTagCompound wrapper = new NBTTagCompound();
+        data.saveNBTData(wrapper);
+        LostTalesQuestRegistry.clearMissives();
+        try {
+            assertNull(LostTalesQuestRegistry.getQuest(running));
+            LostTalesQuestPlayerData loaded = new LostTalesQuestPlayerData();
+            loaded.loadNBTData(wrapper);
+            assertFalse(loaded.isReadOnlyForNewerVersion());
+            assertNotNull(LostTalesQuestRegistry.getQuest(running));
+            assertNotNull(LostTalesQuestRegistry.getQuest(PREFIX + 2));
+        } finally {
+            LostTalesQuestRegistry.clearMissives();
+        }
     }
 
     @Test
@@ -95,7 +119,7 @@ public final class LostTalesQuestPlayerMissiveTest {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
         takeAndFinish(data, 1);
         assertTrue(data.resetQuest(PREFIX + 1));
-        assertTrue(data.getDynamicQuestDefinitions().isEmpty());
+        assertTrue(data.getMissiveDefinitions().isEmpty());
         assertTrue(data.getQuestHistory().isEmpty());
     }
 }

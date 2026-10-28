@@ -264,7 +264,7 @@ public abstract class WindowPage {
      * Puts back what the page lays out as it first was — its panel, its
      * member list and that list's width — as its window's layout is reset.
      */
-    public void resetView() {}
+    public void resetPanels() {}
 
     /** What the well says while nothing is typed in it. */
     public String searchPrompt() {

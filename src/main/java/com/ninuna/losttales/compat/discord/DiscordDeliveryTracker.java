@@ -14,7 +14,7 @@ import java.util.UUID;
 /**
  * Where the Discord posts of the players' own lines have got, so a
  * sender can be told when theirs is slow or will not arrive. A line goes
- * out as one post per binding that posts it, so one message can wait in
+ * out as one post per link that posts it, so one message can wait in
  * several lanes at once: each copy is counted as it reaches a lane, and
  * the line is settled when its last copy is. The sender hears at most
  * two things about a line — a clock once it has waited

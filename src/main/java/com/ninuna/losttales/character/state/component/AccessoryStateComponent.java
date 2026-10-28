@@ -1,8 +1,6 @@
 package com.ninuna.losttales.character.state.component;
 
-import com.ninuna.losttales.accessory.AccessoryCompatibilityRegistry;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
-import com.ninuna.losttales.accessory.AccessorySlotType;
 import com.ninuna.losttales.accessory.player.AccessoryInventory;
 import com.ninuna.losttales.accessory.player.AccessoryInventorySyncManager;
 import com.ninuna.losttales.accessory.player.AccessoryPlayerData;
@@ -13,13 +11,17 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraftforge.common.util.Constants;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The character-owned ring slot plus any loss-prevention quarantine entry.
+ * The character's ring slot, and the entries its accessory data set aside
+ * (the rejected ones) rather than drop. A worn ring the server's list does
+ * not take where the character is played is kept aside then, and handed
+ * back to the inventory once there is room (ACC-07).
  *
  * <p>The snapshot this writes is its own, built from the parsed
  * {@link AccessoryPlayerData} rather than from that data's stored tag: the
@@ -106,19 +108,19 @@ public final class AccessoryStateComponent implements CharacterStateComponent {
                         "Accessory rejected list has an invalid element type");
             }
             if (rejected.tagCount()
-                    > AccessoryPlayerData.MAX_REJECTED_ENTRIES) {
+                    > AccessoryPlayerData.MAX_KEPT_ENTRIES) {
                 throw new CharacterStateValidationException(
                         "Accessory rejected list contains too many entries");
             }
         }
+        // Whether the server's list takes the ring is asked as it is put
+        // on a player, against the list then (ACC-07).
         if (state.hasKey(TAG_EQUIPPED, Constants.NBT.TAG_COMPOUND)) {
             ItemStack equipped = decode(
                     state.getCompoundTag(TAG_EQUIPPED), "equipped");
-            if (equipped.stackSize != 1
-                    || !AccessoryCompatibilityRegistry.server()
-                    .isCompatible(AccessorySlotType.RING, equipped)) {
+            if (equipped.stackSize != 1) {
                 throw new CharacterStateValidationException(
-                        "Accessory equipped entry is incompatible or overstacked");
+                        "Accessory equipped entry is overstacked");
             }
         }
     }
@@ -142,12 +144,23 @@ public final class AccessoryStateComponent implements CharacterStateComponent {
                         rejected.getCompoundTagAt(index).copy());
             }
         }
+        ItemStack leftOff = null;
+        if (equipped != null && !data.getInventory().isItemValidForSlot(
+                AccessoryInventory.RING_SLOT, equipped)) {
+            // The slot does not take it here: kept aside, even past the
+            // bound, and handed back once there is room (ACC-07).
+            rejectedEntries.add((NBTTagCompound)
+                    state.getCompoundTag(TAG_EQUIPPED).copy());
+            leftOff = equipped;
+            equipped = null;
+        }
         try {
             data.replaceState(equipped, rejectedEntries);
         } catch (IllegalArgumentException exception) {
             throw new CharacterStateValidationException(
                     "Accessory state cannot be applied safely", exception);
         }
+        data.noteRingLeftOff(leftOff);
     }
 
     @Override
@@ -159,6 +172,13 @@ public final class AccessoryStateComponent implements CharacterStateComponent {
         player.sendContainerToPlayer(player.inventoryContainer);
         AccessoryInventorySyncManager.send(player);
         AccessoryEffectService.refresh(player);
+        AccessoryPlayerData data = AccessoryPlayerData.get(player);
+        ItemStack leftOff = data == null ? null : data.takeRingLeftOff();
+        if (leftOff != null) {
+            player.addChatMessage(new ChatComponentTranslation(
+                    "chat.losttales.accessory.ring_left_off",
+                    new ChatComponentTranslation(leftOff.getUnlocalizedName() + ".name")));
+        }
     }
 
     private static AccessoryPlayerData requireData(EntityPlayerMP player)

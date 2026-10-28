@@ -6,7 +6,6 @@ import com.ninuna.losttales.chat.ChatMentionCandidate;
 import com.ninuna.losttales.chat.ChatNameSuggester;
 import com.ninuna.losttales.chat.ChatPresenceIdentity;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
-import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -178,16 +177,10 @@ final class ChatNameSuggestionBox extends ChatSuggestionBox {
         int shadow = LostTalesUiInk.shadowAlpha(255);
         if (shadow > 0) {
             ChatPresenceMark.beginShadowCut(x, y, ICON_SIZE);
-            LostTalesSilhouetteRenderState.begin(
-                    LostTalesUiInk.SHADOW);
             try {
-                LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
-                        minecraft, account,
-                        x + LostTalesUiInk.SHADOW_OFFSET,
-                        y + LostTalesUiInk.SHADOW_OFFSET,
-                        ICON_SIZE, 1.0F, 1.0F, 1.0F, shadow / 255.0F);
+                LostTalesChatOverlayRenderer.drawHeadShadow(minecraft, false,
+                        true, account, null, x, y, ICON_SIZE, shadow / 255.0F);
             } finally {
-                LostTalesSilhouetteRenderState.end();
                 ChatPresenceMark.endHeadCut();
             }
         }

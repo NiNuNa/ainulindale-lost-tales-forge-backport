@@ -10,7 +10,7 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraftforge.common.util.Constants;
 
-/** The player's 27-slot ender chest, isolated per roleplaying character. */
+/** The ender chest's 27 slots, each character's own. */
 public final class VanillaEnderChestStateComponent implements CharacterStateComponent {
 
     public static final String ID = "vanilla_ender_chest";

@@ -5,7 +5,7 @@ import com.ninuna.losttales.fellowship.model.FellowshipMark;
 
 import java.util.UUID;
 
-/** Immutable server-authoritative position for one currently trackable member. */
+/** Where one member stands, sent while they share their place. */
 public final class FellowshipTrackedMemberSnapshot {
 
     /** The highest or lowest a tracked member may stand, in blocks. */

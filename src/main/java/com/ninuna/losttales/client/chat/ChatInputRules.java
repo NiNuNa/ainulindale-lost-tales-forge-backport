@@ -2,6 +2,7 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.chat.ChatAction;
 import com.ninuna.losttales.chat.ChatChannel;
+import com.ninuna.losttales.chat.ChatCommandText;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatRolePresentation;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
@@ -17,8 +18,6 @@ import java.util.Locale;
  * strings, so the screen asks them and tests pin them.
  */
 final class ChatInputRules {
-    /** The verbs the chat answers itself rather than sending as commands. */
-    private static final String[] WHISPER_VERBS = {"/msg", "/tell", "/w"};
     /**
      * The chat's own verb for an action in an in-character channel; out
      * of character it is the game's own command.
@@ -78,18 +77,19 @@ final class ChatInputRules {
         return parts.length < 2 ? "" : parts[1].trim();
     }
 
-    /** {@code /msg}, {@code /tell} and {@code /w}, whatever follows. */
+    /**
+     * {@code /msg}, {@code /tell} and {@code /w}, whatever follows: the
+     * game's private message by any of its names
+     * ({@link ChatCommandText#PRIVATE_MESSAGE_NAMES}), which the chat
+     * answers itself rather than sending as a command.
+     */
     static boolean isWhisperCommand(String text) {
         if (text == null) {
             return false;
         }
         String verb = text.trim().split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
-        for (String whisperVerb : WHISPER_VERBS) {
-            if (whisperVerb.equals(verb)) {
-                return true;
-            }
-        }
-        return false;
+        return verb.startsWith("/") && ChatCommandText.PRIVATE_MESSAGE_NAMES
+                .contains(verb.substring(1));
     }
 
     /**

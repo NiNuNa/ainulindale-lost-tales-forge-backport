@@ -2,7 +2,7 @@ package com.ninuna.losttales.compat.lotr;
 
 import com.ninuna.losttales.config.LostTalesConfig;
 
-/** Client presentation choices used by the LOTR quest compatibility hook. */
+/** Whether LOTR's own quest tracker draws; asked by the coremod's patch of it. */
 public final class LotrQuestPresentationHooks {
     private LotrQuestPresentationHooks() {}
 

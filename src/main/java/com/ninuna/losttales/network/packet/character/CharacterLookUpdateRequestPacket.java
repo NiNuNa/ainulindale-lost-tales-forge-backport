@@ -15,8 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
- * Client request to change one owned character's look: its skin, arm
- * width and chest, as Save in Change Look sends them. The wire only bounds
+ * Asks to change the look of one of the player's own characters: its
+ * skin, arms and chest, as Save in Change Look sends them. The wire only bounds
  * the ids; the server holds them to the creator's checks for the
  * character's own race and body type.
  */

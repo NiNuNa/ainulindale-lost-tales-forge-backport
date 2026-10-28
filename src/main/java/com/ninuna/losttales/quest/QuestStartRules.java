@@ -68,7 +68,7 @@ public final class QuestStartRules {
         if (!proven) {
             return Verdict.UNPROVEN;
         }
-        boolean offered = LostTalesQuestDialogue.of(quest).isOffered();
+        boolean offered = LostTalesQuestConversation.of(quest).isOffered();
         if (!wayAllowed(quest, way, offered, itemStarts, interactionStarts)) {
             return Verdict.WRONG_START;
         }

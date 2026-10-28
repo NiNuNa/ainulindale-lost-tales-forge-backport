@@ -6,7 +6,7 @@ import com.ninuna.losttales.gui.hud.compass.LostTalesCompassHudRenderer;
 import com.ninuna.losttales.gui.hud.fellowship.FellowshipHudLayout;
 import com.ninuna.losttales.gui.hud.layout.HudLayoutFiles;
 import com.ninuna.losttales.gui.hud.loot.LostTalesQuickLootHudRenderer;
-import com.ninuna.losttales.gui.hud.quest.LostTalesQuestHudRenderer;
+import com.ninuna.losttales.gui.hud.quest.LostTalesQuestTrackerRenderer;
 import com.ninuna.losttales.progression.ProgressionFiles;
 import java.util.Arrays;
 import java.util.Map;
@@ -24,7 +24,7 @@ import static org.junit.Assert.assertTrue;
 public final class HudLayoutPlacesTest {
     private static final String[] LAYOUTS = {"default", "lotr-safe", "compact", "minimal"};
     private static final String[] PANELS = {
-            "compass", "fellowship", "quickloot", "quest", "notifications"};
+            "compass", "fellowship", "quick_loot", "quest", "notifications"};
     private static final int SCREEN_WIDTH = 480;
     private static final int SCREEN_HEIGHT = 270;
 
@@ -62,8 +62,8 @@ public final class HudLayoutPlacesTest {
                 FellowshipHudLayout.BOX_ROWS));
         assertEquals(BOXES[2][0], LostTalesQuickLootHudRenderer.getPlacementWidth());
         assertEquals(BOXES[2][1], LostTalesQuickLootHudRenderer.getPlacementHeight());
-        assertEquals(BOXES[3][0], LostTalesQuestHudRenderer.getTrackerPlacementWidth());
-        assertEquals(BOXES[3][1], LostTalesQuestHudRenderer.getTrackerPlacementHeight());
+        assertEquals(BOXES[3][0], LostTalesQuestTrackerRenderer.getTrackerPlacementWidth());
+        assertEquals(BOXES[3][1], LostTalesQuestTrackerRenderer.getTrackerPlacementHeight());
         assertEquals(BOXES[4][0], LostTalesNotificationHud.WIDTH);
         assertEquals(BOXES[4][1], LostTalesNotificationHud.HEIGHT);
     }

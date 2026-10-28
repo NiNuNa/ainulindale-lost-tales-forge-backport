@@ -18,8 +18,11 @@ import static org.junit.Assert.assertTrue;
  * own, that flag included.
  */
 public final class LostTalesChatSendPacketUnkeptQuoteTest {
-    /** What follows the forward's id: the typed words, none, one byte. */
-    private static final int TYPED_TAIL = 1;
+    /**
+     * What follows the forward's id: the typed words, none, one byte, and
+     * the speech range, one byte.
+     */
+    private static final int TYPED_TAIL = 2;
 
 
     private static LostTalesChatSendPacket request(boolean unkept) {

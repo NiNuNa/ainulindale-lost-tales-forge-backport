@@ -1,5 +1,6 @@
 package com.ninuna.losttales.compat.discord;
 
+import com.ninuna.losttales.util.EnglishWords;
 import net.minecraft.event.ClickEvent;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
@@ -36,7 +37,7 @@ public final class DiscordGameEventRelayTest {
                         new ChatComponentText("Mordor Orc")));
         assertEquals(DiscordNotice.Kind.PLAYER_DIED, notice.getKind());
         // Vanilla's own wording, rendered by the server.
-        assertEquals("💀 Aragorn was slain by Mordor Orc", notice.getText());
+        assertEquals("💀 Aragorn was slain by Mordor Orc", notice.getText(EnglishWords.INSTANCE));
         assertEquals("", notice.getIconUrl());
     }
 
@@ -48,7 +49,7 @@ public final class DiscordGameEventRelayTest {
                         new ChatComponentText("[Taking Inventory]")));
         assertEquals(DiscordNotice.Kind.ACHIEVEMENT, vanilla.getKind());
         assertEquals("🏆 Steve has just earned the achievement "
-                + "[Taking Inventory]", vanilla.getText());
+                + "[Taking Inventory]", vanilla.getText(EnglishWords.INSTANCE));
 
         // LOTR's key is classified the same way; its wording is LOTR's
         // own and is not on this test classpath, so only the kind and
@@ -59,7 +60,7 @@ public final class DiscordGameEventRelayTest {
                         new ChatComponentText("Middle-earth"),
                         new ChatComponentText("[Orc Slayer]")));
         assertEquals(DiscordNotice.Kind.ACHIEVEMENT, lotr.getKind());
-        assertTrue(lotr.getText().startsWith("🏆 "));
+        assertTrue(lotr.getText(EnglishWords.INSTANCE).startsWith("🏆 "));
     }
 
     @Test

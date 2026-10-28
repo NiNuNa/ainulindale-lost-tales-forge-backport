@@ -5,9 +5,9 @@ import com.ninuna.losttales.character.validation.CharacterErrorId;
 import java.util.UUID;
 
 /**
- * Resolves a durable switch journal against the roster identity that survived
- * a restart. The mutation is storage-independent so every recovery branch can
- * be validated without constructing a live player or world.
+ * Settles a switch journal against the character the roster plays after a
+ * restart. It touches no store and no player, so every case can be tested
+ * without a world.
  */
 public final class CharacterSwitchRecoveryReconciler {
 

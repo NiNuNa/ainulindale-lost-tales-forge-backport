@@ -19,7 +19,7 @@ import java.util.UUID;
 /**
  * Server-to-client: entries of the Server Log, oldest
  * first — one as it happens, a batch when a staff member joins. Sent
- * only to players the server has found to hold {@code chat.server_console.read}
+ * only to players the server has found to hold {@code chat.server_log.read}
  * at that moment; the client is told nothing it may not read and
  * decides nothing about who may. At most {@link #MAX_EVENTS} per packet.
  */

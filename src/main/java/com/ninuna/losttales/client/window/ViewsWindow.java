@@ -302,7 +302,8 @@ final class ViewsWindow extends SubWindowContent {
             return key == Keyboard.KEY_NONE ? view.title()
                     : StatCollector.translateToLocalFormatted(
                             "gui.losttales.window.views.settings_key",
-                            view.title(), LostTalesInputBinding.getFallbackLabel(
+                            view.title(), WindowKeys.commandName(),
+                            LostTalesInputBinding.getFallbackLabel(
                                     LostTalesInputBinding.Type.KEYBOARD, key));
         }
         return view.key() <= 0 ? view.title()

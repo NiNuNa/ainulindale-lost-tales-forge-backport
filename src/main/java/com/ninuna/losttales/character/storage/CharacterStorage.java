@@ -5,9 +5,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 
-/**
- * Resolves the single authoritative character store for the current server.
- */
+/** Finds the character store in dimension 0's storage, and writes it to disk. */
 public final class CharacterStorage {
 
     private CharacterStorage() {}

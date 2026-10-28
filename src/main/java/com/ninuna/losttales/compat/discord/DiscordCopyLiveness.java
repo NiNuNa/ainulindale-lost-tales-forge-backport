@@ -12,25 +12,25 @@ import java.util.List;
  * rule every action on a copy asks, on whichever thread it runs. A copy
  * is live while the message's game channel is open to the bridge, as
  * {@link DiscordBridgePolicy} decides for a new line, and — for the
- * Faction channel, its faction — is bound, by a binding in force now, to
+ * Faction channel, its faction — is linked, by a link in force now, to
  * the Discord channel the copy is in, in the direction the action
  * crosses:
  *
  * <ul>
  * <li>To Discord — the bot's reaction put on or taken off, a webhook
  * edit or deletion, a reply header's or a jump link's pointer at the
- * copy — needs a binding that posts into that channel.</li>
+ * copy — needs a link that posts into that channel.</li>
  * <li>From Discord — a member's reaction, edit or deletion, a Discord
  * reply quoting the message, a Discord jump link to it — needs the
- * binding that reads that channel to be one of the message's own game
+ * link that reads that channel to be one of the message's own game
  * channel.</li>
  * </ul>
  *
- * A binding that only reads carries nothing to Discord: the bot never
+ * A link that only reads carries nothing to Discord: the bot never
  * reacts in its channel and no game line links into it. A copy that is
- * not live is left alone on both sides and its link is kept, so binding
+ * not live is left alone on both sides and its link is kept, so link
  * the pair again, or lifting a read gate on the channel, brings
- * everything back. Bindings are matched by their
+ * everything back. Links are matched by their
  * game channel and their Discord channel, never by id: an id's ordinal
  * moves when the config is reordered. A Discord member's own line is a
  * copy in the channel it was read from. The server's announcements are
@@ -63,9 +63,9 @@ final class DiscordCopyLiveness {
     }
 
     /**
-     * Webhooks nothing is known of: a sending binding is placed by the
+     * Webhooks nothing is known of: a sending link is placed by the
      * Discord channel it names alone. What the server thread asks with,
-     * since word from Discord needs a reading binding, which always
+     * since word from Discord needs a reading link, which always
      * names its channel.
      */
     static final Webhooks NO_WEBHOOKS = new Webhooks() {
@@ -90,25 +90,25 @@ final class DiscordCopyLiveness {
      * which only an action to Discord can go by. False for a message of
      * no known channel, and for one whose channel is closed to the bridge.
      */
-    static boolean isLive(DiscordChannelBindings bindings, ChatChannel channel,
+    static boolean isLive(DiscordChannelLinks channelLinks, ChatChannel channel,
                           String factionScope, String discordChannelId,
                           String webhookUrl, Crossing crossing,
                           Webhooks webhooks) {
-        if (bindings == null || channel == null || crossing == null
+        if (channelLinks == null || channel == null || crossing == null
                 || !DiscordBridgePolicy.isOpenToTheBridge(channel)) {
             return false;
         }
         String copyChannel = discordChannelId == null ? "" : discordChannelId;
         String copyWebhook = webhookUrl == null ? "" : webhookUrl;
         Webhooks known = webhooks == null ? NO_WEBHOOKS : webhooks;
-        for (DiscordChannelBinding binding : bindings.forGame(channel,
+        for (DiscordChannelLink channelLink : channelLinks.forGame(channel,
                 factionScope)) {
             if (crossing == Crossing.FROM_DISCORD) {
-                if (binding.readsFromDiscord() && copyChannel.length() > 0
-                        && copyChannel.equals(binding.getDiscordChannelId())) {
+                if (channelLink.readsFromDiscord() && copyChannel.length() > 0
+                        && copyChannel.equals(channelLink.getDiscordChannelId())) {
                     return true;
                 }
-            } else if (postsInto(binding, copyChannel, copyWebhook, known)) {
+            } else if (postsInto(channelLink, copyChannel, copyWebhook, known)) {
                 return true;
             }
         }
@@ -116,10 +116,10 @@ final class DiscordCopyLiveness {
     }
 
     /** The same, for a copy the links hold. */
-    static boolean isLive(DiscordChannelBindings bindings, ChatChannel channel,
+    static boolean isLive(DiscordChannelLinks channelLinks, ChatChannel channel,
                           String factionScope, DiscordMessageLinks.Copy copy,
                           Crossing crossing, Webhooks webhooks) {
-        return copy != null && isLive(bindings, channel, factionScope,
+        return copy != null && isLive(channelLinks, channel, factionScope,
                 channelIdOf(copy.destination), copy.webhookUrl, crossing,
                 webhooks);
     }
@@ -129,7 +129,7 @@ final class DiscordCopyLiveness {
      * order they were made; empty when none is.
      */
     static List<DiscordMessageLinks.Copy> liveCopies(DiscordMessageLinks links,
-                                                     DiscordChannelBindings bindings,
+                                                     DiscordChannelLinks channelLinks,
                                                      long messageId,
                                                      ChatChannel channel,
                                                      String factionScope,
@@ -140,7 +140,7 @@ final class DiscordCopyLiveness {
         }
         List<DiscordMessageLinks.Copy> live = new ArrayList<DiscordMessageLinks.Copy>(2);
         for (DiscordMessageLinks.Copy copy : links.copiesOf(messageId)) {
-            if (isLive(bindings, channel, factionScope, copy, crossing,
+            if (isLive(channelLinks, channel, factionScope, copy, crossing,
                     webhooks)) {
                 live.add(copy);
             }
@@ -156,7 +156,7 @@ final class DiscordCopyLiveness {
      * came from, is read into now.
      */
     static long inboundTarget(DiscordMessageLinks links,
-                              DiscordChannelBindings bindings, Places places,
+                              DiscordChannelLinks channelLinks, Places places,
                               String discordId, String discordChannelId) {
         if (links == null || places == null) {
             return ChatMessageIds.NONE;
@@ -165,7 +165,7 @@ final class DiscordCopyLiveness {
         if (target == ChatMessageIds.NONE) {
             return ChatMessageIds.NONE;
         }
-        return isLive(bindings, places.channelOf(target),
+        return isLive(channelLinks, places.channelOf(target),
                 places.factionScopeOf(target), discordChannelId, "",
                 Crossing.FROM_DISCORD, NO_WEBHOOKS)
                 ? target : ChatMessageIds.NONE;
@@ -176,10 +176,10 @@ final class DiscordCopyLiveness {
      * quote, or {@link ChatMessageIds#NONE}: a message as
      * {@link #inboundTarget} finds it, with a copy in that very channel.
      */
-    static long quotedBy(DiscordMessageLinks links, DiscordChannelBindings bindings,
+    static long quotedBy(DiscordMessageLinks links, DiscordChannelLinks channelLinks,
                          Places places, String referencedDiscordId,
                          String discordChannelId) {
-        long target = inboundTarget(links, bindings, places, referencedDiscordId,
+        long target = inboundTarget(links, channelLinks, places, referencedDiscordId,
                 discordChannelId);
         return target != ChatMessageIds.NONE
                 && links.hasCopyIn(target, CHANNEL_PREFIX + discordChannelId)
@@ -194,10 +194,10 @@ final class DiscordCopyLiveness {
      * own channel. The link's channel is whatever its author typed, so
      * the linked copy must be there for the link to count.
      */
-    static String gameLink(DiscordMessageLinks links, DiscordChannelBindings bindings,
+    static String gameLink(DiscordMessageLinks links, DiscordChannelLinks channelLinks,
                            Places places, String discordChannelId,
                            String discordMessageId) {
-        long target = inboundTarget(links, bindings, places, discordMessageId,
+        long target = inboundTarget(links, channelLinks, places, discordMessageId,
                 discordChannelId);
         if (!ChatMessageIds.isServerId(target) || !discordMessageId.equals(
                 links.discordIdOf(target, CHANNEL_PREFIX + discordChannelId))) {
@@ -214,14 +214,14 @@ final class DiscordCopyLiveness {
      * to Discord, else its first live copy, else null.
      */
     static DiscordMessageLinks.Copy jumpTarget(DiscordMessageLinks links,
-                                               DiscordChannelBindings bindings,
+                                               DiscordChannelLinks channelLinks,
                                                Places places, long messageId,
                                                String ownDestination,
                                                Webhooks webhooks) {
         if (places == null) {
             return null;
         }
-        List<DiscordMessageLinks.Copy> live = liveCopies(links, bindings, messageId,
+        List<DiscordMessageLinks.Copy> live = liveCopies(links, channelLinks, messageId,
                 places.channelOf(messageId), places.factionScopeOf(messageId),
                 Crossing.TO_DISCORD, webhooks);
         if (live.isEmpty()) {
@@ -238,30 +238,30 @@ final class DiscordCopyLiveness {
     /**
      * The webhook an in-game edit or deletion of a copy goes through, or
      * empty for none. Only the webhook that made a post may change it,
-     * and only through a binding of the message's channel that posts
+     * and only through a link of the message's channel that posts
      * into the copy's channel now. A copy posted in this server run knows
      * its webhook; a copy brought back from the save does not, and uses
-     * the webhook of such a binding that Discord says posts into the
+     * the webhook of such a link that Discord says posts into the
      * copy's channel. A Discord member's own line was made by no webhook.
      * Nothing goes through while the channel is closed to the bridge.
      */
-    static String correctionWebhook(DiscordChannelBindings bindings,
+    static String correctionWebhook(DiscordChannelLinks channelLinks,
                                     ChatChannel channel, String factionScope,
                                     DiscordMessageLinks.Copy copy,
                                     Webhooks webhooks) {
-        if (bindings == null || channel == null || copy == null
-                || (copy.bindingId.length() == 0 && copy.webhookUrl.length() == 0)
+        if (channelLinks == null || channel == null || copy == null
+                || (copy.channelLinkId.length() == 0 && copy.webhookUrl.length() == 0)
                 || !DiscordBridgePolicy.isOpenToTheBridge(channel)) {
             return "";
         }
         String copyChannel = channelIdOf(copy.destination);
         Webhooks known = webhooks == null ? NO_WEBHOOKS : webhooks;
-        for (DiscordChannelBinding binding : bindings.forGame(channel,
+        for (DiscordChannelLink channelLink : channelLinks.forGame(channel,
                 factionScope)) {
-            if (!postsInto(binding, copyChannel, copy.webhookUrl, known)) {
+            if (!postsInto(channelLink, copyChannel, copy.webhookUrl, known)) {
                 continue;
             }
-            String webhook = binding.getWebhookUrl();
+            String webhook = channelLink.getWebhookUrl();
             boolean made = copy.webhookUrl.length() > 0
                     ? copy.webhookUrl.equals(webhook)
                     : copyChannel.length() > 0
@@ -274,29 +274,29 @@ final class DiscordCopyLiveness {
     }
 
     /**
-     * Whether a binding posts into the copy's channel now: it posts,
+     * Whether a link posts into the copy's channel now: it posts,
      * Discord has not refused its webhook, and the copy is in the channel
-     * the binding names or the one its webhook posts into. When the
+     * the link names or the one its webhook posts into. When the
      * copy's channel or the webhook's is not known, the copy is placed
      * by the webhook it went through.
      */
-    private static boolean postsInto(DiscordChannelBinding binding,
+    private static boolean postsInto(DiscordChannelLink channelLink,
                                      String copyChannel, String copyWebhook,
                                      Webhooks webhooks) {
-        if (!binding.sendsToDiscord() || webhooks.refused(binding.getWebhookUrl())) {
+        if (!channelLink.sendsToDiscord() || webhooks.refused(channelLink.getWebhookUrl())) {
             return false;
         }
         if (copyChannel.length() > 0) {
-            if (copyChannel.equals(binding.getDiscordChannelId())) {
+            if (copyChannel.equals(channelLink.getDiscordChannelId())) {
                 return true;
             }
-            String posts = webhooks.channelOf(binding.getWebhookUrl());
+            String posts = webhooks.channelOf(channelLink.getWebhookUrl());
             if (posts != null && posts.length() > 0) {
                 return copyChannel.equals(posts);
             }
         }
         return copyWebhook.length() > 0
-                && copyWebhook.equals(binding.getWebhookUrl());
+                && copyWebhook.equals(channelLink.getWebhookUrl());
     }
 
     /** The Discord channel id a destination names, or empty for any other. */

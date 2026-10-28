@@ -2,7 +2,7 @@ package com.ninuna.losttales.fellowship.sync;
 
 import com.ninuna.losttales.fellowship.server.FellowshipErrorId;
 
-/** Client-side immutable feedback for one fellowship mutation request. */
+/** The server's answer to one fellowship request, as the client keeps it. */
 public final class FellowshipOperationFeedback {
 
     private final int requestId;

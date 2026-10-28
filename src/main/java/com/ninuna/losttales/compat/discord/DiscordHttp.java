@@ -138,7 +138,7 @@ public final class DiscordHttp {
 
     /**
      * Reads a channel object by its id with the bot: what says at start
-     * whether a channel the bindings read exists and is the bot's to
+     * whether a channel the links read exists and is the bot's to
      * see, and which guild holds it.
      */
     static Reply getChannel(String botToken, String channelId) throws IOException {
@@ -257,8 +257,8 @@ public final class DiscordHttp {
      */
     static String reactorsUrl(String channelId, String messageId, String pathForm,
                               boolean burst) throws IOException {
-        if (!DiscordChannelBindings.isSnowflake(channelId)
-                || !DiscordChannelBindings.isSnowflake(messageId)
+        if (!DiscordChannelLinks.isSnowflake(channelId)
+                || !DiscordChannelLinks.isSnowflake(messageId)
                 || pathForm == null || pathForm.length() == 0) {
             throw new IOException("not a reaction Discord can be asked about");
         }

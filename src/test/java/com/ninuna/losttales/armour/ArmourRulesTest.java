@@ -31,6 +31,26 @@ public final class ArmourRulesTest {
     private static final double EPSILON = 1.0E-9D;
     private static final ArmourSettings SHIPPED = ArmourSettings.SHIPPED;
 
+    /**
+     * Soft Step (PROG-17): a foe farther than half its notice range does
+     * not pick a sneaking wearer, until the wearer strikes it; then it
+     * picks them whatever the range, while the server lets a strike end it.
+     */
+    @Test
+    public void softStepHoldsUntilYouStrike() {
+        double nine = 9.0D * 9.0D;
+        assertTrue("nine blocks from a 16-block foe, half as far",
+                ArmourRules.unnoticed(nine, 16.0D, 0.5D, false, true));
+        assertFalse("seven blocks is within half",
+                ArmourRules.unnoticed(7.0D * 7.0D, 16.0D, 0.5D, false, true));
+        assertFalse("struck, it picks you whatever the range",
+                ArmourRules.unnoticed(nine, 16.0D, 0.5D, true, true));
+        assertTrue("unless the server lets a strike change nothing",
+                ArmourRules.unnoticed(nine, 16.0D, 0.5D, true, false));
+        assertTrue("a share past the whole hides you at any range",
+                ArmourRules.unnoticed(1.0D, 16.0D, 2.0D, false, true));
+    }
+
     @Test
     public void fourPiecesOfOneWeightAreAWeightSet() {
         ArmourCatalogue catalogue = catalogue();

@@ -60,6 +60,9 @@ public final class ChatStackRows {
     private int quoteHeight;
     /** The height the rows of a message's words were laid out at. */
     private int messageHeight;
+    /** The heights rows of words read a size larger and a size smaller were laid out at (CHAT-37). */
+    private int nearHeight;
+    private int farHeight;
 
     /**
      * Lays the rows of a view's line list out, the divider's row
@@ -81,6 +84,8 @@ public final class ChatStackRows {
         this.speakerHeight = speakerRowHeight(this.chatOpen);
         this.quoteHeight = quoteRowHeight(this.chatOpen);
         this.messageHeight = messageRowHeight(this.chatOpen);
+        this.nearHeight = messageRowHeight(this.chatOpen, 1);
+        this.farHeight = messageRowHeight(this.chatOpen, -1);
         int rows = this.sourceSize + (dividerIndex >= 0 ? 1 : 0);
         ensureCapacity(rows);
         this.count = rows;
@@ -94,7 +99,7 @@ public final class ChatStackRows {
                         dividerIndex);
                 height = heightOf(lines.get(line), this.reactionHeight,
                         this.speakerHeight, this.quoteHeight,
-                        this.messageHeight);
+                        this.messageHeight, this.nearHeight, this.farHeight);
             }
             this.tops[row + 1] = this.tops[row] + height;
         }
@@ -120,7 +125,9 @@ public final class ChatStackRows {
                 && this.reactionHeight == reactionRowHeight()
                 && this.speakerHeight == speakerRowHeight(chatOpen)
                 && this.quoteHeight == quoteRowHeight(chatOpen)
-                && this.messageHeight == messageRowHeight(chatOpen);
+                && this.messageHeight == messageRowHeight(chatOpen)
+                && this.nearHeight == messageRowHeight(chatOpen, 1)
+                && this.farHeight == messageRowHeight(chatOpen, -1);
     }
 
     /**
@@ -130,13 +137,14 @@ public final class ChatStackRows {
      * every other row as tall as the text it is drawn in: the row naming
      * the speaker ({@link #speakerRowHeight}), a reply's quote
      * ({@link #quoteRowHeight}) and the rows of a message's own words
-     * ({@link #messageRowHeight}), which the closed feed may draw
+     * ({@link #messageRowHeight}), which the feed may draw
      * smaller. A whole line for anything else, a line of another mod's
      * included.
      */
     private static int heightOf(ChatLine line, int reactionHeight,
                                 int speakerHeight, int quoteHeight,
-                                int messageHeight) {
+                                int messageHeight, int nearHeight,
+                                int farHeight) {
         if (ChatWindowLines.isSpacer(line)) {
             return SPACER_HEIGHT;
         }
@@ -153,7 +161,12 @@ public final class ChatStackRows {
         if (ChatReplyMarker.isQuoteRow(row)) {
             return quoteHeight;
         }
-        return ChatLayoutMarker.isBodyRow(row) ? messageHeight : LINE_HEIGHT;
+        if (!ChatLayoutMarker.isBodyRow(row)) {
+            return LINE_HEIGHT;
+        }
+        // A line heard nearby may be read a size larger or smaller (CHAT-37).
+        int step = ChatLayoutMarker.bodyRowStep(row);
+        return step > 0 ? nearHeight : step < 0 ? farHeight : messageHeight;
     }
 
     /**
@@ -197,6 +210,11 @@ public final class ChatStackRows {
     /** How tall a row of a message's own words is. */
     static int messageRowHeight(boolean chatOpen) {
         return rowHeight(LostTalesChatVisualStyle.messageRowScale(chatOpen));
+    }
+
+    /** How tall a row of words read {@code step} sizes from the usual is (CHAT-37). */
+    static int messageRowHeight(boolean chatOpen, int step) {
+        return rowHeight(LostTalesChatVisualStyle.messageRowScale(chatOpen, step));
     }
 
     /**

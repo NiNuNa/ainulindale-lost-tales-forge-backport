@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat;
 
 import com.ninuna.losttales.util.LostTalesLangFile;
+import com.ninuna.losttales.util.LostTalesWords;
 import net.minecraft.util.StatCollector;
 
 /**
@@ -10,11 +11,20 @@ import net.minecraft.util.StatCollector;
  * for an untitled sender. The client composes the same pieces as
  * separate coloured runs; the Discord bridge needs them as one string,
  * so the words are decided here once and both read them, from the lang
- * file in the language of the side that asks. The title travels and is
- * kept as LOTR's lang key, and the faction as its id: each side names them
- * in its own words ({@link #titleName}).
+ * file in the language of the side that asks, or in the words a linked
+ * Discord channel reads. The title travels and is kept as LOTR's lang
+ * key, and the faction as its id: each side names them in its own words
+ * ({@link #titleName}).
  */
 public final class ChatEpithet {
+    /** The lang file's words in the language of the side that asks ({@link #translate}). */
+    private static final LostTalesWords SIDE = new LostTalesWords() {
+        @Override
+        public String format(String key, Object... arguments) {
+            return translate(key, arguments);
+        }
+    };
+
     private ChatEpithet() {}
 
     /**
@@ -36,12 +46,18 @@ public final class ChatEpithet {
      * bare title when the sender's faction is unknown.
      */
     public static String epithet(String factionName, String title) {
+        return epithet(SIDE, factionName, title);
+    }
+
+    /** {@link #epithet} with its joining words in {@code words}. */
+    public static String epithet(LostTalesWords words, String factionName,
+                                 String title) {
         String faction = factionName == null ? "" : factionName.trim();
         String bare = title == null ? "" : title.trim();
         if (faction.length() == 0) {
             return bare;
         }
-        return translate("chat.losttales.title.epithet", faction, bare);
+        return words.format("chat.losttales.title.epithet", faction, bare);
     }
 
     /**
@@ -50,12 +66,18 @@ public final class ChatEpithet {
      */
     public static String titledName(String name, String factionName,
                                     String title) {
+        return titledName(SIDE, name, factionName, title);
+    }
+
+    /** {@link #titledName} with its joining words in {@code words}. */
+    public static String titledName(LostTalesWords words, String name,
+                                    String factionName, String title) {
         String plain = name == null ? "" : name.trim();
         if (title == null || title.trim().length() == 0) {
             return plain;
         }
-        return plain + translate("chat.losttales.title.suffix",
-                epithet(factionName, title));
+        return plain + words.format("chat.losttales.title.suffix",
+                epithet(words, factionName, title));
     }
 
     /**
@@ -64,9 +86,15 @@ public final class ChatEpithet {
      * member's Discord server.
      */
     public static String titleSuffix(boolean discordMember, String epithet) {
+        return titleSuffix(SIDE, discordMember, epithet);
+    }
+
+    /** {@link #titleSuffix} in {@code words}. */
+    public static String titleSuffix(LostTalesWords words, boolean discordMember,
+                                     String epithet) {
         return discordMember
-                ? translate("chat.losttales.title.discord", epithet)
-                : translate("chat.losttales.title.suffix", epithet);
+                ? words.format("chat.losttales.title.discord", epithet)
+                : words.format("chat.losttales.title.suffix", epithet);
     }
 
     /**
@@ -74,9 +102,15 @@ public final class ChatEpithet {
      * Discord server, or the bare name while the server is not known.
      */
     public static String discordName(String name, String guildName) {
+        return discordName(SIDE, name, guildName);
+    }
+
+    /** {@link #discordName} with its joining words in {@code words}. */
+    public static String discordName(LostTalesWords words, String name,
+                                     String guildName) {
         String plain = name == null ? "" : name.trim();
         String guild = guildName == null ? "" : guildName.trim();
-        return guild.length() == 0 ? plain : plain + titleSuffix(true, guild);
+        return guild.length() == 0 ? plain : plain + titleSuffix(words, true, guild);
     }
 
     /**

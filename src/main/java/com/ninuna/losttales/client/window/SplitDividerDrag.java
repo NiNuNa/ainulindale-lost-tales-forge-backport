@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.window;
 
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import com.ninuna.losttales.gui.style.LostTalesUiHitBox;
 
 /**
@@ -59,8 +59,8 @@ final class SplitDividerDrag implements WindowGestures.ContentDrag {
     }
 
     @Override
-    public LostTalesMapCursor.Pose pose() {
-        return this.stacked ? LostTalesMapCursor.Pose.RESIZE_VERTICAL
-                : LostTalesMapCursor.Pose.RESIZE_HORIZONTAL;
+    public LostTalesPointer.Pose pose() {
+        return this.stacked ? LostTalesPointer.Pose.RESIZE_VERTICAL
+                : LostTalesPointer.Pose.RESIZE_HORIZONTAL;
     }
 }

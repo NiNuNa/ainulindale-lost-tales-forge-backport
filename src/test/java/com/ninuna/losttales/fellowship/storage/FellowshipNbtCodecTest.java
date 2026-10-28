@@ -89,8 +89,7 @@ public final class FellowshipNbtCodecTest {
         members.add(nameless);
         Fellowship fellowship = new Fellowship(FELLOWSHIP, LEADER, members,
                 Collections.<UUID>emptyList(), "Grey Company", null,
-                EnumSet.allOf(FellowshipSwitch.class), 1L, 3L,
-                Fellowship.CURRENT_DATA_VERSION);
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 3L);
         assertTrue(fellowship.refreshMemberIdentity(LEADER,
                 fellowship.getMember(LEADER).getOwnerId(), "  "));
         assertEquals("", fellowship.getMember(LEADER).getCharacterName());
@@ -111,8 +110,7 @@ public final class FellowshipNbtCodecTest {
                 4000L, FellowshipColor.BLUE));
         Fellowship fellowship = new Fellowship(FELLOWSHIP, LEADER, members,
                 Collections.<UUID>emptyList(), "Grey Company", null,
-                EnumSet.allOf(FellowshipSwitch.class), 1000L, 2L,
-                Fellowship.CURRENT_DATA_VERSION);
+                EnumSet.allOf(FellowshipSwitch.class), 1000L, 2L);
         Fellowship back = FellowshipNbtCodec.read(write(fellowship))
                 .getFellowships().get(FELLOWSHIP);
         assertEquals(1000L, back.getMember(LEADER).getJoinedAt());
@@ -129,8 +127,7 @@ public final class FellowshipNbtCodecTest {
         }
         Fellowship fellowship = new Fellowship(FELLOWSHIP, members.get(0).getIdentityId(),
                 members, Collections.<UUID>emptyList(), "Grey Company", null,
-                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L,
-                Fellowship.CURRENT_DATA_VERSION);
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L);
         assertEquals(Fellowship.MAX_MEMBERS, FellowshipNbtCodec.read(write(fellowship))
                 .getFellowships().get(FELLOWSHIP).getMemberCount());
     }
@@ -193,6 +190,39 @@ public final class FellowshipNbtCodecTest {
         NBTTagCompound unknownColour = write(fellowship("Grey Company"));
         member(unknownColour, 1).setString("Color", "mauve");
         assertMemberQuarantined(unknownColour, "missing_or_unknown_color");
+    }
+
+    /**
+     * A fellowship whose leader cannot lead goes to the quarantine whole,
+     * as saved: one whose leader's entry went to the quarantine, and one
+     * led by a figure nobody holds (CHAR-36). No leader is made up for it.
+     */
+    @Test
+    public void aFellowshipWithoutALeaderToHoldItIsQuarantinedWhole() {
+        NBTTagCompound leaderGone = write(fellowship("Grey Company"));
+        member(leaderGone, 0).removeTag("Color");
+        assertQuarantinedWhole(leaderGone);
+
+        List<FellowshipMember> members = new ArrayList<FellowshipMember>();
+        members.add(new FellowshipMember(LEADER, FellowshipMember.UNHELD, "Gandalf", 1L,
+                FellowshipColor.GREEN));
+        members.add(new FellowshipMember(GUIDE, UUID.randomUUID(), "Beren", 2L,
+                FellowshipColor.BLUE));
+        assertQuarantinedWhole(write(new Fellowship(FELLOWSHIP, LEADER, members,
+                Collections.<UUID>emptyList(), "Grey Company", null,
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 3L)));
+    }
+
+    private static void assertQuarantinedWhole(NBTTagCompound saved) {
+        NBTTagCompound before = (NBTTagCompound) firstFellowship(saved).copy();
+        FellowshipNbtCodec.ReadResult read = FellowshipNbtCodec.read(saved);
+        assertFalse(read.isReadOnly());
+        assertTrue(read.wasRepaired());
+        assertNull(read.getFellowships().get(FELLOWSHIP));
+        assertEquals(1, read.getQuarantineEntriesCopy().size());
+        NBTTagCompound entry = read.getQuarantineEntriesCopy().get(0);
+        assertEquals("leader_not_a_held_member", entry.getString("Reason"));
+        assertEquals("kept as saved", before, entry.getCompoundTag("OriginalData"));
     }
 
     /** A fellowship whose stored entry lacks a key this build writes goes to the quarantine whole. */
@@ -279,8 +309,7 @@ public final class FellowshipNbtCodecTest {
         members.add(new FellowshipMember(GUIDE, UUID.randomUUID(), "Beren", 2L,
                 FellowshipColor.BLUE));
         return new Fellowship(FELLOWSHIP, LEADER, members, Collections.<UUID>emptyList(),
-                name, null, EnumSet.allOf(FellowshipSwitch.class), 1L, 3L,
-                Fellowship.CURRENT_DATA_VERSION);
+                name, null, EnumSet.allOf(FellowshipSwitch.class), 1L, 3L);
     }
 
     private static NBTTagCompound write(Fellowship fellowship) {

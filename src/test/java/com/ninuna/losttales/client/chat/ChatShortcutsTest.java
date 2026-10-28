@@ -102,7 +102,7 @@ public final class ChatShortcutsTest {
                 help(ChatChannel.OOC).guide.get(1));
         // Nobody else reads the Console: there is nobody to
         // speak as.
-        PageHelp console = help(ChatChannel.CLIENT_CONSOLE);
+        PageHelp console = help(ChatChannel.CONSOLE);
         assertEquals("gui.losttales.help.chat.readers.self",
                 console.guide.get(0));
         assertEquals(1, console.guide.size());

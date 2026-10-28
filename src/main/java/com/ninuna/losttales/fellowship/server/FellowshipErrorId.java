@@ -1,6 +1,9 @@
 package com.ninuna.losttales.fellowship.server;
 
-/** Stable server-side result identifiers for fellowship operations. */
+/**
+ * Why the server refused a fellowship request, or {@link #NONE}. Each id
+ * names its words in the lang file, {@code gui.losttales.fellowship.error.<id>}.
+ */
 public enum FellowshipErrorId {
     NONE("none"),
     INVALID_PLAYER("invalid_player"),
@@ -8,7 +11,7 @@ public enum FellowshipErrorId {
     CHARACTER_STORAGE_READ_ONLY("character_storage_read_only"),
     FELLOWSHIP_STORAGE_READ_ONLY("fellowship_storage_read_only"),
     INVITATION_STORAGE_READ_ONLY("invitation_storage_read_only"),
-    MARKER_STORAGE_READ_ONLY("marker_storage_read_only"),
+    MARK_STORAGE_READ_ONLY("mark_storage_read_only"),
     CHARACTER_NOT_FOUND("character_not_found"),
     CHARACTER_ID_AMBIGUOUS("character_id_ambiguous"),
     ACTIVE_CHARACTER_CHANGED("active_character_changed"),
@@ -62,14 +65,15 @@ public enum FellowshipErrorId {
         return this.id;
     }
 
+    /** The error an id names exactly; null for one that names none, which a decoder refuses. */
     public static FellowshipErrorId fromId(String id) {
         if (id != null) {
             for (FellowshipErrorId value : values()) {
-                if (value.id.equalsIgnoreCase(id.trim())) {
+                if (value.id.equals(id)) {
                     return value;
                 }
             }
         }
-        return INTERNAL_ERROR;
+        return null;
     }
 }

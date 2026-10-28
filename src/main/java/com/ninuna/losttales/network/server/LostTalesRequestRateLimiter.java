@@ -175,7 +175,9 @@ public final class LostTalesRequestRateLimiter {
 
     public static void logQueueFull(EntityPlayerMP player, String packetName) {
         logThrottled(player, null,
-                "Rejected " + safePacketName(packetName) + " because the server task queue is full");
+                "Rejected " + safePacketName(packetName) + " because the request queue"
+                        + " holds no place for it (the player's share is full, or the"
+                        + " server is stopping)");
     }
 
     public static void clearPlayer(UUID ownerId) {

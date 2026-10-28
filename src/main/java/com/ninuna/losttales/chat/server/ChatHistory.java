@@ -9,7 +9,9 @@ import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatRecipientRule;
 import com.ninuna.losttales.chat.ChatReplyReference;
-import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.chat.ChatSpeechRange;
+import com.ninuna.losttales.chat.ChatPageIds;
+import com.ninuna.losttales.chat.ChatUnseenVoice;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -61,8 +63,10 @@ import java.util.UUID;
  * <p>What a reader is shown of a line is theirs too
  * ({@link ChatReaderView}): a reply's quote of a line heard nearby only
  * if they heard it, which the entry keeps as the readers it showed the
- * quote to, and a line an unseen voice said with its speaker only if
- * they are the speaker or staff.</p>
+ * quote to, a line an unseen voice said with its speaker only if
+ * they are the speaker or staff, and a line heard nearby at the size its
+ * reader's distance gave it when it was said, which the entry keeps as
+ * the readers who read it larger and smaller.</p>
  *
  * <p>Bounded per channel — per faction and per fellowship on the channels
  * that hold several, per conversation for whispers, and per account for
@@ -99,10 +103,19 @@ public final class ChatHistory {
     /**
      * The lines every shared channel keeps whatever the total does
      * (CHAT-69): Global, Proximity, OOC, Operator Chat, a server's own
-     * channels and each faction. Fellowships and whispers, which anyone
-     * can make more of, keep no floor and give up their oldest first.
+     * channels and each faction. Fellowships, which anyone can make more
+     * of, keep no floor and give up their oldest first. Each whisper pair
+     * keeps the server's {@code whisperHistoryFloor} (CHAT-31), so a
+     * whisper to someone away waits for them, while whispers hold no more
+     * than {@link #MAX_WHISPER_KEPT} between them.
      */
     public static final int CHANNEL_FLOOR = 50;
+    /**
+     * The most lines whisper pairs keep past the total between them, every
+     * pair's floor together: past it the oldest whisper goes first, as a
+     * line without a floor does. A safety bound on what the save holds.
+     */
+    public static final int MAX_WHISPER_KEPT = 4000;
     /**
      * The most conversations a floor is kept for: every channel the server
      * can have and every faction, with room. What the save reads back is
@@ -110,7 +123,8 @@ public final class ChatHistory {
      */
     static final int MAX_FLOORED_CONVERSATIONS = 128;
     /** The most lines kept at once: the total, and every floor it may not take. */
-    public static final int MAX_KEPT = MAX_TOTAL + CHANNEL_FLOOR * MAX_FLOORED_CONVERSATIONS;
+    public static final int MAX_KEPT = MAX_TOTAL + CHANNEL_FLOOR * MAX_FLOORED_CONVERSATIONS
+            + MAX_WHISPER_KEPT;
 
     /**
      * Before an account's id, the budget of the lines kept for that
@@ -125,6 +139,8 @@ public final class ChatHistory {
             new HashMap<String, Integer>();
     /** How many kept lines are kept for one account alone, every account's together. */
     private static int privateCount;
+    /** How many kept lines are whispers, every pair's together. */
+    private static int whisperCount;
     /** The save the history is written with, or null while it has none. */
     private static ChatHistoryWorldData store;
 
@@ -239,6 +255,24 @@ public final class ChatHistory {
                                            Collection<UUID> recipients,
                                            Audience audience,
                                            Collection<UUID> quoteReaders) {
+        record(messageId, authorId, author, forSender, forOthers, recipients,
+                audience, quoteReaders, null, null);
+    }
+
+    /**
+     * As above, for a line heard nearby that {@code nearReaders} read one
+     * size larger and {@code farReaders} one smaller, by how far they
+     * stood from its speaker (CHAT-37); null for none.
+     */
+    public static synchronized void record(long messageId, UUID authorId,
+                                           String author,
+                                           LostTalesChatMessagePacket forSender,
+                                           LostTalesChatMessagePacket forOthers,
+                                           Collection<UUID> recipients,
+                                           Audience audience,
+                                           Collection<UUID> quoteReaders,
+                                           Collection<UUID> nearReaders,
+                                           Collection<UUID> farReaders) {
         if (!ChatMessageIds.isServerId(messageId) || author == null
                 || author.trim().length() == 0 || forOthers == null
                 || forOthers.getChannel() == null) {
@@ -259,7 +293,8 @@ public final class ChatHistory {
                 channelId, forSender == null ? forOthers : forSender,
                 forOthers, audience == null ? Audience.nobody() : audience,
                 forOthers.getTimestampMillis(), new ChatReactions(),
-                accountsOf(quoteReaders)));
+                accountsOf(quoteReaders), accountsOf(nearReaders),
+                accountsOf(farReaders)));
         if (replaced != null) {
             count(budgetKeyOf(replaced), -1);
         }
@@ -595,8 +630,21 @@ public final class ChatHistory {
         }
         ChatChannel channel = ChatChannel.fromId(entry.channelId);
         return channel == null ? null : new Reportable(channel,
-                entry.forOthers.getScopeValue(), staffAuthorOf(entry),
-                entry.forOthers.getNameColor(), entry.excerpt);
+                entry.forOthers.getScopeValue(), shownAuthorOf(entry),
+                staffAuthorOf(entry), entry.forOthers.isUnseen()
+                        ? ChatUnseenVoice.color() : entry.forOthers.getNameColor(),
+                entry.excerpt);
+    }
+
+    /**
+     * Who said a kept line, as every reader of the Server Log is told:
+     * an unseen voice's line names the unseen voice (CHAT-84), whose
+     * speaker only staff holding {@code chat.moderate} are told
+     * ({@link #staffAuthorOf}).
+     */
+    private static String shownAuthorOf(Entry entry) {
+        return entry.forOthers.isUnseen() ? ChatUnseenVoice.NAME
+                : staffAuthorOf(entry);
     }
 
     /**
@@ -621,15 +669,19 @@ public final class ChatHistory {
         public final ChatChannel channel;
         /** The faction or fellowship it was said in; empty for a channel of one conversation. */
         public final String scope;
+        /** Who said it as every reader of the Server Log is told. */
         public final String author;
+        /** Who said it as staff holding {@code chat.moderate} are told. */
+        public final String staffAuthor;
         public final int authorColor;
         public final String excerpt;
 
         Reportable(ChatChannel channel, String scope, String author,
-                   int authorColor, String excerpt) {
+                   String staffAuthor, int authorColor, String excerpt) {
             this.channel = channel;
             this.scope = scope == null ? "" : scope;
             this.author = author;
+            this.staffAuthor = staffAuthor;
             this.authorColor = authorColor;
             this.excerpt = excerpt;
         }
@@ -675,7 +727,7 @@ public final class ChatHistory {
     /**
      * Rewrites what a message says and answers with everyone who has to
      * be told, or null when nothing is to change: no such message, one
-     * {@code editor} did not write, or new words that are the words it
+     * {@code editor} did not write, a forward, or new words that are the words it
      * already says — an edit that changes nothing is not an edit, and
      * nobody is told of one, whichever side it came from. The excerpt is
      * recut, so a reply made after the edit quotes what the message says
@@ -707,7 +759,10 @@ public final class ChatHistory {
                                                    List<String> roleIds,
                                                    String typed) {
         Entry entry = authored(messageId, editor);
-        if (entry == null || message == null) {
+        // A forward's words are its original's, shown under its author's
+        // name: editing them would put words in that author's mouth.
+        if (entry == null || message == null
+                || entry.forOthers.getReply().isForward()) {
             return null;
         }
         LostTalesChatMessagePacket forSender;
@@ -731,7 +786,7 @@ public final class ChatHistory {
                 entry.author, ChatReplyReference.excerptOf(message),
                 entry.seenBy, entry.channelId, forSender, forOthers,
                 entry.audience, entry.timestampMillis, entry.reactions,
-                entry.quoteReaders));
+                entry.quoteReaders, entry.nearReaders, entry.farReaders));
         changed();
         return Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy));
     }
@@ -773,7 +828,8 @@ public final class ChatHistory {
         ENTRIES.put(Long.valueOf(messageId), new Entry(entry.authorId,
                 entry.author, entry.excerpt, entry.seenBy, entry.channelId,
                 forSender, forOthers, entry.audience, entry.timestampMillis,
-                entry.reactions, entry.quoteReaders));
+                entry.reactions, entry.quoteReaders, entry.nearReaders,
+                entry.farReaders));
         changed();
     }
 
@@ -827,13 +883,27 @@ public final class ChatHistory {
                                                     Requester requester,
                                                     UUID reactor, String name,
                                                     String emoji, boolean add) {
-        return react(messageId, requester, reactor, name, emoji, "", add);
+        return react(messageId, requester, reactor, name, emoji, "", add, false);
+    }
+
+    /**
+     * As above, a player whom the One Ring conceals reacting
+     * {@code asUnseenVoice} to a line heard nearby (CHAT-84): the
+     * reaction names the unseen voice to every reader but them and staff.
+     */
+    public static synchronized ReactionChange react(long messageId,
+                                                    Requester requester,
+                                                    UUID reactor, String name,
+                                                    String emoji, boolean add,
+                                                    boolean asUnseenVoice) {
+        return react(messageId, requester, reactor, name, emoji, "", add,
+                asUnseenVoice);
     }
 
     private static ReactionChange react(long messageId, Requester requester,
                                         UUID reactor, String name,
                                         String emoji, String origin,
-                                        boolean add) {
+                                        boolean add, boolean asUnseenVoice) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         if (entry == null || reactor == null) {
             return null;
@@ -846,7 +916,8 @@ public final class ChatHistory {
             return null;
         }
         ChatReactions.Stand before = entry.reactions.standOf(emoji);
-        if (!entry.reactions.set(emoji, reactor, name, origin, add)) {
+        if (!entry.reactions.set(emoji, reactor, name, origin, add,
+                asUnseenVoice)) {
             return null;
         }
         if (requester != null && requester.accountId != null) {
@@ -879,7 +950,7 @@ public final class ChatHistory {
         String key = entry.reactions.discordKeyOf(emoji, customId, reactor,
                 add);
         return key == null ? null
-                : react(messageId, null, reactor, name, key, origin, add);
+                : react(messageId, null, reactor, name, key, origin, add, false);
     }
 
     /**
@@ -964,9 +1035,18 @@ public final class ChatHistory {
      */
     public static synchronized ChatReactionSummary reactionsFor(
             long messageId, Set<UUID> viewerIds) {
+        return reactionsFor(messageId, viewerIds, false);
+    }
+
+    /**
+     * As above, {@code moderates} for a reader holding
+     * {@code chat.moderate}, who is shown who reacted as an unseen voice.
+     */
+    public static synchronized ChatReactionSummary reactionsFor(
+            long messageId, Set<UUID> viewerIds, boolean moderates) {
         Entry entry = ENTRIES.get(Long.valueOf(messageId));
         return entry == null ? ChatReactionSummary.EMPTY
-                : entry.reactions.summaryFor(viewerIds);
+                : entry.reactions.summaryFor(viewerIds, moderates);
     }
 
     /** The players a kept message names, as the server resolved them; none for none kept. */
@@ -1056,9 +1136,27 @@ public final class ChatHistory {
                 && entry.seenBy.add(requester.accountId)) {
             changed();
         }
+        // A line heard nearby reads at the size it was read at when it
+        // was said, by how far its reader stood (CHAT-37).
+        int step = stepFor(entry, requester.accountId);
+        if (step != line.getDistanceStep()) {
+            line = line.withDistanceStep(step);
+        }
         return entry.reactions.isEmpty() ? line
                 : line.withReactions(entry.reactions.summaryFor(
-                        requester.identityIds));
+                        requester.identityIds, requester.moderates));
+    }
+
+    /** The size step {@code reader} read a kept line at: larger near its speaker, smaller far away. */
+    static int stepFor(Entry entry, UUID reader) {
+        if (reader == null) {
+            return ChatSpeechRange.USUAL_STEP;
+        }
+        if (entry.nearReaders != null && entry.nearReaders.contains(reader)) {
+            return ChatSpeechRange.NEAR_STEP;
+        }
+        return entry.farReaders != null && entry.farReaders.contains(reader)
+                ? ChatSpeechRange.FAR_STEP : ChatSpeechRange.USUAL_STEP;
     }
 
     /** The copy of a kept line meant for the requester: its author's own, else everyone else's. */
@@ -1067,9 +1165,9 @@ public final class ChatHistory {
                 ? entry.forSender : entry.forOthers;
     }
 
-    /** The conversation a whisper copy is held in, as the reader's tab names it. */
+    /** The conversation a whisper copy is held in, as the reader's page names it. */
     private static String conversationIdOf(LostTalesChatMessagePacket copy) {
-        return ChatTabIds.whisperConversationId(copy.getPartner(),
+        return ChatPageIds.whisperConversationId(copy.getPartner(),
                 copy.getPartnerIdentity(), copy.getOwnCharacterId());
     }
 
@@ -1104,7 +1202,7 @@ public final class ChatHistory {
             return null;
         }
         forget(messageId);
-        return new Removal(staffAuthorOf(entry),
+        return new Removal(shownAuthorOf(entry), staffAuthorOf(entry),
                 Collections.unmodifiableSet(new HashSet<UUID>(entry.seenBy)));
     }
 
@@ -1197,11 +1295,11 @@ public final class ChatHistory {
      * The page of a channel before {@code beforeMessageId}, newest first:
      * the newest kept messages of the channel — and of the conversation
      * {@code scopeValue} names, for a channel that has more than one, or
-     * for a whisper the conversation whose tab id it is, read off the
+     * for a whisper the conversation whose page id it is, read off the
      * requester's own copy of each line —
      * older than that line whose audience admits the requester, at most
      * {@link #MAX_OLDER_PER_REQUEST}. What a client scrolled to the top
-     * of a tab asks for; newest first so it can lay each line above the
+     * of a page asks for; newest first so it can lay each line above the
      * one before. The requester's entitlement decides line by line,
      * exactly as it does for the login replay.
      */
@@ -1237,11 +1335,15 @@ public final class ChatHistory {
 
     /** A message a moderator took back: whose it was and who saw it. */
     public static final class Removal {
+        /** Who said it as every reader of the Server Log is told. */
         public final String author;
+        /** Who said it as staff holding {@code chat.moderate} are told. */
+        public final String staffAuthor;
         public final Set<UUID> recipients;
 
-        Removal(String author, Set<UUID> recipients) {
+        Removal(String author, String staffAuthor, Set<UUID> recipients) {
             this.author = author;
+            this.staffAuthor = staffAuthor;
             this.recipients = recipients;
         }
     }
@@ -1557,6 +1659,15 @@ public final class ChatHistory {
         if (isPrivateBudget(channelId)) {
             privateCount = Math.max(0, privateCount + delta);
         }
+        if (isWhisperBudget(channelId)) {
+            whisperCount = Math.max(0, whisperCount + delta);
+        }
+    }
+
+    /** Whether a budget is a whisper pair's. */
+    private static boolean isWhisperBudget(String budgetKey) {
+        return budgetKey != null
+                && budgetKey.startsWith(ChatChannel.WHISPER.getId() + ":");
     }
 
     /** Whether a budget is one account's own: lines kept for that account alone. */
@@ -1609,7 +1720,7 @@ public final class ChatHistory {
                 && entry.audience.soleAccount() == null) {
             return budgetKeyOf(entry);
         }
-        return entry.channelId + ChatTabIds.SEPARATOR
+        return entry.channelId + ChatPageIds.SEPARATOR
                 + entry.forOthers.getScopeValue();
     }
 
@@ -1619,9 +1730,9 @@ public final class ChatHistory {
     }
 
     /**
-     * Whether a budget keeps its floor ({@link #CHANNEL_FLOOR}): a shared
-     * channel's or a faction's, never a fellowship's, a whisper pair's or
-     * an account's own.
+     * Whether a budget keeps a floor: a shared channel's or a faction's
+     * ({@link #CHANNEL_FLOOR}) and a whisper pair's ({@link #floorOf}),
+     * never a fellowship's or an account's own.
      */
     static boolean keepsFloor(String budgetKey) {
         if (budgetKey == null || isPrivateBudget(budgetKey)) {
@@ -1629,8 +1740,20 @@ public final class ChatHistory {
         }
         String channel = budgetKey.indexOf(':') < 0 ? budgetKey
                 : budgetKey.substring(0, budgetKey.indexOf(':'));
-        return !ChatChannel.WHISPER.getId().equals(channel)
-                && !ChatChannel.FELLOWSHIP.getId().equals(channel);
+        return !ChatChannel.FELLOWSHIP.getId().equals(channel)
+                && (!ChatChannel.WHISPER.getId().equals(channel)
+                        || whisperFloor() > 0);
+    }
+
+    /** The lines a budget keeping a floor keeps whatever the total does. */
+    static int floorOf(String budgetKey) {
+        return isWhisperBudget(budgetKey) ? whisperFloor() : CHANNEL_FLOOR;
+    }
+
+    /** The server's floor for each whisper pair, within its bounds. */
+    static int whisperFloor() {
+        return Math.max(0, Math.min(perChannelCapacity(),
+                LostTalesConfig.chatWhisperHistoryFloor));
     }
 
     /**
@@ -1677,13 +1800,20 @@ public final class ChatHistory {
         return false;
     }
 
-    /** Whether a budget keeping its floor holds no more than it. */
+    /**
+     * Whether a budget keeping its floor holds no more than it. Whispers
+     * past {@link #MAX_WHISPER_KEPT} between them keep none, so the
+     * oldest goes.
+     */
     private static boolean atFloor(String budgetKey) {
         if (!keepsFloor(budgetKey)) {
             return false;
         }
+        if (isWhisperBudget(budgetKey) && whisperCount > MAX_WHISPER_KEPT) {
+            return false;
+        }
         Integer count = COUNT_BY_CHANNEL.get(budgetKey);
-        return count == null || count.intValue() <= CHANNEL_FLOOR;
+        return count == null || count.intValue() <= floorOf(budgetKey);
     }
 
     /** Cleared with the rest of the server's chat state. */
@@ -1691,6 +1821,7 @@ public final class ChatHistory {
         ENTRIES.clear();
         COUNT_BY_CHANNEL.clear();
         privateCount = 0;
+        whisperCount = 0;
     }
 
     /** Messages currently within reach. */
@@ -1722,6 +1853,14 @@ public final class ChatHistory {
          * line whose quote, if any, every reader is shown.
          */
         final Set<UUID> quoteReaders;
+        /**
+         * For a line heard nearby, the accounts that read it one size
+         * larger, standing in the nearest third of its range (CHAT-37);
+         * null for none.
+         */
+        final Set<UUID> nearReaders;
+        /** For a line heard nearby, the accounts that read it one size smaller; null for none. */
+        final Set<UUID> farReaders;
 
         Entry(UUID authorId, String author, String excerpt, Set<UUID> seenBy,
               String channelId, LostTalesChatMessagePacket forSender,
@@ -1737,6 +1876,21 @@ public final class ChatHistory {
               LostTalesChatMessagePacket forOthers, Audience audience,
               long timestampMillis, ChatReactions reactions,
               Set<UUID> quoteReaders) {
+            this(authorId, author, excerpt, seenBy, channelId, forSender,
+                    forOthers, audience, timestampMillis, reactions,
+                    quoteReaders, null, null);
+        }
+
+        Entry(UUID authorId, String author, String excerpt, Set<UUID> seenBy,
+              String channelId, LostTalesChatMessagePacket forSender,
+              LostTalesChatMessagePacket forOthers, Audience audience,
+              long timestampMillis, ChatReactions reactions,
+              Set<UUID> quoteReaders, Set<UUID> nearReaders,
+              Set<UUID> farReaders) {
+            this.nearReaders = nearReaders == null || nearReaders.isEmpty()
+                    ? null : nearReaders;
+            this.farReaders = farReaders == null || farReaders.isEmpty()
+                    ? null : farReaders;
             this.quoteReaders = quoteReaders;
             this.reactions = reactions == null ? new ChatReactions() : reactions;
             this.authorId = authorId;

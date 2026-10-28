@@ -100,7 +100,8 @@ public final class LostTalesServerConfigApplyPacket implements IMessage {
                                 return;
                             }
                             ServerConfigApplyResult result =
-                                    LostTalesServerConfigService.apply(message.getChanges());
+                                    LostTalesServerConfigService.applyFromPage(
+                                            message.getChanges());
                             if (!result.getApplied().isEmpty()) {
                                 LostTalesChatService.console(ChatConsoleEvent.Kind.CONFIG,
                                         ChatConsoleEvent.Severity.NOTICE,

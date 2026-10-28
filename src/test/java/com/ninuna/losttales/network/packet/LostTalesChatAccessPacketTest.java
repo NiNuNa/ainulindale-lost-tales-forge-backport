@@ -383,7 +383,7 @@ public final class LostTalesChatAccessPacketTest {
     @Test
     public void theChannelAnswerTravelsAsIdsAndNotAsPositions() {
         List<String> readable = Arrays.asList(
-                ChatChannel.CLIENT_CONSOLE.getId(), ChatChannel.OOC.getId());
+                ChatChannel.CONSOLE.getId(), ChatChannel.OOC.getId());
         LostTalesChatAccessPacket packet = ChatPacketFixtures.access(0)
                 .catalog(ChatRoleCatalog.builtIn().roles())
                 .channels(readable, Collections.<String>emptyList()).build();
@@ -399,7 +399,7 @@ public final class LostTalesChatAccessPacketTest {
         assertFalse(decoded.isMalformed());
         assertEquals(readable, decoded.getReadableChannels());
         assertTrue(decoded.getSendableChannels().isEmpty());
-        assertTrue(written.contains(ChatChannel.CLIENT_CONSOLE.getId()));
+        assertTrue(written.contains(ChatChannel.CONSOLE.getId()));
         assertTrue(written.contains(ChatChannel.OOC.getId()));
     }
 

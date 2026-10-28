@@ -25,7 +25,7 @@ import net.minecraft.client.resources.IResourceManager;
 public final class LostTalesClientQuestDefinitionStore {
     private static final Map<String, LostTalesQuestDefinition> STATIC_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static final Map<String, LostTalesQuestDefinition> SERVER_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
-    private static final Map<String, LostTalesQuestDefinition> DYNAMIC_QUESTS = new LinkedHashMap<String, LostTalesQuestDefinition>();
+    private static final Map<String, LostTalesQuestDefinition> MISSIVES = new LinkedHashMap<String, LostTalesQuestDefinition>();
     private static volatile List<LostTalesQuestDefinition> quests = Collections.emptyList();
     private static volatile boolean loaded;
 
@@ -42,7 +42,7 @@ public final class LostTalesClientQuestDefinitionStore {
             return staticQuest;
         }
         LostTalesQuestDefinition serverQuest = SERVER_QUESTS.get(id);
-        return serverQuest != null ? serverQuest : DYNAMIC_QUESTS.get(id);
+        return serverQuest != null ? serverQuest : MISSIVES.get(id);
     }
 
     public static synchronized void ensureLoaded(IResourceManager resourceManager) {
@@ -64,12 +64,12 @@ public final class LostTalesClientQuestDefinitionStore {
         logMissingMarkerWarnings(quests);
     }
 
-    public static synchronized void setDynamicQuestDefinitions(Collection<LostTalesQuestDefinition> dynamicQuests) {
-        DYNAMIC_QUESTS.clear();
-        if (dynamicQuests != null) {
-            for (LostTalesQuestDefinition quest : dynamicQuests) {
+    public static synchronized void setMissiveDefinitions(Collection<LostTalesQuestDefinition> missives) {
+        MISSIVES.clear();
+        if (missives != null) {
+            for (LostTalesQuestDefinition quest : missives) {
                 if (quest != null && quest.getId() != null && quest.getId().length() > 0) {
-                    DYNAMIC_QUESTS.put(quest.getId(), quest);
+                    MISSIVES.put(quest.getId(), quest);
                 }
             }
         }
@@ -103,8 +103,8 @@ public final class LostTalesClientQuestDefinitionStore {
 
     /** Forgets what the server sent, its own quests and the missives, as the player leaves it. */
     public static synchronized void clearServerSentDefinitions() {
-        if (!DYNAMIC_QUESTS.isEmpty() || !SERVER_QUESTS.isEmpty()) {
-            DYNAMIC_QUESTS.clear();
+        if (!MISSIVES.isEmpty() || !SERVER_QUESTS.isEmpty()) {
+            MISSIVES.clear();
             SERVER_QUESTS.clear();
             rebuildQuestList();
         }
@@ -112,7 +112,7 @@ public final class LostTalesClientQuestDefinitionStore {
 
     private static void rebuildQuestList() {
         LinkedHashMap<String, LostTalesQuestDefinition> merged = new LinkedHashMap<String, LostTalesQuestDefinition>();
-        merged.putAll(DYNAMIC_QUESTS);
+        merged.putAll(MISSIVES);
         merged.putAll(SERVER_QUESTS);
         merged.putAll(STATIC_QUESTS);
 

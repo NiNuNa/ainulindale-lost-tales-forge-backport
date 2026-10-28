@@ -1,6 +1,7 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatReactionSummary;
+import com.ninuna.losttales.chat.ChatUnseenVoice;
 import com.ninuna.losttales.chat.emoji.ChatForeignEmoji;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
 import java.util.ArrayList;
@@ -38,6 +39,10 @@ import java.util.UUID;
  * <p>A Discord member's reaction also keeps the Discord channel it was
  * made in, since the bridge's own reaction on each linked copy stands for
  * everyone who reacted anywhere but on that copy ({@link Stand}).</p>
+ *
+ * <p>A player who reacted to a line heard nearby while the One Ring
+ * concealed them reacted as an unseen voice (CHAT-84): every reader but
+ * that player and staff is shown the unseen voice in their name.</p>
  */
 public final class ChatReactions {
     public static final int MAX_KINDS = ChatReactionSummary.MAX_KINDS;
@@ -60,6 +65,8 @@ public final class ChatReactions {
             new HashMap<String, Map<UUID, String>>();
     /** The keys a restore filed a saved key under by another name; null while none. */
     private Set<String> renamedOnRestore;
+    /** Under each emoji, the reactors who reacted as an unseen voice. */
+    private final Map<String, Set<UUID>> unseen = new HashMap<String, Set<UUID>>();
 
     /**
      * Adds or takes back one reaction. Answers whether anything changed:
@@ -78,6 +85,15 @@ public final class ChatReactions {
      */
     public boolean set(String emoji, UUID reactor, String name, String origin,
                        boolean add) {
+        return set(emoji, reactor, name, origin, add, false);
+    }
+
+    /**
+     * As {@link #set(String, UUID, String, String, boolean)}, a reaction
+     * added {@code asUnseenVoice} made as an unseen voice (CHAT-84).
+     */
+    public boolean set(String emoji, UUID reactor, String name, String origin,
+                       boolean add, boolean asUnseenVoice) {
         if (emoji == null || reactor == null
                 || !ChatForeignEmoji.isReactionKey(emoji)) {
             return false;
@@ -88,6 +104,7 @@ public final class ChatReactions {
                 return false;
             }
             forgetOrigin(emoji, reactor);
+            forgetUnseen(emoji, reactor);
             if (reactors.isEmpty()) {
                 this.byEmoji.remove(emoji);
             }
@@ -97,7 +114,54 @@ public final class ChatReactions {
                 && !LostTalesChatMessagePacket.isDiscordSender(reactor)) {
             return false;
         }
-        return put(emoji, reactors, reactor, name, origin);
+        if (!put(emoji, reactors, reactor, name, origin)) {
+            return false;
+        }
+        if (asUnseenVoice) {
+            markUnseen(emoji, reactor);
+        }
+        return true;
+    }
+
+    /** Marks a reaction kept under {@code emoji} as an unseen voice's. */
+    private void markUnseen(String emoji, UUID reactor) {
+        Set<UUID> reactors = this.unseen.get(emoji);
+        if (reactors == null) {
+            reactors = new HashSet<UUID>();
+            this.unseen.put(emoji, reactors);
+        }
+        reactors.add(reactor);
+    }
+
+    private void forgetUnseen(String emoji, UUID reactor) {
+        Set<UUID> reactors = this.unseen.get(emoji);
+        if (reactors != null) {
+            reactors.remove(reactor);
+            if (reactors.isEmpty()) {
+                this.unseen.remove(emoji);
+            }
+        }
+    }
+
+    /** Whether the reaction {@code reactor} keeps under {@code emoji} was made as an unseen voice. */
+    public boolean isUnseen(String emoji, UUID reactor) {
+        Set<UUID> reactors = this.unseen.get(emoji);
+        return reactors != null && reactors.contains(reactor);
+    }
+
+    /**
+     * A reaction read back from the save as an unseen voice's, after the
+     * reaction itself ({@link #restore}); false where none was restored.
+     */
+    boolean restoreUnseen(String emoji, UUID reactor) {
+        String key = ChatForeignEmoji.restoredKey(emoji);
+        LinkedHashMap<UUID, String> reactors = key == null ? null
+                : this.byEmoji.get(key);
+        if (reactors == null || !reactors.containsKey(reactor)) {
+            return false;
+        }
+        markUnseen(key, reactor);
+        return true;
     }
 
     /**
@@ -515,6 +579,16 @@ public final class ChatReactions {
      * emoji names those of them who reacted.
      */
     public ChatReactionSummary summaryFor(Set<UUID> viewerIds) {
+        return summaryFor(viewerIds, false);
+    }
+
+    /**
+     * As {@link #summaryFor(Set)}: a reaction made as an unseen voice is
+     * named so to every reader but its reactor and, with
+     * {@code revealsUnseen}, staff holding {@code chat.moderate} (CHAT-84).
+     */
+    public ChatReactionSummary summaryFor(Set<UUID> viewerIds,
+                                          boolean revealsUnseen) {
         if (this.byEmoji.isEmpty()) {
             return ChatReactionSummary.EMPTY;
         }
@@ -523,9 +597,15 @@ public final class ChatReactions {
         for (Map.Entry<String, LinkedHashMap<UUID, String>> kind
                 : this.byEmoji.entrySet()) {
             List<String> names = new ArrayList<String>();
-            for (String name : kind.getValue().values()) {
+            for (Map.Entry<UUID, String> reactor : kind.getValue().entrySet()) {
                 if (names.size() >= ChatReactionSummary.MAX_NAMES) {
                     break;
+                }
+                String name = reactor.getValue();
+                if (!revealsUnseen && isUnseen(kind.getKey(), reactor.getKey())
+                        && (viewerIds == null
+                                || !viewerIds.contains(reactor.getKey()))) {
+                    name = ChatUnseenVoice.NAME;
                 }
                 if (name.length() > 0) {
                     names.add(name);

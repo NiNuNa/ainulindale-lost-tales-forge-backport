@@ -1,10 +1,9 @@
 package com.ninuna.losttales.progression.statue;
 
 /**
- * What a reset at a statue costs a character (Nils, 2026-10-19): the
- * first one {@code first} coins, each later one {@code factor} times the
- * one before, as Zelda's statue asks more each time; both server
- * settings. The price never passes {@link #MOST}.
+ * What a reset at a statue costs a character (PROG-12): the first one
+ * {@code first} coins, each later one {@code factor} times the one
+ * before; both server settings. The price never passes {@link #MOST}.
  */
 public final class ResetPrice {
     /** The most coins a reset ever asks. */

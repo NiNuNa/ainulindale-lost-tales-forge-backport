@@ -23,7 +23,14 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
      * read each other's bytes and neither version follows the other.
      */
     private static final int DATA_VERSION = 2;
+    /** The most rings kept aside by the slot's own refusals; past it a ring drops. */
     public static final int MAX_REJECTED_ENTRIES = 16;
+    /**
+     * The safety bound on rings kept aside at all. A worn ring the slot
+     * cannot take as it is read is kept even past {@link #MAX_REJECTED_ENTRIES}
+     * (ACC-07); a list read past this bound is kept whole as one entry.
+     */
+    public static final int MAX_KEPT_ENTRIES = 64;
     private static final String TAG_VERSION = "Version";
     private static final String TAG_EQUIPPED = "Equipped";
     private static final String TAG_REJECTED = "Rejected";
@@ -34,6 +41,8 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
             new ArrayList<NBTTagCompound>();
     private long lastServerRevision = -1L;
     private boolean serverRejectedEntryPresent;
+    /** A worn ring the last character put on could not wear here, for its one line; never saved. */
+    private ItemStack ringLeftOff;
 
     public static AccessoryPlayerData get(EntityPlayer player) {
         if (player == null) {
@@ -114,19 +123,47 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
         return true;
     }
 
+    /**
+     * Keeps an entry aside whatever the count: the rings the saved data
+     * keeps aside, and a worn ring the slot cannot take as it is read, are
+     * never lost on that path (ACC-07).
+     */
+    public void keepAside(NBTTagCompound entry) {
+        if (entry == null) {
+            return;
+        }
+        this.rejectedEntries.add((NBTTagCompound)entry.copy());
+        this.serverRejectedEntryPresent = true;
+    }
+
     public void replaceState(
             ItemStack equipped, List<NBTTagCompound> rejected) {
         if (this.inventory == null) {
             throw new IllegalStateException("accessory inventory is unavailable");
         }
         this.inventory.replaceValidated(equipped);
+        this.ringLeftOff = null;
         this.rejectedEntries.clear();
         if (rejected != null) {
             for (NBTTagCompound entry : rejected) {
-                addRejectedEntry(entry);
+                if (entry != null) {
+                    this.rejectedEntries.add((NBTTagCompound)entry.copy());
+                }
             }
         }
         this.serverRejectedEntryPresent = !this.rejectedEntries.isEmpty();
+    }
+
+    /** Notes the worn ring a character put on could not wear here; null for none. */
+    public void noteRingLeftOff(ItemStack ring) {
+        this.ringLeftOff = ring == null ? null : ring.copy();
+    }
+
+    /** The ring {@link #noteRingLeftOff} noted, once; null for none. */
+    public ItemStack takeRingLeftOff() {
+        ItemStack ring = this.ringLeftOff;
+        this.ringLeftOff = null;
+        return ring;
     }
 
     public void copyFrom(AccessoryPlayerData source) {
@@ -199,9 +236,14 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
         if (data.hasKey(TAG_REJECTED, Constants.NBT.TAG_LIST)) {
             net.minecraft.nbt.NBTTagList rejected = data.getTagList(
                     TAG_REJECTED, Constants.NBT.TAG_COMPOUND);
-            for (int index = 0; index < rejected.tagCount()
-                    && index < MAX_REJECTED_ENTRIES; index++) {
-                addRejectedEntry(rejected.getCompoundTagAt(index));
+            if (rejected.tagCount() > MAX_KEPT_ENTRIES) {
+                // Past the safety bound nothing is read: the data is kept
+                // whole as one entry, which recovery leaves as it is.
+                keepAside(data);
+                return;
+            }
+            for (int index = 0; index < rejected.tagCount(); index++) {
+                keepAside(rejected.getCompoundTagAt(index));
             }
         }
         if (!data.hasKey(TAG_EQUIPPED, Constants.NBT.TAG_COMPOUND)) {
@@ -215,7 +257,7 @@ public final class AccessoryPlayerData implements IExtendedEntityProperties {
             stack = null;
         }
         if (stack == null || !this.inventory.restoreValidated(stack)) {
-            addRejectedEntry(raw);
+            keepAside(raw);
         }
     }
 

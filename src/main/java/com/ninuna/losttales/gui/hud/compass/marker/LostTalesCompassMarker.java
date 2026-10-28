@@ -164,17 +164,19 @@ public class LostTalesCompassMarker {
         return value;
     }
 
+    /**
+     * A marker's colour as red, green and blue from 0 to 1: one of the
+     * twelve a marker is given by name, or {@code #rrggbb}; white for any
+     * other.
+     */
     public static float[] parseColor(String colorName) {
         if (colorName == null || colorName.trim().length() == 0) {
             return new float[] {1.0F, 1.0F, 1.0F};
         }
 
-        String value = colorName.trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+        String value = colorName.trim().toLowerCase(Locale.ROOT);
         if (value.startsWith("#")) {
             return parseHexColor(value.substring(1));
-        }
-        if (value.startsWith("0x")) {
-            return parseHexColor(value.substring(2));
         }
         if ("white".equals(value)) return new float[] {1.0F, 1.0F, 1.0F};
         if ("red".equals(value)) return new float[] {1.0F, 0.25F, 0.25F};
@@ -183,8 +185,8 @@ public class LostTalesCompassMarker {
         if ("yellow".equals(value) || "gold".equals(value)) return new float[] {1.0F, 0.85F, 0.25F};
         if ("orange".equals(value)) return new float[] {1.0F, 0.55F, 0.2F};
         if ("purple".equals(value) || "violet".equals(value)) return new float[] {0.75F, 0.45F, 1.0F};
-        if ("gray".equals(value) || "grey".equals(value)) return new float[] {0.65F, 0.65F, 0.65F};
-        if ("dark_gray".equals(value) || "dark_grey".equals(value)) return new float[] {0.35F, 0.35F, 0.35F};
+        if ("gray".equals(value)) return new float[] {0.65F, 0.65F, 0.65F};
+        if ("dark_gray".equals(value)) return new float[] {0.35F, 0.35F, 0.35F};
         if ("black".equals(value)) return new float[] {0.15F, 0.15F, 0.15F};
         return new float[] {1.0F, 1.0F, 1.0F};
     }

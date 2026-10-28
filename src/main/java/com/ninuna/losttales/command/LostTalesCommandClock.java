@@ -13,13 +13,15 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 
 /**
- * The world's clock (DATA-09). {@code /losttales clock} says when the
- * world last saw the server's clock and whether a jump of it holds
- * anything back; {@code accept} is an operator's word that the clock is
- * right, and what the jump held expires: the deleted characters past
- * their retention are purged, a bounded number at once, the chat audit
- * files past theirs are removed, and the last-seen times past theirs are
- * forgotten as their store next loads.
+ * The world's clock (DATA-09, DATA-15). {@code /losttales clock} says
+ * when the world last saw the server's clock, whether a jump of it holds
+ * anything back, and whether it reads more than a day behind the world's
+ * latest time; {@code accept} is an operator's word that the clock is
+ * right. The world's latest time becomes the clock's reading, and what a
+ * jump held expires: the deleted characters past their retention are
+ * purged, a bounded number at once, the chat audit files past theirs are
+ * removed, and the last-seen times past theirs are forgotten as their
+ * store next loads.
  */
 public final class LostTalesCommandClock extends LostTalesCommandBase {
 
@@ -69,13 +71,19 @@ public final class LostTalesCommandClock extends LostTalesCommandBase {
         long now = System.currentTimeMillis();
         say(sender, EnumChatFormatting.GRAY, SAY + "seen",
                 WorldClock.format(clock.getLastSeen()), WorldClock.format(now));
-        if (!clock.isHolding()) {
+        boolean behind = clock.isBehind(now);
+        if (behind) {
+            say(sender, EnumChatFormatting.YELLOW, SAY + "behind");
+        }
+        if (clock.isHolding()) {
+            say(sender, EnumChatFormatting.YELLOW, SAY + "held",
+                    WorldClock.format(clock.getHeldFrom()),
+                    WorldClock.format(clock.getHeldTo()),
+                    Integer.valueOf(heldDeletions(world, clock, now)));
+        } else if (!behind) {
             say(sender, EnumChatFormatting.GREEN, SAY + "steady");
             return;
         }
-        say(sender, EnumChatFormatting.YELLOW, SAY + "held",
-                WorldClock.format(clock.getHeldFrom()), WorldClock.format(clock.getHeldTo()),
-                Integer.valueOf(heldDeletions(world, clock, now)));
         say(sender, EnumChatFormatting.GRAY, SAY + "accept_hint");
     }
 
@@ -84,20 +92,33 @@ public final class LostTalesCommandClock extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "unreadable");
             return;
         }
-        if (!clock.isHolding()) {
-            say(sender, EnumChatFormatting.GRAY, SAY + "nothing_held");
+        long now = System.currentTimeMillis();
+        boolean behind = clock.isBehind(now);
+        boolean holding = clock.isHolding();
+        if (!holding && !behind) {
+            say(sender, EnumChatFormatting.GRAY, SAY + "nothing_to_accept");
             return;
         }
+        long latest = clock.getLastSeen();
         long from = clock.getHeldFrom();
         long to = clock.getHeldTo();
-        clock.accept(System.currentTimeMillis());
-        LostTalesLog.warning("%s accepted the server's clock; what its jump from %s to %s"
-                + " held may expire now", sender.getCommandSenderName(),
-                WorldClock.format(from), WorldClock.format(to));
-        int purged = CharacterDeletionService.getInstance().purgeExpired(world,
-                PURGES_AT_ACCEPT);
-        ChatAuditLog.pruneExpired();
-        say(sender, EnumChatFormatting.GREEN, SAY + "accepted", Integer.valueOf(purged));
+        clock.accept(now);
+        if (behind) {
+            LostTalesLog.warning("%s accepted the server's clock; the world's latest time moves"
+                    + " back from %s to %s", sender.getCommandSenderName(),
+                    WorldClock.format(latest), WorldClock.format(now));
+            say(sender, EnumChatFormatting.GREEN, SAY + "accepted.behind",
+                    WorldClock.format(now));
+        }
+        if (holding) {
+            LostTalesLog.warning("%s accepted the server's clock; what its jump from %s to %s"
+                    + " held may expire now", sender.getCommandSenderName(),
+                    WorldClock.format(from), WorldClock.format(to));
+            int purged = CharacterDeletionService.getInstance().purgeExpired(world,
+                    PURGES_AT_ACCEPT);
+            ChatAuditLog.pruneExpired();
+            say(sender, EnumChatFormatting.GREEN, SAY + "accepted", Integer.valueOf(purged));
+        }
     }
 
     /** How many deleted characters past their retention the clock holds; 0 for a journal that cannot be read. */

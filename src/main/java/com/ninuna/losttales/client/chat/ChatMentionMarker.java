@@ -21,7 +21,7 @@ import net.minecraft.util.IChatComponent;
  * pointer the way a sender's name does. Same mechanism as
  * {@link ChatColorMarker}: the click event is the carrier, and it
  * survives vanilla's wrapped-chat component copies. Every name rides in
- * base64, as a channel link's tab does, so a name holding any character
+ * base64, as a channel link's page does, so a name holding any character
  * at all — a Discord nickname may hold anything — reads back whole.
  */
 final class ChatMentionMarker {

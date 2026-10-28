@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Bounded server-authoritative positions of the members of the fellowship travelled with. */
+/** Where the members of the fellowship the player travels with stand, each while they share it. */
 public final class FellowshipTrackingSyncPacket implements IMessage {
 
     private FellowshipTrackingSnapshot snapshot;

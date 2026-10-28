@@ -50,7 +50,8 @@ public final class QuestRumoursTest {
     public void aRumourIsWrittenWithItsTellers() {
         assertEquals(Collections.<String>emptyList(), warnings(QUEST));
         LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser.parseQuest(
-                new StringReader(QUEST), "quests/test.json");
+                new StringReader(QUEST), "quests/test.json",
+                new ArrayList<String>());
         assertEquals("They say the woman by the well needs a hand.",
                 LostTalesQuestWords.rumourLine(quest));
         assertEquals("lotr.BreeMan,lotr.BreeInnkeeper",
@@ -65,8 +66,8 @@ public final class QuestRumoursTest {
     @Test
     public void aCharacterKeepsItsRumoursUntilItTakesTheQuest() {
         LostTalesQuestPlayerData data = new LostTalesQuestPlayerData();
-        assertTrue(data.hearRumour("losttales:server/old_road"));
-        assertFalse("once", data.hearRumour("losttales:server/old_road"));
+        assertTrue(data.hearRumour("losttales:server/old_road", ""));
+        assertFalse("once", data.hearRumour("losttales:server/old_road", ""));
         assertTrue(data.getQuestIdsInLog().contains("losttales:server/old_road"));
         NBTTagCompound wrapper = new NBTTagCompound();
         data.saveNBTData(wrapper);
@@ -78,7 +79,7 @@ public final class QuestRumoursTest {
         loaded.startQuest("losttales:server/old_road", "1", 1L, 0L);
         assertTrue("taken, it is no lead any more", loaded.getHeardRumours().isEmpty());
         for (int index = 0; index <= LostTalesQuestPlayerData.MAX_RUMOURS; index++) {
-            loaded.hearRumour("losttales:server/q" + index);
+            loaded.hearRumour("losttales:server/q" + index, "");
         }
         assertEquals(LostTalesQuestPlayerData.MAX_RUMOURS, loaded.getHeardRumours().size());
         assertFalse("the oldest goes", loaded.getHeardRumours().contains("losttales:server/q0"));
@@ -115,7 +116,7 @@ public final class QuestRumoursTest {
         assertTrue("the place is not found by hearing of it",
                 data.getDiscoveredMarkerIds().isEmpty());
         assertFalse(data.isMarkerDiscovered("losttales:bree_well"));
-        assertTrue(data.hearRumour("losttales:server/no_place"));
+        assertTrue(data.hearRumour("losttales:server/no_place", ""));
         assertEquals("", data.getRumourMarkers().get("losttales:server/no_place"));
 
         NBTTagCompound wrapper = new NBTTagCompound();
@@ -211,5 +212,86 @@ public final class QuestRumoursTest {
                         .withRumourPlaces(Collections.singletonList(well(180.0D))),
                 false);
         assertNotNull(moved.whole);
+    }
+
+    private static LostTalesQuestDefinition parsed(String json) {
+        return LostTalesQuestDefinitionJsonParser.parseQuest(new StringReader(json),
+                "quests/test.json", new ArrayList<String>());
+    }
+
+    /**
+     * A rumour that names no marker points to the first place its quest
+     * names (QUEST-20): its markers but its giver's, then its objectives'
+     * markers stage by stage, never a marker its giver's names.
+     */
+    @Test
+    public void aRumourWithNoMarkerTakesTheFirstPlaceItsQuestNames() {
+        LostTalesQuestDefinition quest = parsed("{\"id\":\"losttales:server/old_road\","
+                + "\"startMode\":\"interaction\",\"interaction\":{\"entity\":\"losttales.Nia\"},"
+                + "\"markers\":{\"giver\":\"losttales:nia_hut\",\"waymark\":\"losttales:waymark, losttales:ford\"},"
+                + "\"stages\":[{\"id\":\"1\",\"objectives\":[{\"id\":\"a\",\"type\":\"goto\","
+                + "\"params\":{\"marker\":\"losttales:nia_hut\"}},{\"id\":\"b\",\"type\":\"goto\","
+                + "\"params\":{\"marker\":\"losttales:old_bridge\"}}]}]}");
+        assertEquals(Arrays.asList("losttales:waymark", "losttales:ford",
+                "losttales:old_bridge"), QuestRumourPlaces.questMarkers(quest));
+        assertNull("a creature's quest with no place written points to no block",
+                QuestRumourPlaces.blockPlace(quest, 0));
+
+        LostTalesQuestDefinition objectivesOnly = parsed("{\"id\":\"losttales:server/ford\","
+                + "\"startMode\":\"interaction\",\"interaction\":{\"entity\":\"losttales.Nia\"},"
+                + "\"stages\":[{\"id\":\"1\",\"objectives\":[{\"id\":\"a\",\"type\":\"goto\","
+                + "\"params\":{\"marker\":\"losttales:ford\"}}]}]}");
+        assertEquals(Collections.singletonList("losttales:ford"),
+                QuestRumourPlaces.questMarkers(objectivesOnly));
+        assertTrue(QuestRumourPlaces.questMarkers(null).isEmpty());
+    }
+
+    /** With no marker at all, a quest a block gives points to where its block stands. */
+    @Test
+    public void aBlocksQuestPointsToItsBlock() {
+        LostTalesQuestDefinition quest = parsed("{\"id\":\"losttales:server/cauldron\","
+                + "\"startMode\":\"interaction\",\"interaction\":{\"block\":\"minecraft:cauldron\","
+                + "\"x\":\"120\",\"y\":\"70\",\"z\":\"-340\",\"dimension\":\"100\"},"
+                + "\"stages\":[{\"id\":\"1\",\"objectives\":[{\"id\":\"a\",\"type\":\"gather\","
+                + "\"params\":{\"item\":\"minecraft:log\"}}]}]}");
+        assertTrue(QuestRumourPlaces.questMarkers(quest).isEmpty());
+        QuestRumourPlace place = QuestRumourPlaces.blockPlace(quest, 0);
+        assertNotNull(place);
+        assertFalse("a bare place bears no marker", place.isMarker());
+        assertTrue(place.isValid());
+        assertEquals(100, place.getDimensionId());
+        assertEquals(120.5D, place.getX(), 0.0D);
+        assertEquals(-339.5D, place.getZ(), 0.0D);
+        assertEquals("a bare place has no name", "", place.shownName());
+
+        QuestRumourPlace here = QuestRumourPlaces.blockPlace(parsed(
+                "{\"id\":\"losttales:server/cauldron\",\"startMode\":\"interaction\","
+                + "\"interaction\":{\"block\":\"minecraft:cauldron\",\"x\":\"3\",\"z\":\"4\"},"
+                + "\"stages\":[{\"id\":\"1\",\"objectives\":[{\"id\":\"a\",\"type\":\"gather\","
+                + "\"params\":{\"item\":\"minecraft:log\"}}]}]}"), 7);
+        assertEquals("bare coordinates stand where the player is", 7, here.getDimensionId());
+        assertNull("a block with no place written points nowhere",
+                QuestRumourPlaces.blockPlace(parsed("{\"id\":\"losttales:server/cauldron\","
+                        + "\"startMode\":\"interaction\","
+                        + "\"interaction\":{\"block\":\"minecraft:cauldron\"},"
+                        + "\"stages\":[{\"id\":\"1\",\"objectives\":[{\"id\":\"a\","
+                        + "\"type\":\"gather\",\"params\":{\"item\":\"minecraft:log\"}}]}]}"), 0));
+    }
+
+    /** A bare place travels to the journal as a marker's does; a name without a marker does not. */
+    @Test
+    public void aBarePlaceTravelsWithItsRumour() {
+        QuestRumourPlace bare = new QuestRumourPlace("losttales:server/old_road", "", "", "",
+                100, 120.5D, -339.5D);
+        assertFalse("a name needs a marker to bear it", new QuestRumourPlace(
+                "losttales:server/old_road", "", "The Well", "", 100, 1.0D, 1.0D).isValid());
+        LostTalesQuestSyncPacket sent = withRumours("losttales:server/old_road")
+                .withRumourPlaces(Collections.singletonList(bare));
+        ByteBuf buffer = Unpooled.buffer();
+        sent.toBytes(buffer);
+        LostTalesQuestSyncPacket read = new LostTalesQuestSyncPacket();
+        read.fromBytes(buffer);
+        assertFalse(read.isMalformed());
+        assertEquals(Collections.singletonList(bare), read.getRumourPlaces());
     }
 }

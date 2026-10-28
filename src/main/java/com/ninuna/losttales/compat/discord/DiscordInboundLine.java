@@ -7,11 +7,14 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A Discord member's line as the chat takes it: its text in the server's
- * words, and the same text in pieces, each either plain words or a mark the
- * lang file words (a forward's, a sticker's), which each game reads in its
- * own language ({@link DiscordInboundBody}). The pieces always join to the
- * text exactly; a line without a mark has nothing to translate.
+ * A Discord member's line as the chat takes it: its text with its marks in
+ * English, what the history and the logs keep, and the same text in
+ * pieces, each either plain words or a mark the lang file words (a
+ * forward's, a sticker's). Each game reads the marks in its own language
+ * ({@link DiscordInboundBody}), and each linked Discord channel the line
+ * goes on to in the language chosen for it ({@link #textIn}). The pieces
+ * always join to the text exactly; a line without a mark has nothing to
+ * translate.
  */
 public final class DiscordInboundLine {
     /** A line with nothing sayable in it. */
@@ -26,8 +29,22 @@ public final class DiscordInboundLine {
         this.text = textOf(this.pieces);
     }
 
-    /** The line in the server's words; empty for nothing sayable. */
+    /** The line with its marks in English; empty for nothing sayable. */
     public String getText() { return this.text; }
+
+    /**
+     * The line with its marks in {@code words}: what a linked Discord
+     * channel the line goes on to is posted, in the language chosen for it.
+     */
+    public String textIn(LostTalesWords words) {
+        StringBuilder text = new StringBuilder();
+        for (Piece piece : this.pieces) {
+            text.append(piece.isMark()
+                    ? words.format(piece.key, piece.arguments.toArray())
+                    : piece.words);
+        }
+        return text.toString();
+    }
 
     /** The line in pieces, plain words and marks, in order. */
     public List<Piece> getPieces() { return this.pieces; }
@@ -44,7 +61,7 @@ public final class DiscordInboundLine {
 
     /** One run of a line: plain words, or a mark under a lang key. */
     public static final class Piece {
-        /** The run in the server's words. */
+        /** The run as the line's text holds it, a mark in English. */
         public final String words;
         /** The mark's lang key; null for plain words. */
         public final String key;
@@ -62,7 +79,7 @@ public final class DiscordInboundLine {
             return new Piece(words, null, Collections.<String>emptyList());
         }
 
-        /** A mark under {@code key}, read in the server's words for the text. */
+        /** A mark under {@code key}, read in {@code words} for the text. */
         static Piece mark(LostTalesWords words, String key, String... arguments) {
             String[] copied = arguments.clone();
             return new Piece(words.format(key, (Object[])copied), key,

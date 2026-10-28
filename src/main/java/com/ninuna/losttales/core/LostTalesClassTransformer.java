@@ -28,8 +28,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Applies narrowly scoped compatibility hooks where public Forge 1.7.10 events
- * do not expose the required camera, debug-box, identity, and LOTR behavior.
+ * Every patch the mod makes to vanilla and LOTR classes, for what no Forge
+ * event reaches. A patch that cannot find its target, or fails while it is
+ * made, leaves the class as it was and logs a warning.
  * Every call a patch injects is wrapped in one catch as its class is written
  * ({@link HookGuard}, DATA-08), so a fault of the mod's never reaches
  * vanilla's or LOTR's code.
@@ -55,6 +56,18 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 @Override
                 protected List<String[]> initialValue() {
                     return new ArrayList<String[]>();
+                }
+            };
+    /**
+     * The lines saying what the patch being tried on this thread changed,
+     * logged once its class is written ({@link #logOnWrite}), so a class
+     * the hook guard refuses is never logged as patched.
+     */
+    private static final ThreadLocal<List<String>> LOGGED_ON_WRITE =
+            new ThreadLocal<List<String>>() {
+                @Override
+                protected List<String> initialValue() {
+                    return new ArrayList<String>();
                 }
             };
     public static final String LOTR_MAP_SCENE_ACTIVE_PROPERTY =
@@ -114,8 +127,19 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             "losttales.accessoryPickBlockTransformer.active";
     public static final String ACCESSORY_CREATIVE_ACTIVE_PROPERTY =
             "losttales.accessoryCreativeTransformer.active";
+    /**
+     * The ring's death drop in {@code EntityPlayer.onDeath}: what a
+     * client's player runs, so what the client's ring slot asks.
+     */
     public static final String ACCESSORY_DEATH_ACTIVE_PROPERTY =
             "losttales.accessoryDeathTransformer.active";
+    /**
+     * The ring's death drop in {@code EntityPlayerMP.onDeath}, which every
+     * server's player runs in place of {@code EntityPlayer}'s: what the
+     * server's ring slot asks (ACC-05).
+     */
+    public static final String ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY =
+            "losttales.accessoryServerDeathTransformer.active";
     public static final String ACCESSORY_COLLISION_ACTIVE_PROPERTY =
             "losttales.accessoryCollisionTransformer.active";
     public static final String ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY =
@@ -600,8 +624,8 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             return transformPlayerController(basicClass);
         }
         if (ENTITY_PLAYER_MP.equals(transformedName)) {
-            return transformEntityPlayerMpChatLine(
-                    transformEntityPlayerMpDeathMessage(basicClass));
+            return transformEntityPlayerMpChatLine(transformEntityPlayerMpDeathDrop(
+                    transformEntityPlayerMpDeathMessage(basicClass)));
         }
         if (ENTITY_PLAYER.equals(transformedName)) {
             return transformEntityPlayerContainer(basicClass);
@@ -696,7 +720,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 guard.add(render);
                 method.instructions.insert(guard);
                 activate(LOTR_QUEST_TRACKER_ACTIVE_PROPERTY);
-                info("Patched the native LOTR quest tracker behind the Lost Tales fallback option");
+                logOnWrite("Patched the native LOTR quest tracker behind the Lost Tales fallback option");
                 return write(owner);
             }
             warn("Could not locate LOTRGuiMiniquestTracker#drawTracker; keeping LOTR's tracker");
@@ -1027,48 +1051,9 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     containerPatched = patchPlayerContainer(method);
                 }
 
-                if (("onDeath".equals(method.name)
-                        || "func_70645_a".equals(method.name))
-                        && "(Lnet/minecraft/util/DamageSource;)V".equals(
-                        method.desc)) {
-                    if (containsHook(method, ACCESSORY_DEATH_HOOK_OWNER,
-                            "captureAccessoryDrop")) {
-                        deathPatched = true;
-                        continue;
-                    }
-                    for (AbstractInsnNode instruction =
-                         method.instructions.getFirst();
-                         instruction != null;
-                         instruction = instruction.getNext()) {
-                        if (!(instruction instanceof FieldInsnNode)
-                                || instruction.getOpcode() != Opcodes.PUTFIELD) {
-                            continue;
-                        }
-                        FieldInsnNode field = (FieldInsnNode)instruction;
-                        AbstractInsnNode zero = previousCode(field);
-                        AbstractInsnNode playerLoad = previousCode(zero);
-                        if (!"captureDrops".equals(field.name)
-                                || !"Z".equals(field.desc)
-                                || zero == null
-                                || zero.getOpcode() != Opcodes.ICONST_0
-                                || !(playerLoad instanceof VarInsnNode)
-                                || playerLoad.getOpcode() != Opcodes.ALOAD
-                                || ((VarInsnNode)playerLoad).var != 0) {
-                            continue;
-                        }
-                        InsnList hook = new InsnList();
-                        hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                        hook.add(hookCall(
-                                ACCESSORY_DEATH_HOOK_OWNER,
-                                "captureAccessoryDrop",
-                                "(Lnet/minecraft/entity/player/EntityPlayer;)V",
-                                HookFallback.NOTHING));
-                        method.instructions.insertBefore(playerLoad, hook);
-                        deathPatched = true;
-                        break;
-                    }
+                if (isPlayerDeath(method)) {
+                    deathPatched = patchDeathDropCapture(method);
                 }
-
             }
             byte[] result = containerPatched || deathPatched
                     ? write(owner) : basicClass;
@@ -1084,7 +1069,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 info("Installed accessory death-drop capture hook");
             } else {
                 warn("Could not patch EntityPlayer death-drop capture; "
-                        + "accessory insertion must remain disabled");
+                        + "the client's ring slot takes nothing");
             }
             return result;
         } catch (Throwable throwable) {
@@ -1093,6 +1078,90 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     + throwable);
             return basicClass;
         }
+    }
+
+    /**
+     * Drops the worn ring with the server player's things at death (ACC-05).
+     * A server's player runs {@code EntityPlayerMP.onDeath}, which never
+     * calls {@code EntityPlayer}'s, so its death takes the same capture;
+     * with {@code keepInventory} on, the method never opens the capture and
+     * the ring stays on.
+     */
+    private static byte[] transformEntityPlayerMpDeathDrop(byte[] basicClass) {
+        try {
+            ClassNode owner = read(basicClass);
+            for (Object value : owner.methods) {
+                MethodNode method = (MethodNode)value;
+                if (!isPlayerDeath(method)) {
+                    continue;
+                }
+                if (containsHook(method, ACCESSORY_DEATH_HOOK_OWNER,
+                        "captureAccessoryDrop")) {
+                    activate(ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY);
+                    return basicClass;
+                }
+                if (!patchDeathDropCapture(method)) {
+                    break;
+                }
+                activate(ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY);
+                logOnWrite("Installed the server player's accessory death-drop capture hook");
+                return write(owner);
+            }
+            warn("Could not patch EntityPlayerMP death-drop capture; "
+                    + "the ring slot takes nothing on this server");
+            return basicClass;
+        } catch (Throwable throwable) {
+            rollBack();
+            warn("Failed to patch EntityPlayerMP death-drop capture: " + throwable);
+            return basicClass;
+        }
+    }
+
+    /** Whether the method is a player's {@code onDeath(DamageSource)}, by its MCP or SRG name. */
+    private static boolean isPlayerDeath(MethodNode method) {
+        return ("onDeath".equals(method.name) || "func_70645_a".equals(method.name))
+                && "(Lnet/minecraft/util/DamageSource;)V".equals(method.desc);
+    }
+
+    /**
+     * Puts the ring's drop into a player's death right before Forge's drop
+     * capture closes ({@code this.captureDrops = false}), so the ring is
+     * among the drops {@code PlayerDropsEvent} is handed. Answers whether
+     * the hook is there now, found or put in.
+     */
+    private static boolean patchDeathDropCapture(MethodNode method) {
+        if (containsHook(method, ACCESSORY_DEATH_HOOK_OWNER, "captureAccessoryDrop")) {
+            return true;
+        }
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+             instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof FieldInsnNode)
+                    || instruction.getOpcode() != Opcodes.PUTFIELD) {
+                continue;
+            }
+            FieldInsnNode field = (FieldInsnNode)instruction;
+            AbstractInsnNode zero = previousCode(field);
+            AbstractInsnNode playerLoad = previousCode(zero);
+            if (!"captureDrops".equals(field.name)
+                    || !"Z".equals(field.desc)
+                    || zero == null
+                    || zero.getOpcode() != Opcodes.ICONST_0
+                    || !(playerLoad instanceof VarInsnNode)
+                    || playerLoad.getOpcode() != Opcodes.ALOAD
+                    || ((VarInsnNode)playerLoad).var != 0) {
+                continue;
+            }
+            InsnList hook = new InsnList();
+            hook.add(new VarInsnNode(Opcodes.ALOAD, 0));
+            hook.add(hookCall(
+                    ACCESSORY_DEATH_HOOK_OWNER,
+                    "captureAccessoryDrop",
+                    "(Lnet/minecraft/entity/player/EntityPlayer;)V",
+                    HookFallback.NOTHING));
+            method.instructions.insertBefore(playerLoad, hook);
+            return true;
+        }
+        return false;
     }
 
     /** Rejects concealed players before vanilla and LOTR target suitability. */
@@ -1116,7 +1185,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         ACCESSORY_CONCEALMENT_HOOK_OWNER,
                         "isConcealed")) {
                     activate(ACCESSORY_AI_TARGET_ACTIVE_PROPERTY);
-                    info("Installed accessory AI target-suitability hook");
+                    logOnWrite("Installed accessory AI target-suitability hook");
                     return write(owner);
                 }
             }
@@ -1150,7 +1219,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         ACCESSORY_CONCEALMENT_HOOK_OWNER,
                         "isConcealed")) {
                     activate(ACCESSORY_INVISIBILITY_ACTIVE_PROPERTY);
-                    info("Installed accessory vanilla-invisibility hook");
+                    logOnWrite("Installed accessory vanilla-invisibility hook");
                     return write(owner);
                 }
             }
@@ -1209,7 +1278,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 warn("Could not patch EntityLivingBase collision targeting");
             }
             if (sightPatched || collisionPatched) {
-                info("Installed accessory living sight/collision hooks");
+                logOnWrite("Installed accessory living sight/collision hooks");
                 return write(owner);
             }
             return basicClass;
@@ -1339,7 +1408,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         redirect(call, ACCESSORY_CONTAINER_HOOK_OWNER,
                                 "resolveVanillaInventorySlotCount", "(Ljava/util/List;)I");
                         activate(ACCESSORY_PICK_BLOCK_ACTIVE_PROPERTY);
-                        info("Patched creative pick-block hotbar indexing");
+                        logOnWrite("Patched creative pick-block hotbar indexing");
                         return write(owner);
                     }
                 }
@@ -1402,7 +1471,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 method.instructions.insertBefore(
                         method.instructions.getFirst(), hook);
                 activate(ACCESSORY_CREATIVE_ACTIVE_PROPERTY);
-                info("Installed server accessory creative-slot validation");
+                logOnWrite("Installed server accessory creative-slot validation");
                 return write(owner);
             }
             warn("Could not patch creative inventory action handling");
@@ -1478,7 +1547,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             HookFallback.argument(0)));
                     method.instructions.insert(invocation, hook);
                     activate(DEATH_MESSAGE_ACTIVE_PROPERTY);
-                    info("Patched player death messages with roleplay names");
+                    logOnWrite("Patched player death messages with roleplay names");
                     return write(owner);
                 }
             }
@@ -1546,7 +1615,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                     "resolveMapPlayerName", MAP_PLAYER_NAME_HOOK_DESC);
                             playerNameHookPresent = true;
                             changed = true;
-                            info("Patched LOTR map player tooltips with "
+                            logOnWrite("Patched LOTR map player tooltips with "
                                     + "roleplay names");
                             break;
                         }
@@ -1765,7 +1834,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         hook.add(new InsnNode(Opcodes.RETURN));
         hook.add(renderNativePlayers);
         method.instructions.insert(hook);
-        info("Patched LOTR map player icons with smooth Lost Tales rendering");
+        logOnWrite("Patched LOTR map player icons with smooth Lost Tales rendering");
         return true;
     }
 
@@ -1788,7 +1857,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 continue;
             }
             redirect(call, LOTR_MAP_LAYOUT_HOOK_OWNER, "lotrScissor", call.desc);
-            info("Patched the LOTR map scissor to follow its window");
+            logOnWrite("Patched the LOTR map scissor to follow its window");
             return true;
         }
         return false;
@@ -1831,7 +1900,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
             if (isOpPatched && protectionPatched) {
                 activate(LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY);
-                info("Patched LOTR's map news to reach the map in a window");
+                logOnWrite("Patched LOTR's map news to reach the map in a window");
             } else {
                 System.clearProperty(LOTR_MAP_WINDOW_NEWS_ACTIVE_PROPERTY);
                 warn("Could not patch LOTR's map news; a map in a window "
@@ -1902,7 +1971,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     "fillClippedMapBackground",
                     "(ZIIIIIIII)V", HookFallback.NOTHING));
             method.instructions.insertBefore(call, hook);
-            info("Patched clipped LOTR map previews with ocean padding");
+            logOnWrite("Patched clipped LOTR map previews with ocean padding");
             return true;
         }
         return false;
@@ -1938,7 +2007,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 continue;
             }
             redirect(call, LOTR_MAP_COMPASS_HOOK_OWNER, "drawMapCompass", call.desc);
-            info("Patched the LOTR map compass onto the Lost Tales strip");
+            logOnWrite("Patched the LOTR map compass onto the Lost Tales strip");
             return true;
         }
         return false;
@@ -1975,7 +2044,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     "beginSheetPass",
                     "(Llotr/client/gui/LOTRGuiMap;)V", HookFallback.NOTHING));
             method.instructions.insert(hook);
-            info("Patched LOTR map labels to turn with the map sheet");
+            logOnWrite("Patched LOTR map labels to turn with the map sheet");
         }
         return injected;
     }
@@ -2009,7 +2078,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             injected = true;
         }
         if (injected) {
-            info("Patched LOTR map region names onto the Lost Tales palette");
+            logOnWrite("Patched LOTR map region names onto the Lost Tales palette");
         }
         return injected;
     }
@@ -2030,7 +2099,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             injected = true;
         }
         if (injected) {
-            info("Patched LOTR map subtitles onto the Lost Tales palette");
+            logOnWrite("Patched LOTR map subtitles onto the Lost Tales palette");
         }
         return injected;
     }
@@ -2054,7 +2123,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             instruction = next;
         }
         if (injected) {
-            info("Patched LOTR map coordinates with Lost Tales rotation");
+            logOnWrite("Patched LOTR map coordinates with Lost Tales rotation");
         }
         return injected;
     }
@@ -2077,7 +2146,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             instruction = next;
         }
         if (injected) {
-            info("Patched LOTR map viewport with Lost Tales fullscreen bounds");
+            logOnWrite("Patched LOTR map viewport with Lost Tales fullscreen bounds");
         }
         return injected;
     }
@@ -2094,7 +2163,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         hook.add(new InsnNode(Opcodes.RETURN));
         hook.add(renderFrame);
         method.instructions.insert(hook);
-        info("Patched LOTR map frame for Lost Tales fullscreen maps");
+        logOnWrite("Patched LOTR map frame for Lost Tales fullscreen maps");
         return true;
     }
 
@@ -2150,7 +2219,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             endPresent = foundReturn;
         }
         if (beginPresent && endPresent && filterPresent) {
-            info("Patched LOTR fullscreen subtitle positioning");
+            logOnWrite("Patched LOTR fullscreen subtitle positioning");
         }
         return beginPresent && endPresent && filterPresent;
     }
@@ -2190,7 +2259,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             endPresent = foundReturn;
         }
         if (beginPresent && endPresent) {
-            info("Patched LOTR map tooltips for the bottom control bar");
+            logOnWrite("Patched LOTR map tooltips for the bottom control bar");
         }
         return beginPresent && endPresent;
     }
@@ -2207,7 +2276,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         hook.add(new InsnNode(Opcodes.RETURN));
         hook.add(renderMiniQuests);
         method.instructions.insert(hook);
-        info("Patched LOTR map miniquest rendering with map-only filters");
+        logOnWrite("Patched LOTR map miniquest rendering with map-only filters");
         return true;
     }
 
@@ -2257,7 +2326,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                     + "LOTRPacketUpdatePlayerLocations;"
                                     + "Lcom/mojang/authlib/GameProfile;DD)V");
                     activate(ACCESSORY_LOTR_MAP_ACTIVE_PROPERTY);
-                    info("Patched LOTR map locations for accessory concealment");
+                    logOnWrite("Patched LOTR map locations for accessory concealment");
                     return write(owner);
                 }
             }
@@ -2331,7 +2400,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 activate(THIRD_PERSON_BLOCK_ACTION_ACTIVE_PROPERTY);
             }
             if (changed) {
-                info("Patched PlayerControllerMP third-person actions "
+                logOnWrite("Patched PlayerControllerMP third-person actions "
                         + "with vanilla fallbacks");
                 return write(owner);
             }
@@ -2374,7 +2443,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         redirect(call, ROLEPLAY_IDENTITY_HOOK_OWNER,
                                 "resolveGameplayId", GAMEPLAY_ID_HOOK_DESC);
                         activateLotrBountyTransformer();
-                        info("Bound LOTR faction bounties "
+                        logOnWrite("Bound LOTR faction bounties "
                                 + "to active roleplay-character UUIDs");
                         return write(owner);
                     }
@@ -2428,7 +2497,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 method.instructions.add(new org.objectweb.asm.tree.InsnNode(
                         Opcodes.ARETURN));
                 activateLotrBountyTransformer();
-                info("Patched LOTR bounty target names "
+                logOnWrite("Patched LOTR bounty target names "
                         + "for roleplay-character UUIDs");
                 return write(owner);
             }
@@ -2476,7 +2545,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         redirect(call, ROLEPLAY_IDENTITY_HOOK_OWNER,
                                 "resolveRoleplayName", ROLEPLAY_NAME_HOOK_DESC);
                         activate(LOTR_SPEECH_ACTIVE_PROPERTY);
-                        info("Patched LOTR NPC speech to "
+                        logOnWrite("Patched LOTR NPC speech to "
                                 + "use active roleplay-character names");
                         return write(owner);
                     }
@@ -2554,7 +2623,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         NPC_CHAT_HOOK_DESC);
                 insertImmersiveSpeechHook(method, npcLocal);
                 activate(NPC_CHAT_ACTIVE_PROPERTY);
-                info("Patched LOTR NPC speech chat lines into the "
+                logOnWrite("Patched LOTR NPC speech chat lines into the "
                         + "Lost Tales chat presentation");
                 return write(owner);
             }
@@ -2626,7 +2695,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 lift.add(new VarInsnNode(Opcodes.DSTORE, 4));
                 method.instructions.insert(lift);
                 activate(ALIGNMENT_LIFT_ACTIVE_PROPERTY);
-                info("Patched LOTR floating alignment to stand above a "
+                logOnWrite("Patched LOTR floating alignment to stand above a "
                         + "speaker's name");
                 return write(owner);
             }
@@ -2669,7 +2738,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 guard.add(carryOn);
                 method.instructions.insert(guard);
                 activate(NAMEPLATE_ACTIVE_PROPERTY);
-                info("Patched entity nameplates so a speaking player "
+                logOnWrite("Patched entity nameplates so a speaking player "
                         + "wears the chat's own name");
                 return write(owner);
             }
@@ -2710,7 +2779,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         redirect(call, NPC_CHAT_HOOK_OWNER, "renderNpcSpeeches",
                                 call.desc);
                         activate(NPC_SPEECH_RENDER_ACTIVE_PROPERTY);
-                        info("Patched LOTR NPC floating speech into the "
+                        logOnWrite("Patched LOTR NPC floating speech into the "
                                 + "Lost Tales chat style");
                         return write(owner);
                     }
@@ -2839,7 +2908,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 redirect(targetCall, FAST_TRAVEL_HOOK_OWNER, "setTargetIfAllowed",
                         FAST_TRAVEL_HOOK_DESC);
                 activate(FAST_TRAVEL_ACTIVE_PROPERTY);
-                info("Patched LOTR fast travel for "
+                logOnWrite("Patched LOTR fast travel for "
                         + "character-specific marker discovery");
                 return write(owner);
             }
@@ -2988,7 +3057,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
             }
             if (changed) {
-                info("Patched EntityRenderer race origin, third-person "
+                logOnWrite("Patched EntityRenderer race origin, third-person "
                         + "camera, and targeting hooks");
                 return write(owner);
             }
@@ -3041,7 +3110,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             "(Lnet/minecraft/client/gui/GuiScreen;IIF)V");
                     activateGuiAnimationPart(
                             GUI_ANIMATION_DRAW_ACTIVE_PROPERTY);
-                    info("Patched GUI draw coordinates for animated screens");
+                    logOnWrite("Patched GUI draw coordinates for animated screens");
                     return write(owner);
                 }
             }
@@ -3122,7 +3191,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 method.instructions.insertBefore(buttonCall, hook);
                 activateGuiAnimationPart(
                         GUI_ANIMATION_INPUT_ACTIVE_PROPERTY);
-                info("Patched GuiScreen mouse coordinates for animated screens");
+                logOnWrite("Patched GuiScreen mouse coordinates for animated screens");
                 return write(owner);
             }
             warn("Could not locate GuiScreen#handleMouseInput; GUI animation "
@@ -3176,7 +3245,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 }
                 activateGuiAnimationPart(
                         GUI_ANIMATION_BACKGROUND_ACTIVE_PROPERTY);
-                info("Patched GuiScreen backdrop for stationary GUI fades");
+                logOnWrite("Patched GuiScreen backdrop for stationary GUI fades");
                 return write(owner);
             }
             warn("Could not locate GuiScreen#drawWorldBackground; animated "
@@ -3239,7 +3308,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 head.add(vanilla);
                 method.instructions.insert(head);
                 activate(CHAT_HIT_TEST_ACTIVE_PROPERTY);
-                info("Patched GuiNewChat hit testing for the Lost Tales chat layout");
+                logOnWrite("Patched GuiNewChat hit testing for the Lost Tales chat layout");
                 return write(owner);
             }
             warn("Could not locate GuiNewChat#func_146236_a; third-party chat "
@@ -3308,7 +3377,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(new VarInsnNode(Opcodes.ASTORE, lines.var));
                 method.instructions.insertBefore(receiver, hook);
                 activate(CHAT_WRAP_ACTIVE_PROPERTY);
-                info("Patched GuiNewChat line wrapping for the Lost Tales chat layout");
+                logOnWrite("Patched GuiNewChat line wrapping for the Lost Tales chat layout");
                 return write(owner);
             }
             warn("Could not locate GuiNewChat#func_146237_a; wrapped chat "
@@ -3372,7 +3441,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     return basicClass;
                 }
                 activate(CHAT_LOG_ACTIVE_PROPERTY);
-                info("Patched GuiNewChat logging to keep each chat line on one"
+                logOnWrite("Patched GuiNewChat logging to keep each chat line on one"
                         + " log line");
                 return write(owner);
             }
@@ -3446,7 +3515,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     return basicClass;
                 }
                 activate(CHAT_DELETE_ACTIVE_PROPERTY);
-                info("Patched GuiNewChat line replacement for re-wrapping");
+                logOnWrite("Patched GuiNewChat line replacement for re-wrapping");
                 return write(owner);
             }
             warn("Could not locate GuiNewChat#func_146237_a; re-wrapping "
@@ -3506,7 +3575,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     return basicClass;
                 }
                 activate(CHAT_HISTORY_ACTIVE_PROPERTY);
-                info("Patched GuiNewChat history capacity");
+                logOnWrite("Patched GuiNewChat history capacity");
                 return write(owner);
             }
             warn("Could not locate GuiNewChat#func_146237_a; the chat "
@@ -3570,7 +3639,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     return basicClass;
                 }
                 activate(MENU_FRAMERATE_ACTIVE_PROPERTY);
-                info("Patched menu framerate cap");
+                logOnWrite("Patched menu framerate cap");
                 return write(owner);
             }
             warn("Could not locate Minecraft#getLimitFramerate; the menus "
@@ -3643,7 +3712,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                                 + "Llotr/common/world/map/LOTRAbstractWaypoint;)V",
                         HookFallback.NOTHING));
                 activate(LOTR_FAST_TRAVEL_ARRIVAL_ACTIVE_PROPERTY);
-                info("Patched LOTR fast travel completion to report arrivals");
+                logOnWrite("Patched LOTR fast travel completion to report arrivals");
                 return write(owner);
             }
             warn("Could not locate LOTRPlayerData#receiveFTBouncePacket; "
@@ -3702,7 +3771,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     return basicClass;
                 }
                 activate(LOTR_HIRED_UNIT_ACTIVE_PROPERTY);
-                info("Patched LOTR unit hiring to tag units with the hiring identity");
+                logOnWrite("Patched LOTR unit hiring to tag units with the hiring identity");
                 return write(owner);
             }
             warn("Could not locate LOTRHiredNPCInfo#hireUnit; hired units will "
@@ -3758,7 +3827,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     return basicClass;
                 }
                 activate(LOTR_SHARED_WAYPOINT_NAME_ACTIVE_PROPERTY);
-                info("Patched LOTR shared waypoints to name the sharing character");
+                logOnWrite("Patched LOTR shared waypoints to name the sharing character");
                 return write(owner);
             }
             warn("Could not locate LOTRCustomWaypoint#setSharingPlayerID; "
@@ -3822,7 +3891,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 return basicClass;
             }
             activate(LOTR_FELLOWSHIP_REQUESTS_ACTIVE_PROPERTY);
-            info("Patched LOTR's fellowship requests to be refused");
+            logOnWrite("Patched LOTR's fellowship requests to be refused");
             return write(owner);
         } catch (Throwable throwable) {
             rollBack();
@@ -3860,7 +3929,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 refusal.add(go);
                 method.instructions.insert(refusal);
                 activate(LOTR_FELLOWSHIP_CREATE_ACTIVE_PROPERTY);
-                info("Patched LOTR's request to make a fellowship to be refused");
+                logOnWrite("Patched LOTR's request to make a fellowship to be refused");
                 return write(owner);
             }
             warn("Could not locate LOTRPacketFellowshipCreate.Handler#onMessage; "
@@ -3898,7 +3967,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     break;
                 }
                 activate(LOTR_FELLOWSHIP_SHARE_ACTIVE_PROPERTY);
-                info("Patched LOTR's waypoint share to pass over a fellowship held for the record");
+                logOnWrite("Patched LOTR's waypoint share to pass over a fellowship held for the record");
                 return write(owner);
             }
             warn("Could not locate the fellowship lookup of LOTRPacketShareCWP.Handler#onMessage; "
@@ -3939,7 +4008,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     break;
                 }
                 activate(LOTR_FELLOWSHIP_SHARE_ROW_ACTIVE_PROPERTY);
-                info("Patched LOTR's map to offer only the fellowships behind the character played");
+                logOnWrite("Patched LOTR's map to offer only the fellowships behind the character played");
                 return write(owner);
             }
             warn("Could not locate LOTRGuiMap#getFellowshipByName's lookup; LOTR's map "
@@ -4044,7 +4113,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 return basicClass;
             }
             activate(LOTR_TRADER_NOTICE_ACTIVE_PROPERTY);
-            info("Patched " + patched + " LOTR travelling trader notices to wear "
+            logOnWrite("Patched " + patched + " LOTR travelling trader notices to wear "
                     + "the trader's faction colour");
             return write(owner);
         } catch (Throwable throwable) {
@@ -4111,7 +4180,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 return basicClass;
             }
             activate(LOTR_ACHIEVEMENT_HOVER_ACTIVE_PROPERTY);
-            info("Patched LOTR achievement hover cards into the chat's palette");
+            logOnWrite("Patched LOTR achievement hover cards into the chat's palette");
             return write(owner);
         } catch (Throwable throwable) {
             rollBack();
@@ -4161,7 +4230,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(send);
                 method.instructions.insert(hook);
                 activate(PLAYER_LINE_ACTIVE_PROPERTY);
-                info("Patched player chat lines to keep a command's "
+                logOnWrite("Patched player chat lines to keep a command's "
                         + "answers with its tab");
                 return write(owner);
             }
@@ -4223,7 +4292,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 hook.add(send);
                 method.instructions.insert(hook);
                 activate(SERVER_BROADCAST_ACTIVE_PROPERTY);
-                info("Patched server chat broadcasts to report every "
+                logOnWrite("Patched server chat broadcasts to report every "
                         + "server-wide line");
                 return write(owner);
             }
@@ -4342,7 +4411,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 injectTooltipSmoothingEnd(method);
                 activate(TOOLTIP_ICON_ACTIVE_PROPERTY);
                 activate(TOOLTIP_SMOOTHING_ACTIVE_PROPERTY);
-                info("Patched GuiScreen tooltips for inline key icons and "
+                logOnWrite("Patched GuiScreen tooltips for inline key icons and "
                         + "pointer-accurate placement");
                 return write(owner);
             }
@@ -4485,7 +4554,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             if (framePatched && iconPatched && overlayPatched
                     && intentPatched) {
                 activate(SMOOTH_INVENTORY_ACTIVE_PROPERTY);
-                info("Installed smooth inventory item movement hooks");
+                logOnWrite("Installed smooth inventory item movement hooks");
                 return write(owner);
             }
             warn("Could not install all smooth inventory item hooks");
@@ -4551,7 +4620,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 redirect(isEmpty, SET_BONUS_COLUMN_HOOK_OWNER, "noEffects",
                         "(Ljava/util/Collection;)Z");
                 activate(SET_BONUS_ROOM_ACTIVE_PROPERTY);
-                info("Patched InventoryEffectRenderer to make room for set "
+                logOnWrite("Patched InventoryEffectRenderer to make room for set "
                         + "bonuses");
                 return write(owner);
             }
@@ -4597,7 +4666,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             method.instructions.insert(hook);
 
             activate(DEBUG_BOX_ACTIVE_PROPERTY);
-            info("Patched RenderManager F3+B origin for roleplay races");
+            logOnWrite("Patched RenderManager F3+B origin for roleplay races");
             return write(owner);
         } catch (Throwable throwable) {
             rollBack();
@@ -4643,7 +4712,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     method.instructions.insert(limit, hook);
                 }
                 activate(PERK_ALIGNMENT_ACTIVE_PROPERTY);
-                info("Patched LOTR alignment gains for Friend of the Wise");
+                logOnWrite("Patched LOTR alignment gains for Friend of the Wise");
                 return write(owner);
             }
             warn("Could not locate LOTRPlayerData#addAlignment; Friend of the Wise"
@@ -4693,7 +4762,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     method.instructions.insert(time, hook);
                 }
                 activate(PERK_ATTACK_SERVER_ACTIVE_PROPERTY);
-                info("Patched LOTR's server attack timer for Daggerwork");
+                logOnWrite("Patched LOTR's server attack timer for Daggerwork");
                 return write(owner);
             }
             warn("Could not locate LOTRNetHandlerPlayServer#processUseEntity;"
@@ -4733,7 +4802,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                             HookFallback.argument(0)));
                 }
                 activate(PERK_ATTACK_CLIENT_ACTIVE_PROPERTY);
-                info("Patched LOTR's client attack timer for Daggerwork");
+                logOnWrite("Patched LOTR's client attack timer for Daggerwork");
                 return write(owner);
             }
             warn("Could not locate LOTRAttackTiming#doAttackTiming; Daggerwork's"
@@ -4795,7 +4864,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 return basicClass;
             }
             activate(PERK_TRADE_ACTIVE_PROPERTY);
-            info("Patched LOTR trade prices for Fair Dealer");
+            logOnWrite("Patched LOTR trade prices for Fair Dealer");
             return write(owner);
         } catch (Throwable throwable) {
             rollBack();
@@ -4855,7 +4924,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                 return basicClass;
             }
             activate(PERK_TRADE_SCREEN_ACTIVE_PROPERTY);
-            info("Patched LOTR's trade screen for Fair Dealer");
+            logOnWrite("Patched LOTR's trade screen for Fair Dealer");
             return write(owner);
         } catch (Throwable throwable) {
             rollBack();
@@ -4896,7 +4965,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     method.instructions.insert(read, hook);
                 }
                 activate(PERK_SELL_ACTIVE_PROPERTY);
-                info("Patched LOTR sales for Fair Dealer");
+                logOnWrite("Patched LOTR sales for Fair Dealer");
                 return write(owner);
             }
             warn("Could not locate LOTRPacketSell's handler; Fair Dealer will not"
@@ -4946,7 +5015,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                     method.instructions.insertBefore(end, hook);
                 }
                 activate(PERK_ANVIL_ACTIVE_PROPERTY);
-                info("Patched LOTR's anvil output for Repair and Master Smith");
+                logOnWrite("Patched LOTR's anvil output for Repair and Master Smith");
                 return write(owner);
             }
             warn("Could not locate LOTRContainerAnvil#updateRepairOutput; Repair and"
@@ -4984,7 +5053,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
                         HookFallback.NOTHING));
                 method.instructions.insert(hook);
                 activate(PERK_ANVIL_TAKE_ACTIVE_PROPERTY);
-                info("Patched LOTR's anvil output slot to count repairs");
+                logOnWrite("Patched LOTR's anvil output slot to count repairs");
                 return write(owner);
             }
             warn("Could not locate LOTRSlotAnvilOutput#onPickupFromSlot; repairs at"
@@ -5036,6 +5105,7 @@ public final class LostTalesClassTransformer implements IClassTransformer {
     private static ClassNode read(byte[] bytes) {
         ACTIVATED.get().clear();
         DECLARED.get().clear();
+        LOGGED_ON_WRITE.get().clear();
         ClassNode node = new ClassNode();
         new ClassReader(bytes).accept(node, 0);
         return node;
@@ -5066,18 +5136,26 @@ public final class LostTalesClassTransformer implements IClassTransformer {
             }
         }
         activated.clear();
+        LOGGED_ON_WRITE.get().clear();
     }
 
     /**
      * Writes the patched class, every call into the mod first wrapped in
      * its guard ({@link HookGuard}); a call that declared no fallback fails
-     * the patch, and the class stays as it was.
+     * the patch, and the class stays as it was. Once written, the lines
+     * saying what the patch changed are logged.
      */
     private static byte[] write(ClassNode node) {
         HookGuard.guard(node, DECLARED.get());
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         node.accept(writer);
-        return writer.toByteArray();
+        byte[] written = writer.toByteArray();
+        List<String> lines = LOGGED_ON_WRITE.get();
+        for (String line : lines) {
+            info(line);
+        }
+        lines.clear();
+        return written;
     }
 
     private static MethodNode findCameraMethod(ClassNode owner) {
@@ -5591,5 +5669,13 @@ public final class LostTalesClassTransformer implements IClassTransformer {
         } catch (Throwable ignored) {
             // Very early bootstrap may not have initialized FML's logger.
         }
+    }
+
+    /**
+     * Says what the patch being tried changed, once its class is written
+     * ({@link #write}); dropped if it is never written or rolls back.
+     */
+    private static void logOnWrite(String message) {
+        LOGGED_ON_WRITE.get().add(message);
     }
 }

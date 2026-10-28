@@ -318,12 +318,12 @@ public final class LostTalesQuestProgress {
         return path;
     }
 
-    /** Whether a saved path is one {@link #writeStagePath} could have written. */
+    /**
+     * Whether a saved path is one {@link #writeStagePath} could have
+     * written: every running quest and History line has one, empty or not.
+     */
     public static boolean isReasonableStagePath(NBTTagCompound owner, String key) {
-        if (!owner.hasKey(key)) {
-            return true;
-        }
-        if (!(owner.getTag(key) instanceof NBTTagList)) {
+        if (!owner.hasKey(key, Constants.NBT.TAG_LIST)) {
             return false;
         }
         NBTTagList list = (NBTTagList) owner.getTag(key);

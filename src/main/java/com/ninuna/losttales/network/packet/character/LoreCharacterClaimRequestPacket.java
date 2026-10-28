@@ -12,7 +12,7 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 
-/** Narrow claim request; all lore metadata and state remain server-owned. */
+/** Asks to claim a lore character into an open slot; everything else about the figure is the server's. */
 public final class LoreCharacterClaimRequestPacket implements IMessage {
 
     private int requestId;

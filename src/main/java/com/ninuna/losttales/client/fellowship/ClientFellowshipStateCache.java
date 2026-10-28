@@ -9,7 +9,10 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Client-only synchronized fellowship view. It is never authoritative. */
+/**
+ * The fellowship state as the server last sent it, and the requests still
+ * waiting for an answer. The server checks every request again.
+ */
 public final class ClientFellowshipStateCache {
 
     public enum SyncState {
@@ -47,8 +50,9 @@ public final class ClientFellowshipStateCache {
     }
 
     /**
-     * Accepts only newer server sequences. A stale response may still complete
-     * its matching request because a later unsolicited snapshot already won.
+     * Keeps the state only when it is newer than the one held. An older
+     * state still ends the request it answers, since a newer one sent
+     * unasked came first.
      */
     public static synchronized void acceptState(int requestId,
                                                 FellowshipStateSnapshot incoming) {

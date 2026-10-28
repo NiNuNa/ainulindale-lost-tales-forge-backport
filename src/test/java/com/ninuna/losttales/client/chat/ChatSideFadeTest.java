@@ -7,7 +7,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * A name cut by a tab's or the indicator's edge thins out into it: the
+ * A name cut by a page's or the indicator's edge thins out into it: the
  * words fade from each side as far as the name has run past it, one
  * line deep, never past a third of the room.
  */

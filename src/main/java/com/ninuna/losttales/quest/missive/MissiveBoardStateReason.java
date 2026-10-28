@@ -16,22 +16,27 @@ public enum MissiveBoardStateReason {
     ACCEPTED(2, "gui.losttales.missive_board.said.accepted", false),
     TAKEN(3, "gui.losttales.missive_board.said.taken", false),
     PINNED(4, "gui.losttales.missive_board.said.pinned", false),
-    /** The notice is no longer in the slot the page read it in. */
+    /** The slot the page read holds no notice. */
     GONE(5, "chat.losttales.missive.gone", true),
     /** Another letter stands in that slot now. */
     NOTICE_CHANGED(6, "chat.losttales.missive.changed", true),
     DAMAGED(7, "chat.losttales.missive.damaged", true),
     INVENTORY_FULL(8, "chat.losttales.missive.inventory_full", true),
     BOARD_FULL(9, "chat.losttales.missive.board_full", true),
-    /** The letter to pin is no longer in the inventory slot the page read it in. */
+    /** The inventory slot the page read holds no letter to pin. */
     LETTER_GONE(10, "chat.losttales.missive.letter_gone", true),
-    ALREADY_ACTIVE(11, "chat.losttales.missive.already_active", true),
-    ALREADY_COMPLETED(12, "chat.losttales.missive.already_completed", true),
-    /** No quest could be made of the letter. */
-    REFUSED(13, "chat.losttales.missive.refused", true),
+    /** The player runs the quest already; the start gate said so. */
+    ALREADY_ACTIVE(11, "chat.losttales.missive.already_active", false),
+    /** The player finished the quest already; the start gate said so. */
+    ALREADY_COMPLETED(12, "chat.losttales.missive.already_completed", false),
+    /** The start gate refused the letter's quest and said why in its own line. */
+    REFUSED(13, "chat.losttales.missive.refused", false),
     /** The quest's requirements are not met; the quest's own line said which. */
     REQUIREMENTS(14, "gui.losttales.missive_board.said.requirements", false),
-    /** Any other reason the quest would not start; the quest's own line says which. */
+    /**
+     * The world's record of missives taken cannot be read, or could not
+     * record this one (QUEST-34); nothing else says so.
+     */
     NOT_NOW(15, "chat.losttales.missive.not_now", true),
     /** The notice's time on a board is past, so its letter starts nothing. */
     EXPIRED(16, "chat.losttales.missive.expired", true),

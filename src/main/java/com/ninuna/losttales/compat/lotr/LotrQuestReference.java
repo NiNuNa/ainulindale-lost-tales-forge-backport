@@ -2,7 +2,7 @@ package com.ninuna.losttales.compat.lotr;
 
 import java.util.UUID;
 
-/** Stable Lost Tales reference for a LOTR miniquest. */
+/** How the mod names a LOTR mini-quest: {@code lotr:miniquest/<uuid>}. */
 public final class LotrQuestReference {
     public static final String PREFIX = "lotr:miniquest/";
 

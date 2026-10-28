@@ -3,7 +3,6 @@ package com.ninuna.losttales.progression;
 import com.ninuna.losttales.armour.Armour;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.character.server.CharacterActiveResolver;
-import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.progression.perk.Perks;
 import com.ninuna.losttales.progression.skill.PerkDefinition;
 import com.ninuna.losttales.progression.skill.PerkEffect;
@@ -55,6 +54,17 @@ public final class ProgressionService {
      */
     public static double count(EntityPlayerMP player, String skillId, String repeatKey,
                                boolean repeats, double worth) {
+        return count(player, skillId, repeatKey, repeats, worth, GrantSource.ACT);
+    }
+
+    /**
+     * Counts an act as {@link #count(EntityPlayerMP, String, String, boolean, double)}
+     * does, from {@code source}: a finished quest or a first find shrinks
+     * for repeats as any act, and goes past the hourly cap where the
+     * server lets it (PROG-08).
+     */
+    public static double count(EntityPlayerMP player, String skillId, String repeatKey,
+                               boolean repeats, double worth, GrantSource source) {
         if (!(worth > 0.0D)) {
             return 0.0D;
         }
@@ -71,7 +81,8 @@ public final class ProgressionService {
                     : memory.peekShare(key, ProgressionSettings.repeatRule(), now);
         }
         double sets = 1.0D + Armour.worn(player).experience(skillId);
-        return grant(player, character, skillId, worth * share * sets, GrantSource.ACT);
+        return grant(player, character, skillId, worth * share * sets,
+                source == null ? GrantSource.ACT : source);
     }
 
     /**
@@ -109,7 +120,7 @@ public final class ProgressionService {
             return 0.0D;
         }
         double allowed = source.allow(memory(character.getCharacterId()), skillId, amount,
-                LostTalesConfig.skillHourlyCap, System.currentTimeMillis());
+                ProgressionSettings.hourlyCap(), System.currentTimeMillis());
         if (!(allowed > 0.0D)) {
             return 0.0D;
         }

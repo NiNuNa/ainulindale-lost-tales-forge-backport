@@ -133,29 +133,29 @@ public final class FellowshipClientRequestManager {
     }
 
     /** Puts the go-here mark of the character played where the player stands. */
-    public static int setGoHereMarker(UUID expectedActiveIdentityId) {
+    public static int setGoHereMark(UUID expectedActiveIdentityId) {
         Minecraft minecraft = Minecraft.getMinecraft();
         if (minecraft == null || minecraft.thePlayer == null) {
-            return failWithoutSend(FellowshipOperationType.SET_GO_HERE_MARKER);
+            return failWithoutSend(FellowshipOperationType.SET_GO_HERE_MARK);
         }
-        return setGoHereMarker(expectedActiveIdentityId,
+        return setGoHereMark(expectedActiveIdentityId,
                 minecraft.thePlayer.dimension,
                 minecraft.thePlayer.posX, minecraft.thePlayer.posZ);
     }
 
     /** Puts the go-here mark of the character played at a place picked on the map. */
-    public static int setGoHereMarker(UUID expectedActiveIdentityId,
+    public static int setGoHereMark(UUID expectedActiveIdentityId,
                                       int dimensionId,
                                       double x,
                                       double z) {
-        return send(FellowshipOperationType.SET_GO_HERE_MARKER,
+        return send(FellowshipOperationType.SET_GO_HERE_MARK,
                 expectedActiveIdentityId, null,
                 FellowshipActionRequestPacket.NO_FELLOWSHIP_REVISION, null, null,
                 true, dimensionId, x, z, null, -1);
     }
 
-    public static int removeGoHereMarker(UUID expectedActiveIdentityId) {
-        return send(FellowshipOperationType.REMOVE_GO_HERE_MARKER,
+    public static int removeGoHereMark(UUID expectedActiveIdentityId) {
+        return send(FellowshipOperationType.REMOVE_GO_HERE_MARK,
                 expectedActiveIdentityId, null,
                 FellowshipActionRequestPacket.NO_FELLOWSHIP_REVISION, null, null);
     }

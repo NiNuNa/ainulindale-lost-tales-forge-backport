@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Versioned character-owned player snapshots, isolated from roster metadata. */
+/** One account's saved lives, a file of their own per account, with its quarantine. */
 public final class CharacterPlayerStateWorldData extends WorldSavedData {
 
     public static final String DATA_NAME_PREFIX =
@@ -31,6 +31,16 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
     public static final int MAX_QUARANTINED = 16;
     /** The reason of a player's state set aside when an operator put their character back. */
     public static final String REASON_SWITCH_MIXED_STATE = "switch_mixed_state";
+    /**
+     * The reason of the stacks a saved life held that the game no longer
+     * takes, set aside as the life was read (CHAR-46): one entry per read
+     * that took any, its {@code OriginalData} holding them under
+     * {@code Items} ({@link SavedLifeItems}).
+     */
+    public static final String REASON_ITEMS_SET_ASIDE = "items_set_aside";
+    /** Whether the player has been told what an {@link #REASON_ITEMS_SET_ASIDE} entry holds. */
+    private static final String TAG_TOLD = "Told";
+    private static final String TAG_SET_ASIDE_ITEMS = "Items";
 
     private static final String TAG_DATA_VERSION = "DataVersion";
     private static final String TAG_ACCOUNTS = "Accounts";
@@ -124,8 +134,9 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
         for (int index = 0; index < accountList.tagCount(); index++) {
             NBTTagCompound raw = accountList.getCompoundTagAt(index);
             UUID ownerId = NbtTags.readUuid(raw, TAG_OWNER_UUID);
+            List<NBTTagCompound> setAside = new ArrayList<NBTTagCompound>();
             try {
-                CharacterPlayerStateAccount account = readAccount(raw);
+                CharacterPlayerStateAccount account = readAccount(raw, setAside);
                 if (account == null) {
                     quarantine(raw, "invalid_account", ownerId);
                     repaired = true;
@@ -153,6 +164,15 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
                     continue;
                 }
                 this.accounts.put(account.getOwnerId(), account);
+                if (!setAside.isEmpty()) {
+                    // What the game no longer takes leaves the saved lives
+                    // here, and the store keeps it (CHAR-46).
+                    this.quarantinedEntries.add(setAsideEntry(setAside));
+                    repaired = true;
+                    LostTalesLog.warning("Set aside %d stack(s) the game no longer takes "
+                                    + "from the saved lives of owner %s",
+                            Integer.valueOf(setAside.size()), account.getOwnerId());
+                }
             } catch (UnsupportedVersionException exception) {
                 this.readOnlyForNewerVersion = true;
                 this.unsupportedDataVersion = exception.version;
@@ -312,6 +332,72 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
         markDirty();
     }
 
+    /**
+     * Puts a saved life from outside this file, a lore figure's from the
+     * transfer vault, into {@code account}, what the game no longer takes
+     * set aside first as a read would (CHAR-46). Answers the record as
+     * kept. A record with something to set aside and no room in the
+     * quarantine is refused, the store closing, and nothing changes.
+     */
+    public CharacterPlayerStateRecord putRecordSettingAside(
+            CharacterPlayerStateAccount account, CharacterPlayerStateRecord record) {
+        ensureWritable();
+        if (account == null || record == null) {
+            throw new IllegalArgumentException("an account and a record are required");
+        }
+        List<NBTTagCompound> setAside = new ArrayList<NBTTagCompound>();
+        CharacterPlayerStateRecord kept = SavedLifeItems.clean(
+                record, SavedLifeItems.GAME, setAside);
+        if (!setAside.isEmpty()) {
+            if (!hasQuarantineRoomFor(1)) {
+                throw new IllegalStateException(
+                        "The character player-state quarantine is full");
+            }
+            this.quarantinedEntries.add(setAsideEntry(setAside));
+        }
+        account.putRecord(kept);
+        markDirty();
+        return kept;
+    }
+
+    /**
+     * What every entry of stacks set aside the player has not been told of
+     * holds, each entry's {@code Items} list in turn, and marks them told.
+     * Empty for a store that cannot be written, so nothing is told twice.
+     */
+    public List<NBTTagList> takeUntoldSetAside() {
+        List<NBTTagList> untold = new ArrayList<NBTTagList>();
+        if (this.readOnlyForNewerVersion) {
+            return untold;
+        }
+        for (NBTTagCompound entry : this.quarantinedEntries) {
+            if (!REASON_ITEMS_SET_ASIDE.equals(entry.getString("Reason"))
+                    || entry.getBoolean(TAG_TOLD)) {
+                continue;
+            }
+            untold.add((NBTTagList) entry.getCompoundTag("OriginalData")
+                    .getTagList(TAG_SET_ASIDE_ITEMS, Constants.NBT.TAG_COMPOUND).copy());
+            entry.setBoolean(TAG_TOLD, true);
+            markDirty();
+        }
+        return untold;
+    }
+
+    /** One quarantine entry holding every stack a read set aside, not yet told. */
+    private static NBTTagCompound setAsideEntry(List<NBTTagCompound> setAside) {
+        NBTTagList items = new NBTTagList();
+        for (NBTTagCompound item : setAside) {
+            items.appendTag(item.copy());
+        }
+        NBTTagCompound original = new NBTTagCompound();
+        original.setTag(TAG_SET_ASIDE_ITEMS, items);
+        NBTTagCompound entry = new NBTTagCompound();
+        entry.setString("Reason", REASON_ITEMS_SET_ASIDE);
+        entry.setBoolean(TAG_TOLD, false);
+        entry.setTag("OriginalData", original);
+        return entry;
+    }
+
     /** A copy of every quarantined entry, in the order it was set aside. */
     public List<NBTTagCompound> getQuarantinedEntries() {
         ArrayList<NBTTagCompound> copies = new ArrayList<NBTTagCompound>();
@@ -379,7 +465,12 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
         return tag;
     }
 
-    private static CharacterPlayerStateAccount readAccount(NBTTagCompound tag) {
+    /**
+     * Reads one account, each saved life cleaned of what the game no
+     * longer takes, which goes into {@code setAside} (CHAR-46).
+     */
+    private static CharacterPlayerStateAccount readAccount(NBTTagCompound tag,
+                                                           List<NBTTagCompound> setAside) {
         int version = tag.hasKey(TAG_DATA_VERSION, Constants.NBT.TAG_INT)
                 ? tag.getInteger(TAG_DATA_VERSION) : 0;
         if (version != CharacterPlayerStateAccount.CURRENT_DATA_VERSION) {
@@ -396,8 +487,9 @@ public final class CharacterPlayerStateWorldData extends WorldSavedData {
             NBTTagList recordList = tag.getTagList(
                     TAG_RECORDS, Constants.NBT.TAG_COMPOUND);
             for (int index = 0; index < recordList.tagCount(); index++) {
-                CharacterPlayerStateRecord record = readRecordCopy(
-                        recordList.getCompoundTagAt(index));
+                CharacterPlayerStateRecord record = SavedLifeItems.clean(
+                        readRecordCopy(recordList.getCompoundTagAt(index)),
+                        SavedLifeItems.GAME, setAside);
                 if (!seen.add(record.getCharacterId())) {
                     throw new IllegalArgumentException(
                             "duplicate character state record " + record.getCharacterId());

@@ -52,7 +52,6 @@ public final class Fellowship {
 
     private final UUID fellowshipId;
     private final long createdAt;
-    private final int dataVersion;
     private final Map<UUID, FellowshipMember> membersByIdentityId =
             new LinkedHashMap<UUID, FellowshipMember>();
     private final Set<UUID> guides = new LinkedHashSet<UUID>();
@@ -72,15 +71,14 @@ public final class Fellowship {
         }
         return new Fellowship(fellowshipId, leader.getIdentityId(),
                 Collections.singletonList(leader), Collections.<UUID>emptyList(),
-                name, null, EnumSet.allOf(FellowshipSwitch.class), createdAt, 0L,
-                CURRENT_DATA_VERSION);
+                name, null, EnumSet.allOf(FellowshipSwitch.class), createdAt, 0L);
     }
 
     public Fellowship(UUID fellowshipId, UUID leaderIdentityId,
                       Iterable<FellowshipMember> members, Collection<UUID> guides,
                       String name, FellowshipIcon icon,
                       Set<FellowshipSwitch> switchesOn, long createdAt,
-                      long revision, int dataVersion) {
+                      long revision) {
         if (fellowshipId == null) {
             throw new IllegalArgumentException("fellowshipId must not be null");
         }
@@ -92,7 +90,6 @@ public final class Fellowship {
         this.icon = icon;
         this.createdAt = Math.max(0L, createdAt);
         this.revision = Math.max(0L, revision);
-        this.dataVersion = dataVersion <= 0 ? CURRENT_DATA_VERSION : dataVersion;
         if (members != null) {
             for (FellowshipMember member : members) {
                 if (member == null || this.membersByIdentityId.size() >= MAX_MEMBERS) {
@@ -150,10 +147,6 @@ public final class Fellowship {
 
     public long getRevision() {
         return this.revision;
-    }
-
-    public int getDataVersion() {
-        return this.dataVersion;
     }
 
     public int getMemberCount() {
@@ -348,23 +341,24 @@ public final class Fellowship {
         return true;
     }
 
-    /** Lets a member go; a leader going is followed by the member who joined first. */
+    /**
+     * Lets a member other than the leader go; null for the leader and for
+     * one who is no member. The lead is handed on first, as
+     * {@code FellowshipService.successorOf} picks, and a fellowship ends
+     * with its last leader.
+     */
     public FellowshipMember removeMember(UUID identityId) {
-        FellowshipMember removed = identityId == null
-                ? null : this.membersByIdentityId.remove(identityId);
-        if (removed == null) {
+        if (identityId == null || identityId.equals(this.leaderIdentityId)
+                || !this.membersByIdentityId.containsKey(identityId)) {
             return null;
         }
+        FellowshipMember removed = this.membersByIdentityId.remove(identityId);
         this.guides.remove(identityId);
-        if (identityId.equals(this.leaderIdentityId)) {
-            this.leaderIdentityId = selectSuccessorIdentityId();
-            this.guides.remove(this.leaderIdentityId);
-        }
         incrementRevision();
         return removed;
     }
 
-    /** Makes another member the leader; the new leader is no guide any more. */
+    /** Makes another member the leader, who stops being a guide. */
     public boolean transferLeadership(UUID targetIdentityId) {
         if (targetIdentityId == null
                 || targetIdentityId.equals(this.leaderIdentityId)
@@ -457,27 +451,6 @@ public final class Fellowship {
     public boolean hasValidLeader() {
         return this.leaderIdentityId != null
                 && this.membersByIdentityId.containsKey(this.leaderIdentityId);
-    }
-
-    public boolean repairLeaderIfNecessary() {
-        if (hasValidLeader()) {
-            return false;
-        }
-        this.leaderIdentityId = selectSuccessorIdentityId();
-        this.guides.remove(this.leaderIdentityId);
-        incrementRevision();
-        return true;
-    }
-
-    /** The member who joined first among those somebody holds, else the first of all. */
-    private UUID selectSuccessorIdentityId() {
-        List<FellowshipMember> ordered = getMembers();
-        for (FellowshipMember member : ordered) {
-            if (!member.isUnheld()) {
-                return member.getIdentityId();
-            }
-        }
-        return ordered.isEmpty() ? null : ordered.get(0).getIdentityId();
     }
 
     private void incrementRevision() {

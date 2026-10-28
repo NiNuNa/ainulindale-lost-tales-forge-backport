@@ -36,28 +36,26 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
                             activeQuestMarkers, entry.getId());
             boolean activeQuestMarker = activeQuestLabel != null;
             boolean discovered = LostTalesClientQuestProgressStore.isMarkerDiscovered(entry.getId());
-            boolean pinned = LostTalesClientQuestProgressStore
-                    .isMapMarkerPinned(entry.getId());
+            boolean tracked = LostTalesClientQuestProgressStore
+                    .isMapMarkerTracked(entry.getId());
             boolean undiscovered = entry.isDiscoverable() && !discovered;
 
+            // An undiscovered marker shows as a question mark once its
+            // region is open; one hidden until discovered reaches this game
+            // only for a manager (WAY-11), whose compass shows it so too.
             if (!LostTalesClientMapMarkerVisibility
                     .isRegionRequirementMet(entry)) {
-                continue;
-            }
-            if (undiscovered
-                    && !LostTalesClientMapMarkerVisibility
-                    .isUndiscoveredCompassVisible(entry)) {
                 continue;
             }
 
             String name = activeQuestMarker
                     ? activeQuestLabel : entry.getName();
-            if (pinned) {
+            if (tracked) {
                 name = StatCollector.translateToLocalFormatted(
                         "gui.losttales.compass.tracked", name);
             }
 
-            LostTalesCompassMarkerIcon icon = LostTalesCompassMarkerIcon.fromName(pinned ? "quest" : entry.getIconName());
+            LostTalesCompassMarkerIcon icon = LostTalesCompassMarkerIcon.fromName(tracked ? "quest" : entry.getIconName());
             String color = entry.getColorName();
             boolean scaleWithFocus = true;
             boolean showDistanceLabel = true;
@@ -72,7 +70,7 @@ public class LostTalesStaticCompassMarkerProvider implements LostTalesCompassMar
                 showDistanceLabel = true;
             }
 
-            double compassFadeInRadius = activeQuestMarker || pinned ? Math.max(entry.getCompassFadeInRadius(), 512.0D) : entry.getCompassFadeInRadius();
+            double compassFadeInRadius = activeQuestMarker || tracked ? Math.max(entry.getCompassFadeInRadius(), 512.0D) : entry.getCompassFadeInRadius();
             double markerY = entry.getEffectiveY(
                     minecraft.theWorld, minecraft.thePlayer.posY);
             if (activeQuestMarker) {

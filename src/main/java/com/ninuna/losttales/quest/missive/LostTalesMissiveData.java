@@ -17,7 +17,7 @@ import java.util.Map;
  * them.
  */
 public final class LostTalesMissiveData {
-    public static final String QUEST_ID_PREFIX = "losttales:missive/generated/";
+    public static final String QUEST_ID_PREFIX = "losttales:missive/";
 
     private final String questId;
     private final String questType;

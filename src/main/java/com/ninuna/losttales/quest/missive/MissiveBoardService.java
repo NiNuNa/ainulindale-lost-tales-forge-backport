@@ -320,8 +320,11 @@ public final class MissiveBoardService {
         if (!site.usable()) {
             return "chat.losttales.missive.too_far";
         }
-        if (!site.bannerAllows() || !site.othersAllow()) {
+        if (!site.bannerAllows()) {
             return "chat.losttales.missive.protected";
+        }
+        if (!site.othersAllow()) {
+            return "chat.losttales.missive.not_allowed";
         }
         return null;
     }
@@ -362,14 +365,9 @@ public final class MissiveBoardService {
      */
     static long ticksLeft(LostTalesMissiveData missive, long expiration,
                           long worldTime) {
-        if (missive == null || expiration <= 0L) {
-            return MissiveNotice.STAYS_UP;
-        }
-        long postedAt = missive.getGenerationWorldTime();
-        if (postedAt <= 0L || worldTime < postedAt) {
-            return MissiveNotice.STAYS_UP;
-        }
-        return Math.max(0L, postedAt + expiration - worldTime);
+        return missive == null ? MissiveNotice.STAYS_UP
+                : MissiveNotice.ticksLeft(missive.getGenerationWorldTime(),
+                        expiration, worldTime);
     }
 
     /** Sends the player the board's notices and why, and watches the board for them. */

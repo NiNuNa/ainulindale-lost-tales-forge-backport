@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Server-built character-creation options that may depend on server config and
- * the installed LOTR faction catalogue. Stable identifiers only are sent.
+ * What the creator may offer, as the server builds it from its settings
+ * and LOTR's factions. Only ids are sent.
  */
 public final class CharacterCreationCatalog {
 

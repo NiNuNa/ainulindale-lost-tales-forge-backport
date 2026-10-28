@@ -204,6 +204,61 @@ public final class CharacterPlayerStateWorldDataTest {
         assertPreservedReadOnly(saved);
     }
 
+    /**
+     * A stack of an item the game no longer has leaves the saved life as
+     * it is read and is kept in the quarantine, one entry for the read,
+     * blocking nobody; the player is told of it once (CHAR-46). No item is
+     * in the game while the tests run, so any stack is one.
+     */
+    @Test
+    public void aStackTheGameNoLongerHasIsSetAsideAsTheLifeIsRead() {
+        NBTTagCompound item = new NBTTagCompound();
+        item.setByte("Slot", (byte)0);
+        item.setShort("id", (short)31000);
+        item.setByte("Count", (byte)3);
+        CharacterPlayerStateWorldData loaded = new CharacterPlayerStateWorldData(
+                CharacterPlayerStateWorldData.dataName(OWNER));
+        loaded.readFromNBT(savedAccountHolding(item));
+
+        assertFalse(loaded.isReadOnlyForNewerVersion());
+        assertFalse(loaded.isOwnerBlocked(OWNER));
+        assertEquals(0, loaded.getAccount(OWNER).getRecord(OWNER).getCurrent()
+                .getComponent("vanilla_inventory")
+                .getTagList("Items", Constants.NBT.TAG_COMPOUND).tagCount());
+        assertEquals(1, loaded.getQuarantinedEntryCount());
+        NBTTagCompound entry = loaded.getQuarantinedEntries().get(0);
+        assertEquals(CharacterPlayerStateWorldData.REASON_ITEMS_SET_ASIDE,
+                entry.getString("Reason"));
+        assertFalse(entry.getBoolean("Told"));
+
+        java.util.List<NBTTagList> untold = loaded.takeUntoldSetAside();
+        assertEquals(1, untold.size());
+        assertEquals(1, untold.get(0).tagCount());
+        NBTTagCompound kept = untold.get(0).getCompoundTagAt(0);
+        assertEquals(SavedLifeItems.WHY_UNKNOWN, kept.getString(SavedLifeItems.TAG_WHY));
+        assertEquals(3, kept.getCompoundTag(SavedLifeItems.TAG_ITEM).getByte("Count"));
+        assertTrue("told once", loaded.takeUntoldSetAside().isEmpty());
+
+        NBTTagCompound written = new NBTTagCompound();
+        loaded.writeToNBT(written);
+        CharacterPlayerStateWorldData again = new CharacterPlayerStateWorldData(
+                CharacterPlayerStateWorldData.dataName(OWNER));
+        again.readFromNBT(written);
+        assertEquals("nothing more is set aside", 1, again.getQuarantinedEntryCount());
+        assertTrue(again.takeUntoldSetAside().isEmpty());
+    }
+
+    /** A file holding the owner's account with one record whose inventory holds {@code item}. */
+    private static NBTTagCompound savedAccountHolding(NBTTagCompound item) {
+        NBTTagCompound saved = savedAccount();
+        NBTTagCompound inventory = firstRecord(saved).getCompoundTag("Current")
+                .getCompoundTag("Components").getCompoundTag("vanilla_inventory");
+        NBTTagList items = new NBTTagList();
+        items.appendTag(item);
+        inventory.setTag("Items", items);
+        return saved;
+    }
+
     /** A file holding the owner's account with one record, as this build writes it. */
     private static NBTTagCompound savedAccount() {
         CharacterPlayerStateWorldData data = new CharacterPlayerStateWorldData(

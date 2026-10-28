@@ -11,7 +11,7 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import io.netty.buffer.ByteBuf;
 
-/** Structured result for one character-management request. */
+/** The server's answer to one character request: done or refused, and why. */
 public final class CharacterOperationResultPacket implements IMessage {
 
     private static final long MAX_RETRY_AFTER_MILLIS = 365L * 24L * 60L * 60L * 1000L;
@@ -66,6 +66,9 @@ public final class CharacterOperationResultPacket implements IMessage {
             this.changed = buffer.readBoolean();
             this.errorId = CharacterErrorId.fromId(LostTalesPacketCodec.readUtf8String(
                     buffer, CharacterPacketCodec.MAX_ERROR_ID_BYTES));
+            if (this.errorId == null) {
+                throw new CharacterPacketCodec.DecodeException("unknown error id");
+            }
             this.retryAfterMillis = buffer.readLong();
             this.rosterFollows = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);

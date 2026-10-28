@@ -293,7 +293,7 @@ public final class LostTalesChatPresentationTest {
         net.minecraft.util.ChatComponentText printed =
                 new net.minecraft.util.ChatComponentText(
                         "Your game mode has been updated");
-        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage console = ConversationPage.of(ChatChannel.CONSOLE);
         LostTalesChatMessagePacket packet = LostTalesChatPresentation
                 .clientPacket(console, printed, 123456789L,
                         com.ninuna.losttales.chat.ChatReplyReference.NONE);
@@ -314,18 +314,18 @@ public final class LostTalesChatPresentationTest {
             ChatHeadMarker.Data marker = ChatHeadMarker.decode(part);
             head |= marker != null && marker.isSystemSender()
                     && marker.mark() == com.ninuna.losttales.chat.emoji.ChatEmoji.CONSOLE;
-            if (ChatChannel.CLIENT_CONSOLE.getDisplayName().equals(
+            if (ChatChannel.CONSOLE.getDisplayName().equals(
                     part.getUnformattedTextForChat())) {
                 prefixColor = ChatPrefixMarker.decode(part);
             }
         }
         String rendered = plainText.toString();
         assertTrue(rendered, rendered.startsWith(
-                ChatChannel.CLIENT_CONSOLE.getDisplayName() + ": "));
+                ChatChannel.CONSOLE.getDisplayName() + ": "));
         assertTrue(rendered, rendered.endsWith("Your game mode has been updated"));
         assertTrue(anchor);
         assertTrue("the Client wears the console mark for a head", head);
-        assertEquals(Integer.valueOf(ChatChannel.CLIENT_CONSOLE.getDisplayColor()),
+        assertEquals(Integer.valueOf(ChatChannel.CONSOLE.getDisplayColor()),
                 prefixColor);
     }
 
@@ -355,7 +355,7 @@ public final class LostTalesChatPresentationTest {
     }
 
     /**
-     * The Faction prefix names the reader's faction, as the tab does — the
+     * The Faction prefix names the reader's faction, as the page does — the
      * account reads as Unaligned — and wears the line's own faction colour.
      */
     @Test
@@ -936,8 +936,8 @@ public final class LostTalesChatPresentationTest {
             // Its card is the player as the line recorded them: the
             // character, its head and its name, named as a live card
             // names a player.
-            LostTalesChatHoverCard.Target card =
-                    LostTalesChatHoverCard.recordedTarget(null,
+            LostTalesChatCard.Target card =
+                    LostTalesChatCard.recordedTarget(null,
                             marker.recorded);
             assertEquals(player, card.playerId);
             assertEquals(character, card.characterId);

@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-/** Client-only display and option helpers for synchronized character identifiers. */
+/** The words a character's ids stand for on screen: races, body types, skins, factions, errors. */
 public final class ClientCharacterDisplayNames {
 
     private static final LotrCharacterAdapter LOTR_ADAPTER = LotrCharacterAdapter.getInstance();

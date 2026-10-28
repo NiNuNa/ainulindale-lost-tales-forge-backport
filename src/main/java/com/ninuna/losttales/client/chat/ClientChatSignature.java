@@ -19,8 +19,8 @@ import net.minecraft.client.Minecraft;
  * conversation, the echo of a command.
  *
  * <p>It follows the same rules the server signs by, so a locally built
- * line reads exactly like a served one: the identity the tab
- * currently speaks as decides the name and the head, and the tab's
+ * line reads exactly like a served one: the identity the page
+ * currently speaks as decides the name and the head, and the page's
  * channel decides whether the roles are tagged and what colours the
  * name ({@link ChatRolePresentation}). The LOTR title is the server's
  * to resolve, so a locally signed line carries none.</p>
@@ -30,20 +30,20 @@ final class ClientChatSignature {
     private ClientChatSignature() {}
 
     /**
-     * How the tab's current identity signs a line built here; a page
+     * How the page's current identity signs a line built here; a page
      * signs as the character played, in no channel.
      */
-    static Signature of(WindowPage tab) {
+    static Signature of(WindowPage page) {
         Minecraft minecraft = Minecraft.getMinecraft();
         String account = minecraft == null || minecraft.thePlayer == null
                 ? "" : minecraft.thePlayer.getCommandSenderName();
         ClientChatIdentities.Identity identity =
-                ClientChatIdentities.effectiveFor(tab);
-        ChatChannel channel = tab instanceof ConversationPage
-                ? ((ConversationPage)tab).getChannel() : null;
+                ClientChatIdentities.effectiveFor(page);
+        ChatChannel channel = page instanceof ConversationPage
+                ? ((ConversationPage)page).getChannel() : null;
         int roles = ChatRolePresentation.rolesShown(channel,
                 statedRoleMask(identity));
-        if (ClientChatIdentities.narratesOn(tab)) {
+        if (ClientChatIdentities.narratesOn(page)) {
             // The Narrator's voice over the identity: its name, colour
             // and mark, on the line the identity would sign.
             return new Signature(ChatNarrator.NAME, account,
@@ -66,10 +66,6 @@ final class ClientChatSignature {
      * line the account's own, a character line the account's together
      * with that character's — a role given to an account is worn by every
      * character of it, one given to a character by that character alone.
-     * A server that does not state the two apart gives one mask for the
-     * character being played, which then stands for the account too, and
-     * nothing for any other character; the served copy, signed with the
-     * worn character's own roles, takes the line's place a moment later.
      */
     private static int statedRoleMask(
             ClientChatIdentities.Identity identity) {

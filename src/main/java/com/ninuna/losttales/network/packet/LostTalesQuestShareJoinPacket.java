@@ -21,7 +21,7 @@ import net.minecraft.util.ChatComponentTranslation;
 
 import java.util.UUID;
 
-/** Requests the independent copy advertised by one recorded fellowship quest card. */
+/** Asks to join a quest card in the chat history: a fresh copy of its quest (QUEST-25). */
 public final class LostTalesQuestShareJoinPacket implements IMessage {
     private long messageId;
     private int tokenIndex;
@@ -66,7 +66,7 @@ public final class LostTalesQuestShareJoinPacket implements IMessage {
     /**
      * Joins the card where the player may read its line and shares a
      * fellowship with its author; the start gate then refuses the author,
-     * a quest the author no longer runs as the character they play, and a
+     * a quest the author does not run as the character they play, and a
      * quest that could not start for the player by its own rules now.
      */
     private static void execute(EntityPlayerMP player, long messageId,

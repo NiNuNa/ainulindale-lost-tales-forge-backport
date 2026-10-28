@@ -3,8 +3,8 @@ package com.ninuna.losttales.fellowship.sync;
 import java.util.UUID;
 
 /**
- * Minimal client-safe projection of one currently online account whose active
- * identity may be invited by the receiving fellowship leader.
+ * One online player whose played identity the leader or a guide reading it
+ * may invite: the account, and the character it plays.
  */
 public final class FellowshipInviteTargetSnapshot {
 

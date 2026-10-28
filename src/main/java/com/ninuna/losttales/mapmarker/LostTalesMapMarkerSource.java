@@ -5,7 +5,7 @@ public enum LostTalesMapMarkerSource {
     CUSTOM_PRESET("custom_preset"),
     LOTR_ADAPTER("lotr_adapter"),
     PLAYER_CREATED("player_created"),
-    QUEST_DYNAMIC("quest_dynamic");
+    QUEST_GIVER("quest_giver");
 
     private final String serializedName;
 

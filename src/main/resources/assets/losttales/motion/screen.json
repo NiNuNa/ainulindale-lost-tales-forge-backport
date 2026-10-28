@@ -23,7 +23,7 @@
   "screen.characters.glide": {
     "follow": 0.08
   },
-  "screen.dialogue.glide": {
+  "screen.conversation.glide": {
     "follow": 0.08
   }
 }

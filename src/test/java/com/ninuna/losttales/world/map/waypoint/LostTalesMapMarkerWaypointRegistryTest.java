@@ -182,7 +182,7 @@ public final class LostTalesMapMarkerWaypointRegistryTest {
                         LostTalesMapMarkerDefinition.AUTOMATIC_Y,
                         LOTRWaypoint.BREE.getZCoord(),
                         128.0D, 8.0D,
-                        false, false, true, LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
+                        false, false, true, LostTalesMapMarkerSource.QUEST_GIVER, false, "", 0);
 
         assertTrue(LostTalesMapMarkerWaypointRegistry
                 .matchesWaypoint(disabled, LOTRWaypoint.BREE));

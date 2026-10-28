@@ -4,7 +4,7 @@ import net.minecraft.item.ItemStack;
 
 import java.util.UUID;
 
-/** Immutable, bounded runtime projection for one authorized fellowship member. */
+/** One member's availability and, while online as the member, their world, health, helmet and held item. */
 public final class FellowshipMemberStatusSnapshot {
 
     public static final int NO_DIMENSION = Integer.MIN_VALUE;
@@ -134,12 +134,12 @@ public final class FellowshipMemberStatusSnapshot {
         return this.maximumHealth;
     }
 
-    /** Returns a defensive copy suitable for client-side item rendering. */
+    /** A copy of the helmet, for the client to draw; null for none. */
     public ItemStack getHelmet() {
         return copy(this.helmet);
     }
 
-    /** Returns a defensive copy suitable for client-side item rendering. */
+    /** A copy of the held item, for the client to draw; null for none. */
     public ItemStack getHeldItem() {
         return copy(this.heldItem);
     }

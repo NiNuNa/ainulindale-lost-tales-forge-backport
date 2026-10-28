@@ -25,7 +25,6 @@ import com.ninuna.losttales.gui.style.LostTalesUiFramedButton;
 import com.ninuna.losttales.gui.style.LostTalesUiRules;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.ChatPresence;
-import com.ninuna.losttales.client.render.LostTalesSilhouetteRenderState;
 import com.ninuna.losttales.client.render.player.LostTalesCharacterHeadIconRenderer;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.gui.style.LostTalesColors;
@@ -102,14 +101,16 @@ public final class ChatInputBar {
     static final int BAR_GAP = 3;
     /**
      * The field is never narrower than this, however little room a
-     * narrow window leaves between the tab button and the counter.
+     * narrow window leaves between the page button and the counter.
      */
     private static final int MIN_FIELD_WIDTH = 20;
     /**
-     * Room the field keeps before the tab button gives up any of its
+     * Room the field keeps before the page button gives up any of its
      * name for it: about a dozen letters.
      */
     static final int COMFORTABLE_FIELD_WIDTH = 64;
+    /** The range button of a copy heard nearby, beside the identity button (CHAT-37). */
+    private final ChatRangeButton rangeButton = new ChatRangeButton();
     /** The head the identity button holds. */
     private static final int CHARACTER_HEAD_SIZE =
             LostTalesChatOverlayRenderer.HEAD_SIZE;
@@ -131,7 +132,7 @@ public final class ChatInputBar {
     private ChatInputField restingField;
     private int screenHeight;
 
-    /** The live bar's tab and identity buttons: their light, marquee and beat. */
+    /** The live bar's page and identity buttons: their light, marquee and beat. */
     private final BarLead lead = new BarLead();
     /**
      * The bar's own glyph buttons, each keeping its own beat: the send
@@ -397,7 +398,47 @@ public final class ChatInputBar {
      * counter's slot, which is as wide as the widest count.
      */
     private ChatInputLine inputLine(int barRight) {
-        return lineAfter(leadFit(barRight).right, barRight);
+        return lineAfter(controlsRight(leadFit(barRight),
+                ClientChatChannelState.getSelected()), barRight);
+    }
+
+    /**
+     * Where the bar's leading controls end on {@code copy}'s bar: after
+     * the identity button, and after the range button where the copy is
+     * of a conversation heard nearby (CHAT-37).
+     */
+    private static int controlsRight(BarLead.Fit fit, ConversationPage copy) {
+        return fit.right + ChatRangeButton.room(copy);
+    }
+
+    /** Left edge of the range button's frame on the selected copy's bar. */
+    private int rangeButtonLeft() {
+        return ChatRangeButton.leftAfter(leadFit(this.right).right);
+    }
+
+    /** Whether the point is on the range button's frame; never on a bar without one. */
+    boolean isInsideRangeButton(double mouseX, double mouseY) {
+        return ChatSpeechRanges.hasRange(ClientChatChannelState.getSelected())
+                && ChatRangeButton.contains(mouseX, mouseY, rangeButtonLeft(),
+                        framedButtonTop());
+    }
+
+    /**
+     * The range button of the selected copy, lit under the pointer,
+     * holding how far it speaks; nothing on a bar without one.
+     */
+    void drawRangeButton(double mouseX, double mouseY) {
+        ConversationPage copy = ClientChatChannelState.getSelected();
+        if (!ChatSpeechRanges.hasRange(copy)) {
+            return;
+        }
+        boolean hovered = isInsideRangeButton(mouseX, mouseY);
+        this.rangeButton.advance(hovered, hovered && Mouse.isButtonDown(0));
+        int left = rangeButtonLeft();
+        this.rangeButton.draw(left, framedButtonTop(),
+                ChatSpeechRanges.of(copy), surfaceAlpha(), faded(255));
+        this.regions.add(left, framedButtonTop(), left + ChatRangeButton.SIZE,
+                framedButtonTop() + ChatRangeButton.SIZE);
     }
 
     /** The typing line after the bar's leading controls, ending at {@code controlsRight}. */
@@ -420,7 +461,7 @@ public final class ChatInputBar {
 
     /**
      * How much of its opacity the bar being drawn shows: all of it, but
-     * for the bar of a window still fading in — one just made from tabs
+     * for the bar of a window still fading in — one just made from pages
      * carried out of their row — which fades in with its window. Set
      * round one bar's drawing and put back after it
      * ({@link #beginFade}, {@link #endFade}).
@@ -570,10 +611,10 @@ public final class ChatInputBar {
 
     /**
      * The active window's input bar in the tool strip's surface — the
-     * tab in front's secondary colour at two thirds, one flat stretch of it, so
+     * page in front's secondary colour at two thirds, one flat stretch of it, so
      * the history stands between two bands of one tone — exactly
      * as wide as the window,
-     * with holes cut in it for the tab and identity buttons' frames and
+     * with holes cut in it for the page and identity buttons' frames and
      * the typing well, and the empty field's hint in the well. The strip's
      * first row is the window's bottom rule, drawn with the window, so
      * the bar's own paint begins one row below it and never darkens the
@@ -581,8 +622,10 @@ public final class ChatInputBar {
      */
     void drawBar(int barRight) {
         BarLead.Fit fit = leadFit(barRight);
-        ChatInputLine line = lineAfter(fit.right, barRight);
-        drawBarSurface(activeFrame(), fit, line, barRight);
+        ConversationPage copy = ClientChatChannelState.getSelected();
+        ChatInputLine line = lineAfter(controlsRight(fit, copy), barRight);
+        drawBarSurface(activeFrame(), fit, ChatRangeButton.room(copy) > 0,
+                line, barRight);
         drawHint(line, this.field.getText(),
                 ClientChatChannelState.getSelected());
         // The rows stand in the well as far as it has grown, lowered by
@@ -612,7 +655,8 @@ public final class ChatInputBar {
      * corners, arriving with the bar.
      */
     private void drawBarSurface(ChatFrame frame, BarLead.Fit fit,
-                                ChatInputLine line, int barRight) {
+                                boolean ranged, ChatInputLine line,
+                                int barRight) {
         int wellTop = wellTopFor(this.top);
         int wellBottom = wellTop + WELL_HEIGHT;
         boolean grown = this.growth > 0.0F;
@@ -622,7 +666,7 @@ public final class ChatInputBar {
         int surface = LostTalesUiInk.argb(
                 LostTalesUiTheme.secondaryRgb(),
                 Math.round(WindowStyle.INSET_ALPHA * opacity));
-        // Holes for the tab and identity buttons' frames and the typing
+        // Holes for the page and identity buttons' frames and the typing
         // well; each frame's corner pixels are the bar's, outside the
         // frame's rounding.
         List<int[]> holes = new ArrayList<int[]>();
@@ -630,6 +674,12 @@ public final class ChatInputBar {
                 frameTop + LostTalesUiFramedButton.HEIGHT, 1});
         holes.add(new int[] {fit.identityLeft, frameTop, fit.right,
                 frameTop + BarLead.IDENTITY_SIZE, 1});
+        if (ranged) {
+            int rangeLeft = ChatRangeButton.leftAfter(fit.right);
+            holes.add(new int[] {rangeLeft, frameTop,
+                    rangeLeft + ChatRangeButton.SIZE,
+                    frameTop + ChatRangeButton.SIZE, 1});
+        }
         // A grown well runs up through the bar's first rows, which the
         // surface above it fills instead.
         holes.add(new int[] {line.wellLeft, grown ? this.top + 1 : wellTop,
@@ -660,8 +710,8 @@ public final class ChatInputBar {
 
     /**
      * Another drawn window's bar: the same bar the active window wears,
-     * at rest — its surface, its well holding the front tab's unsent
-     * draft or the hint, that tab's tab and identity buttons, the
+     * at rest — its surface, its well holding the front page's unsent
+     * draft or the hint, that page's page and identity buttons, the
      * buttons unlit — so every window reads as a place to type, while
      * only the active window's bar is typed in. Nothing here answers
      * the pointer beyond the strip itself; a press on it moves the
@@ -670,20 +720,20 @@ public final class ChatInputBar {
      * with a window that is still appearing.
      */
     void drawRestingBar(ChatFrame frame, Window window) {
-        ConversationPage tab = ConversationPage.from(ChatFrame.activeTab(window,
+        ConversationPage page = ConversationPage.from(ChatFrame.activeTab(window,
                 ChatFrame.visibleTabs(window)));
-        if (tab == null || frame == null || !frame.drawn) {
+        if (page == null || frame == null || !frame.drawn) {
             return;
         }
         beginFade(frame.shownShare());
         try {
-            drawRestingBar(frame, tab);
+            drawRestingBar(frame, page);
         } finally {
             endFade();
         }
     }
 
-    private void drawRestingBar(ChatFrame frame, ConversationPage tab) {
+    private void drawRestingBar(ChatFrame frame, ConversationPage page) {
         int liveLeft = this.left;
         int liveTop = this.top;
         int liveRight = this.right;
@@ -696,14 +746,20 @@ public final class ChatInputBar {
         try {
             GL11.glTranslatef(this.fractionX, this.fractionY + entranceOffset(),
                     0.0F);
-            String draft = ClientChatChannelState.getDraft(tab);
-            BarLead.Fit fit = leadFit(barRight, tab);
-            ChatInputLine line = lineAfter(fit.right, barRight);
-            drawBarSurface(frame, fit, line, barRight);
-            drawHint(line, draft, tab);
+            String draft = ClientChatChannelState.getDraft(page);
+            BarLead.Fit fit = leadFit(barRight, page);
+            ChatInputLine line = lineAfter(controlsRight(fit, page), barRight);
+            drawBarSurface(frame, fit, ChatRangeButton.room(page) > 0, line,
+                    barRight);
+            drawHint(line, draft, page);
             drawDraft(line, draft);
-            BarLead.drawIdentityAtRest(fit, framedButtonTop(), faceFor(tab),
+            BarLead.drawIdentityAtRest(fit, framedButtonTop(), faceFor(page),
                     surfaceAlpha(), faded(255));
+            if (ChatRangeButton.room(page) > 0) {
+                ChatRangeButton.drawAtRest(ChatRangeButton.leftAfter(fit.right),
+                        framedButtonTop(), ChatSpeechRanges.of(page),
+                        surfaceAlpha(), faded(255));
+            }
             BarLead.drawTabAtRest(this.mc, this.font, fit, framedButtonTop(),
                     barTextTop(), surfaceAlpha(), faded(255));
             int toggleLeft = toolbarToggleLeft(barRight);
@@ -781,11 +837,11 @@ public final class ChatInputBar {
      * of the caret waiting at the field's start and goes with the first
      * character typed.
      */
-    private void drawHint(ChatInputLine line, String typed, ConversationPage tab) {
+    private void drawHint(ChatInputLine line, String typed, ConversationPage page) {
         if (typed.length() > 0) {
             return;
         }
-        String key = ClientChatChannelState.canSend(tab)
+        String key = ClientChatChannelState.canSend(page)
                 ? "gui.losttales.chat.input.hint"
                 : "gui.losttales.chat.input.hint.read_only";
         int x = line.fieldLeft + LostTalesUiCaret.WIDTH + 1;
@@ -836,7 +892,7 @@ public final class ChatInputBar {
     }
 
     /**
-     * The bar's tab button: the channel in front's icon and name in its
+     * The bar's page button: the channel in front's icon and name in its
      * colour, lit under the pointer, a cut name read whole by the marquee
      * ({@link BarLead}).
      */
@@ -846,11 +902,12 @@ public final class ChatInputBar {
         this.lead.drawTab(this.mc, this.font, fit, framedButtonTop(),
                 barTextTop(), surfaceAlpha(), faded(255));
         this.regions.add(fit.frameLeft, this.top,
-                ChatInputLine.dividerAfter(fit.right),
+                ChatInputLine.dividerAfter(controlsRight(fit,
+                        ClientChatChannelState.getSelected())),
                 this.top + WindowPlacement.BAR_STRIP_HEIGHT);
     }
 
-    /** Left edge of the identity button's frame on the selected tab's bar. */
+    /** Left edge of the identity button's frame on the selected page's bar. */
     int characterButtonLeft() {
         return leadFit(this.right).identityLeft;
     }
@@ -871,13 +928,13 @@ public final class ChatInputBar {
                 * fadedShare(WindowStyle.opacity(this.mc)));
     }
 
-    /** The bar's tab and identity buttons for the selected channel. */
+    /** The bar's page and identity buttons for the selected channel. */
     private BarLead.Fit leadFit(int barRight) {
         return leadFit(barRight, ClientChatChannelState.getSelected());
     }
 
     /**
-     * The tab and identity buttons on the bar of a window whose front tab
+     * The page and identity buttons on the bar of a window whose front page
      * is {@code channel}, an edge's gap in from the window's edge: the name
      * whole while the field beside them keeps
      * {@link #COMFORTABLE_FIELD_WIDTH}, else giving the field what it
@@ -887,13 +944,14 @@ public final class ChatInputBar {
         WindowBar.Measure measure = WindowBar.measure(this.font);
         int left = this.left + WindowStyle.EDGE_GAP;
         int whole = BarLead.wholeWidth(channel, measure);
-        ChatInputLine wholeLine = lineAfter(left + whole, barRight);
+        ChatInputLine wholeLine = lineAfter(left + whole
+                + ChatRangeButton.room(channel), barRight);
         return BarLead.fit(channel, left, leadWidth(whole,
                 wholeLine.fieldRight - wholeLine.fieldLeft), measure);
     }
 
     /**
-     * How wide the tab and identity buttons stand, {@code whole} wide with
+     * How wide the page and identity buttons stand, {@code whole} wide with
      * the whole name, beside a field that would be {@code fieldWidth}
      * wide: all of it while the field keeps
      * {@link #COMFORTABLE_FIELD_WIDTH}, else what the field lacks of that
@@ -931,22 +989,22 @@ public final class ChatInputBar {
     }
 
     /**
-     * Who the player is on {@code tab}, as its identity button shows it:
-     * the head of the identity the tab shows, wearing the sphere of the
+     * Who the player is on {@code page}, as its identity button shows it:
+     * the head of the identity the page shows, wearing the sphere of the
      * status everyone else sees of it, over the chat's flat shadow like
      * every other head in the chat; or the Narrator's mark while that
-     * voice is taken up on a tab that speaks in character. The head and
+     * voice is taken up on a page that speaks in character. The head and
      * its sphere are one icon. Null with no player to show.
      */
-    BarLead.Face faceFor(final WindowPage tab) {
+    BarLead.Face faceFor(final WindowPage page) {
         if (this.mc == null || this.mc.thePlayer == null) {
             return null;
         }
         final Minecraft minecraft = this.mc;
         final UUID self = minecraft.thePlayer.getUniqueID();
-        final boolean narrating = ClientChatIdentities.narratesOn(tab);
+        final boolean narrating = ClientChatIdentities.narratesOn(page);
         final ClientChatIdentities.Identity shown =
-                ClientChatIdentities.effectiveFor(tab);
+                ClientChatIdentities.effectiveFor(page);
         return new BarLead.Face() {
             @Override
             public int width() {
@@ -969,11 +1027,13 @@ public final class ChatInputBar {
                 boolean account = shown.account || shown.skinId.length() == 0;
                 float share = alpha / 255.0F;
                 ChatPresence presence = ClientChatPresence.presenceOf(self,
-                        ClientChatPresence.speakerOf(tab));
+                        ClientChatPresence.speakerOf(page));
                 ChatPresenceMark.beginShadowCut(x, y, CHARACTER_HEAD_SIZE);
                 try {
-                    drawHeadShadow(minecraft, self, account, shown.skinId, x,
-                            y, share);
+                    LostTalesChatOverlayRenderer.drawHeadShadow(minecraft,
+                            false, account, self, shown.skinId, x, y,
+                            CHARACTER_HEAD_SIZE,
+                            LostTalesUiInk.SHADOW_OPACITY * share);
                 } finally {
                     ChatPresenceMark.endHeadCut();
                 }
@@ -1011,36 +1071,7 @@ public final class ChatInputBar {
                 x, y, CHARACTER_HEAD_SIZE, alpha, false);
     }
 
-    /**
-     * The head's flat silhouette shadow, one pixel down-right at two
-     * thirds opacity: the treatment every comparable head in the chat
-     * carries.
-     */
-    private static void drawHeadShadow(Minecraft minecraft, UUID self,
-                                       boolean account, String skinId,
-                                       float x, float y, float share) {
-        LostTalesSilhouetteRenderState.begin(LostTalesUiInk.SHADOW);
-        try {
-            if (account) {
-                LostTalesCharacterHeadIconRenderer.drawTintedAccountHeadBase(
-                        minecraft, self, x + LostTalesUiInk.SHADOW_OFFSET,
-                        y + LostTalesUiInk.SHADOW_OFFSET, CHARACTER_HEAD_SIZE,
-                        1.0F, 1.0F, 1.0F,
-                        LostTalesUiInk.SHADOW_OPACITY * share);
-            } else {
-                LostTalesCharacterHeadIconRenderer.drawTintedSnapshotHeadBase(
-                        minecraft, self, skinId,
-                        x + LostTalesUiInk.SHADOW_OFFSET,
-                        y + LostTalesUiInk.SHADOW_OFFSET, CHARACTER_HEAD_SIZE,
-                        1.0F, 1.0F, 1.0F,
-                        LostTalesUiInk.SHADOW_OPACITY * share);
-            }
-        } finally {
-            LostTalesSilhouetteRenderState.end();
-        }
-    }
-
-    /** Whether the point is on the tab button's frame. */
+    /** Whether the point is on the page button's frame. */
     boolean isInsideIndicator(double mouseX, double mouseY, int barRight) {
         return leadFit(barRight).onTab(mouseX, mouseY, framedButtonTop());
     }

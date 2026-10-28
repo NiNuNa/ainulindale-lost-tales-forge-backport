@@ -3,6 +3,7 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.chat.ChatChannel;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.UUID;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,24 +24,36 @@ public final class ClientChatTypingStateTest {
         ClientChatTypingState.clear();
     }
 
-    /** A typist in a roleplaying tab shows over their head; one in OOC or an NPC tab does not. */
+    /**
+     * Only typing heard nearby shows over a head (CHAT-58), found by the
+     * typist's account, never by a name: a fellowship's, OOC's or an NPC's
+     * typing does not, and neither does a namesake's.
+     */
     @Test
-    public void typingInARoleplayingTabShowsOverTheHead() {
-        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.FELLOWSHIP), "Aragorn", true, 0L);
-        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.OOC), "Steve", true, 0L);
+    public void onlyTypingHeardNearbyShowsOverTheHead() {
+        UUID aragorn = new UUID(1L, 1L);
+        UUID steve = new UUID(1L, 2L);
+        UUID namesake = new UUID(1L, 3L);
+        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.PROXIMITY),
+                "Aragorn", aragorn, true, 0L);
+        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.FELLOWSHIP),
+                "Gimli", steve, true, 0L);
+        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.OOC), "Steve",
+                steve, true, 0L);
         ClientChatTypingState.apply(ConversationPage.npc("Bard"), "Bard", true, 0L);
         long soon = ClientChatTypingState.TTL_NANOS - 1L;
-        assertTrue(ClientChatTypingState.isTypingInCharacter("Aragorn", soon));
-        assertTrue(ClientChatTypingState.anyTypingInCharacter(soon));
-        assertFalse("OOC is not in character",
-                ClientChatTypingState.isTypingInCharacter("Steve", soon));
-        assertFalse("nobody types on an NPC's side",
-                ClientChatTypingState.isTypingInCharacter("Bard", soon));
-        assertFalse(ClientChatTypingState.isTypingInCharacter("Aragorn",
+        assertTrue(ClientChatTypingState.isTypingNearby(aragorn, soon));
+        assertTrue(ClientChatTypingState.anyTypingNearby(soon));
+        assertFalse("a fellowship's words are not said aloud",
+                ClientChatTypingState.isTypingNearby(steve, soon));
+        assertFalse("a namesake shows nothing",
+                ClientChatTypingState.isTypingNearby(namesake, soon));
+        assertFalse(ClientChatTypingState.isTypingNearby(aragorn,
                 ClientChatTypingState.TTL_NANOS));
-        assertFalse(ClientChatTypingState.isTypingInCharacter("", soon));
-        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.FELLOWSHIP), "Aragorn", false, 1L);
-        assertFalse(ClientChatTypingState.anyTypingInCharacter(soon));
+        assertFalse(ClientChatTypingState.isTypingNearby(null, soon));
+        ClientChatTypingState.apply(ConversationPage.of(ChatChannel.PROXIMITY),
+                "Aragorn", aragorn, false, 1L);
+        assertFalse(ClientChatTypingState.anyTypingNearby(soon));
     }
 
     @Test
@@ -68,8 +81,8 @@ public final class ClientChatTypingStateTest {
                         3L + ClientChatTypingState.TTL_NANOS - 1L));
         assertTrue(ClientChatTypingState.namesTyping(fellowship,
                 3L + ClientChatTypingState.TTL_NANOS).isEmpty());
-        // Whisper typists are filed under the partner's tab, by name,
-        // case-insensitively like the tab itself.
+        // Whisper typists are filed under the partner's page, by name,
+        // case-insensitively like the page itself.
         ClientChatTypingState.apply(ConversationPage.whisper("bilbo", ""), "Bilbo",
                 true, 0L);
         assertEquals(Collections.singletonList("Bilbo"),
@@ -80,14 +93,14 @@ public final class ClientChatTypingStateTest {
     }
 
     @Test
-    public void aTabKeepsABoundedNumberOfTypists() {
+    public void aPageKeepsABoundedNumberOfTypists() {
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
-        for (int index = 0; index < ClientChatTypingState.MAX_NAMES_PER_TAB + 5;
+        for (int index = 0; index < ClientChatTypingState.MAX_NAMES_PER_PAGE + 5;
              index++) {
             ClientChatTypingState.apply(global, "Player" + index, true,
                     index);
         }
-        assertEquals(ClientChatTypingState.MAX_NAMES_PER_TAB,
+        assertEquals(ClientChatTypingState.MAX_NAMES_PER_PAGE,
                 ClientChatTypingState.namesTyping(global, 100L).size());
         assertEquals("Player5",
                 ClientChatTypingState.namesTyping(global, 100L).get(0));

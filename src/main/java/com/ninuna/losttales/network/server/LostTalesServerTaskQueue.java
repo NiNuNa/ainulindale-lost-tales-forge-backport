@@ -15,15 +15,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * Bounded Forge 1.7.10 logical-server task queue for client requests.
- *
- * Network handlers enqueue only immutable request data and the sender UUID.
- * The currently connected EntityPlayerMP is resolved on the server tick so a
- * queued request never executes against a stale entity object after reconnect,
- * respawn, or logout. Each player holds at most {@link #MAX_QUEUED_PER_PLAYER}
- * places in it, and that share is the only bound: a player is never refused
- * because others filled theirs, and the queue never holds more than a share
- * for each player with a request in it.
+ * The one queue every client request waits in for the server thread. A
+ * network handler queues the request's own data and the sender's id; at
+ * the start of each tick the queue runs up to {@link #MAX_TASKS_PER_TICK}
+ * of them, each against the player connected under that id at that
+ * moment, so none runs against a player who has left, come back or
+ * respawned since. Each player holds at most
+ * {@link #MAX_QUEUED_PER_PLAYER} places, and that share is the only
+ * bound: nobody is refused because others filled theirs (DATA-01).
  */
 public final class LostTalesServerTaskQueue {
 

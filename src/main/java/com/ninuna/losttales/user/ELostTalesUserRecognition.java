@@ -4,9 +4,8 @@ import com.ninuna.losttales.chat.ChatAccountRole;
 
 /**
  * What a recognized Lost Tales user is recognized <em>as</em>. Recognition
- * is cosmetic: it decides credits, chat roles and, later, other
- * decorations, and nothing here is ever consulted for a permission,
- * an operator check or a gameplay decision.
+ * is cosmetic: it decides credits and the chat role, and nothing here is
+ * ever asked for a permission, an operator check or a gameplay decision.
  */
 public enum ELostTalesUserRecognition {
     /** Listed for credits only; no chat role. */

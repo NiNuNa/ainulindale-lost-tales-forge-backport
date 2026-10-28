@@ -5,6 +5,8 @@ import com.ninuna.losttales.character.model.CharacterRoster;
 import com.ninuna.losttales.character.storage.CharacterStorage;
 import com.ninuna.losttales.character.storage.CharacterWorldData;
 import com.ninuna.losttales.character.switching.CharacterSwitchCoordinator;
+import com.ninuna.losttales.character.switching.CharacterSwitchSourceRestore;
+import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.compat.discord.DiscordGameEventRelay;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
@@ -52,6 +54,11 @@ import net.minecraftforge.event.world.BlockEvent;
  * waits the same way (CHAR-01): the creator says the server cannot read
  * characters right now, and staff are told in the Server Log. Who waits is
  * kept for the session only, cleared with the server's other state.</p>
+ *
+ * <p>A player whose last switch waits for an administrator (a held
+ * journal) is held the same way, as a ghost touching nothing, until an
+ * operator settles it (CHAR-45); the world knows them, so their join and
+ * their lines are said as anyone's.</p>
  */
 public final class CharacterJoin {
     /** The players waiting, by account id. Touched on the server thread; read from any. */
@@ -65,8 +72,96 @@ public final class CharacterJoin {
 
     /** Whether the entity is a player still waiting for their first character. */
     public static boolean isWaiting(Entity entity) {
+        Waiting waiting = entity instanceof EntityPlayerMP
+                ? WAITING.get(entity.getUniqueID()) : null;
+        return waiting != null && waiting.firstVisit;
+    }
+
+    /**
+     * Whether the entity is a player held as a ghost: waiting for their
+     * first character, or for an administrator to settle their last
+     * switch (CHAR-45). A held player touches nothing and nothing touches
+     * them.
+     */
+    public static boolean isHeld(Entity entity) {
         return entity instanceof EntityPlayerMP
                 && WAITING.containsKey(entity.getUniqueID());
+    }
+
+    /** Whether the player is held because their last switch waits for an administrator (CHAR-45). */
+    public static boolean isHeldForJournal(Entity entity) {
+        Waiting waiting = entity instanceof EntityPlayerMP
+                ? WAITING.get(entity.getUniqueID()) : null;
+        return waiting != null && waiting.journalHeld;
+    }
+
+    /**
+     * Why the player may not speak in character, as a lang key; null when
+     * they may: one waiting for their first character, or held for their
+     * last switch (CHAR-45).
+     */
+    public static String inCharacterRefusal(Entity entity) {
+        if (isWaiting(entity)) {
+            return "chat.losttales.identity.first_character";
+        }
+        return isHeldForJournal(entity) ? "chat.losttales.identity.journal_held" : null;
+    }
+
+    /**
+     * Holds the player as a ghost while their account's switch journal
+     * waits for an administrator, and lets them go once it does not
+     * (CHAR-45): asked at each join, respawn and change of dimension, and
+     * after an operator's recover or discard. An account whose entry the
+     * switch store had to set aside is held too. A player let go plays as
+     * their game mode allows again and is sent their roster; one newly
+     * held is sent it too. Answers whether they are held for it now.
+     */
+    public static boolean settleJournalHold(EntityPlayerMP player) {
+        if (player == null || player.worldObj == null || player.worldObj.isRemote
+                || player.getUniqueID() == null) {
+            return false;
+        }
+        boolean held = CharacterSwitchSourceRestore.characterRemovalRefusal(
+                player.worldObj, player.getUniqueID()) == CharacterErrorId.SWITCH_JOURNAL_HELD;
+        Waiting waiting = WAITING.get(player.getUniqueID());
+        boolean wasHeld = waiting != null && waiting.journalHeld;
+        if (held) {
+            if (waiting == null) {
+                waiting = new Waiting();
+                waiting.firstVisit = false;
+                WAITING.put(player.getUniqueID(), waiting);
+            }
+            waiting.journalHeld = true;
+            // Held where they stand now, after a respawn too.
+            waiting.hold(player.posX, player.posY, player.posZ);
+            player.capabilities.disableDamage = true;
+            player.sendPlayerAbilities();
+        } else if (wasHeld) {
+            waiting.journalHeld = false;
+            if (!waiting.firstVisit) {
+                WAITING.remove(player.getUniqueID());
+                player.theItemInWorldManager.getGameType()
+                        .configurePlayerCapabilities(player.capabilities);
+                player.sendPlayerAbilities();
+            }
+        }
+        if (held != wasHeld) {
+            sendRoster(player);
+        }
+        return held;
+    }
+
+    private static void sendRoster(EntityPlayerMP player) {
+        try {
+            CharacterRoster roster = CharacterStorage.get(player.worldObj)
+                    .getRoster(player.getUniqueID());
+            if (roster != null) {
+                CharacterSyncManager.sendRoster(player,
+                        CharacterSyncManager.UNSOLICITED_REQUEST_ID, roster);
+            }
+        } catch (RuntimeException unreadable) {
+            // The roster request the page sends brings it.
+        }
     }
 
     /** Whether the account of that name is still waiting for its first character. */
@@ -125,12 +220,12 @@ public final class CharacterJoin {
      */
     static void arrive(EntityPlayerMP player, CharacterRoster roster) {
         Waiting waiting = player == null ? null : WAITING.get(player.getUniqueID());
-        if (waiting == null) {
+        if (waiting == null || !waiting.firstVisit) {
             return;
         }
         waiting.storeUnreadable = false;
         if (roster != null && roster.getActiveCharacterId() != null) {
-            forget(player);
+            endFirstVisit(player);
             return;
         }
         if (roster != null && !roster.getCharacters().isEmpty()
@@ -159,7 +254,7 @@ public final class CharacterJoin {
                     result.getErrorId().getId());
             return result;
         }
-        Waiting waiting = forget(player);
+        Waiting waiting = endFirstVisit(player);
         // What the game mode grants comes back with the ghost's hold gone.
         player.theItemInWorldManager.getGameType()
                 .configurePlayerCapabilities(player.capabilities);
@@ -176,7 +271,7 @@ public final class CharacterJoin {
 
     /**
      * Whether the player's roster plays no character; null where the store
-     * cannot say: one written by a newer version, or one that fails to read.
+     * cannot say: one of another version, or one that fails to read.
      */
     static Boolean playsNoCharacter(EntityPlayerMP player) {
         try {
@@ -236,6 +331,23 @@ public final class CharacterJoin {
         return waiting;
     }
 
+    /**
+     * The first visit is over; a hold for a journal stays. Answers what
+     * the player waited with.
+     */
+    private static Waiting endFirstVisit(EntityPlayerMP player) {
+        NAMES.values().remove(player.getUniqueID());
+        Waiting waiting = WAITING.get(player.getUniqueID());
+        if (waiting == null) {
+            return null;
+        }
+        if (waiting.journalHeld) {
+            waiting.firstVisit = false;
+            return waiting;
+        }
+        return WAITING.remove(player.getUniqueID());
+    }
+
     /** A player who leaves still waiting was never there; their join line goes with them. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onLogout(PlayerLoggedOutEvent event) {
@@ -247,7 +359,7 @@ public final class CharacterJoin {
     /** Held where they stand: a waiting player who moves is put back. */
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !isWaiting(event.player)) {
+        if (event.phase != TickEvent.Phase.END || !isHeld(event.player)) {
             return;
         }
         Waiting waiting = WAITING.get(event.player.getUniqueID());
@@ -267,8 +379,8 @@ public final class CharacterJoin {
     /** Untouchable: nothing hurts a waiting player, and they hurt nothing. */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onAttacked(LivingAttackEvent event) {
-        if (isWaiting(event.entityLiving)
-                || event.source != null && isWaiting(event.source.getEntity())) {
+        if (isHeld(event.entityLiving)
+                || event.source != null && isHeld(event.source.getEntity())) {
             event.setCanceled(true);
         }
     }
@@ -276,7 +388,7 @@ public final class CharacterJoin {
     /** No creature takes a waiting player for its target. */
     @SubscribeEvent
     public void onTargeted(LivingSetAttackTargetEvent event) {
-        if (isWaiting(event.target) && event.entityLiving instanceof EntityLiving) {
+        if (isHeld(event.target) && event.entityLiving instanceof EntityLiving) {
             ((EntityLiving)event.entityLiving).setAttackTarget(null);
         }
     }
@@ -328,7 +440,7 @@ public final class CharacterJoin {
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onToss(ItemTossEvent event) {
-        if (!isWaiting(event.player) || event.entityItem == null) {
+        if (!isHeld(event.player) || event.entityItem == null) {
             return;
         }
         ItemStack stack = event.entityItem.getEntityItem();
@@ -340,7 +452,7 @@ public final class CharacterJoin {
 
     private static void refuse(Entity player,
                                cpw.mods.fml.common.eventhandler.Event event) {
-        if (isWaiting(player) && event.isCancelable()) {
+        if (isHeld(player) && event.isCancelable()) {
             event.setCanceled(true);
         }
     }
@@ -353,6 +465,10 @@ public final class CharacterJoin {
 
     /** A player waiting: where they are held once placed, and their join line. */
     private static final class Waiting {
+        /** Whether they wait for their first character; a held journal alone is not one. */
+        volatile boolean firstVisit = true;
+        /** Whether their last switch waits for an administrator (CHAR-45). */
+        volatile boolean journalHeld;
         volatile boolean held;
         volatile double x;
         volatile double y;

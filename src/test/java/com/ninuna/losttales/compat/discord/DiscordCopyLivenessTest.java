@@ -23,7 +23,7 @@ import static org.junit.Assert.assertTrue;
  * The one rule every action on a Discord copy asks: a copy is live
  * while the message's game channel is bound to the copy's Discord
  * channel, in the direction the action crosses. An unbound pair is left
- * alone both ways and its links are kept, so binding it again brings
+ * alone both ways and its links are kept, so link it again brings
  * everything back.
  */
 public final class DiscordCopyLivenessTest {
@@ -101,8 +101,8 @@ public final class DiscordCopyLivenessTest {
         }
     }
 
-    private static DiscordChannelBindings bound(String... entries) {
-        return DiscordChannelBindings.parse(entries, true, null);
+    private static DiscordChannelLinks bound(String... entries) {
+        return DiscordChannelLinks.parse(entries, true, null);
     }
 
     /** A Discord member's own line, read from {@code channelId}. */
@@ -110,11 +110,11 @@ public final class DiscordCopyLivenessTest {
         return new DiscordMessageLinks.Copy(discordId, "channel:" + channelId, "", "", "");
     }
 
-    private static boolean live(DiscordChannelBindings bindings, ChatChannel channel,
+    private static boolean live(DiscordChannelLinks channelLinks, ChatChannel channel,
                                 String faction, DiscordMessageLinks.Copy copy,
                                 DiscordCopyLiveness.Crossing crossing,
                                 DiscordCopyLiveness.Webhooks webhooks) {
-        return DiscordCopyLiveness.isLive(bindings, channel, faction, copy,
+        return DiscordCopyLiveness.isLive(channelLinks, channel, faction, copy,
                 crossing, webhooks);
     }
 
@@ -126,7 +126,7 @@ public final class DiscordCopyLivenessTest {
      */
     @Test
     public void anAnnouncementIsLiveOnlyInItsOwnChannelsDiscordChannels() {
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A,
                 "gondor=BIDIRECTIONAL;channel=6;webhook=" + HOOK_B);
         Hooks hooks = new Hooks().posting(HOOK_A, "5").posting(HOOK_B, "6");
@@ -134,31 +134,31 @@ public final class DiscordCopyLivenessTest {
                 "222", "channel:5", HOOK_A, "", "ooc");
         DiscordMessageLinks.Copy gondorEmbed = new DiscordMessageLinks.Copy(
                 "333", "channel:6", HOOK_B, "", "gondor");
-        assertTrue(live(bindings, ChatChannel.OOC, "", oocEmbed, TO, hooks));
-        assertTrue(live(bindings, ChatChannel.OOC, "", oocEmbed, FROM, hooks));
-        assertFalse(live(bindings, ChatChannel.OOC, "", gondorEmbed, TO, hooks));
-        assertFalse(live(bindings, ChatChannel.OOC, "", gondorEmbed, FROM, hooks));
-        assertEquals("", DiscordCopyLiveness.correctionWebhook(bindings,
+        assertTrue(live(channelLinks, ChatChannel.OOC, "", oocEmbed, TO, hooks));
+        assertTrue(live(channelLinks, ChatChannel.OOC, "", oocEmbed, FROM, hooks));
+        assertFalse(live(channelLinks, ChatChannel.OOC, "", gondorEmbed, TO, hooks));
+        assertFalse(live(channelLinks, ChatChannel.OOC, "", gondorEmbed, FROM, hooks));
+        assertEquals("", DiscordCopyLiveness.correctionWebhook(channelLinks,
                 ChatChannel.OOC, "", gondorEmbed, hooks));
 
         DiscordMessageLinks links = new DiscordMessageLinks();
         links.link(MESSAGE, "333", "", "channel:6", HOOK_B, "gondor");
         assertEquals(ChatMessageIds.NONE, DiscordCopyLiveness.inboundTarget(links,
-                bindings, new Said().put(MESSAGE, ChatChannel.OOC, ""), "333", "6"));
-        assertTrue(DiscordCopyLiveness.liveCopies(links, bindings, MESSAGE,
+                channelLinks, new Said().put(MESSAGE, ChatChannel.OOC, ""), "333", "6"));
+        assertTrue(DiscordCopyLiveness.liveCopies(links, channelLinks, MESSAGE,
                 ChatChannel.OOC, "", TO, hooks).isEmpty());
     }
 
     @Test
     public void aBoundPairIsLiveBothWays() {
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
         DiscordMessageLinks.Copy line = memberLine("111", "5");
-        assertTrue(live(bindings, ChatChannel.OOC, "", line, TO, NOTHING_KNOWN));
-        assertTrue(live(bindings, ChatChannel.OOC, "", line, FROM, NOTHING_KNOWN));
+        assertTrue(live(channelLinks, ChatChannel.OOC, "", line, TO, NOTHING_KNOWN));
+        assertTrue(live(channelLinks, ChatChannel.OOC, "", line, FROM, NOTHING_KNOWN));
         DiscordMessageLinks.Copy posted = new DiscordMessageLinks.Copy("222",
                 "channel:5", HOOK_A, "", "ooc");
-        assertTrue(live(bindings, ChatChannel.OOC, "", posted, TO,
+        assertTrue(live(channelLinks, ChatChannel.OOC, "", posted, TO,
                 new Hooks().posting(HOOK_A, "5")));
     }
 
@@ -168,16 +168,16 @@ public final class DiscordCopyLivenessTest {
         DiscordMessageLinks.Copy line = memberLine("111", "5");
         DiscordMessageLinks.Copy posted = new DiscordMessageLinks.Copy("222",
                 "channel:5", HOOK_A, "", "ooc");
-        for (DiscordChannelBindings bindings : Arrays.asList(
-                DiscordChannelBindings.EMPTY,
+        for (DiscordChannelLinks channelLinks : Arrays.asList(
+                DiscordChannelLinks.EMPTY,
                 bound("ooc=BIDIRECTIONAL;channel=6;webhook=" + HOOK_B),
                 // OOC's entry switched off: Global has channel 5 already.
                 bound("global=BIDIRECTIONAL;channel=5;webhook=" + HOOK_B,
                         "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A))) {
-            assertFalse(live(bindings, ChatChannel.OOC, "", line, TO, hooks));
-            assertFalse(live(bindings, ChatChannel.OOC, "", line, FROM, hooks));
-            assertFalse(live(bindings, ChatChannel.OOC, "", posted, TO, hooks));
-            assertEquals("", DiscordCopyLiveness.correctionWebhook(bindings,
+            assertFalse(live(channelLinks, ChatChannel.OOC, "", line, TO, hooks));
+            assertFalse(live(channelLinks, ChatChannel.OOC, "", line, FROM, hooks));
+            assertFalse(live(channelLinks, ChatChannel.OOC, "", posted, TO, hooks));
+            assertEquals("", DiscordCopyLiveness.correctionWebhook(channelLinks,
                     ChatChannel.OOC, "", posted, hooks));
         }
     }
@@ -190,9 +190,9 @@ public final class DiscordCopyLivenessTest {
      */
     @Test
     public void aDiscordChannelReboundToAnotherGameChannelLeavesTheOldMessagesAlone() {
-        DiscordChannelBindings before = bound(
+        DiscordChannelLinks before = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
-        DiscordChannelBindings after = bound(
+        DiscordChannelLinks after = bound(
                 "global=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
         Hooks hooks = new Hooks().posting(HOOK_A, "5");
         DiscordMessageLinks links = new DiscordMessageLinks();
@@ -234,7 +234,7 @@ public final class DiscordCopyLivenessTest {
      */
     @Test
     public void aClosedChannelsCopiesAreLeftAloneBothWays() {
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
         Hooks hooks = new Hooks().posting(HOOK_A, "5");
         DiscordMessageLinks links = new DiscordMessageLinks();
@@ -243,9 +243,9 @@ public final class DiscordCopyLivenessTest {
         Said said = new Said().put(MESSAGE, ChatChannel.OOC, "")
                 .put(OTHER, ChatChannel.OOC, "");
         DiscordMessageLinks.Copy posted = links.copiesOf(OTHER).get(0);
-        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, bindings, said,
+        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, channelLinks, said,
                 "111", "5"));
-        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(channelLinks,
                 ChatChannel.OOC, "", posted, hooks));
 
         Map<ChatChannel, ChatChannelGates.Gate> gates =
@@ -254,29 +254,29 @@ public final class DiscordCopyLivenessTest {
                 Collections.singleton("mod"), Collections.<String>emptySet()));
         ChatChannelGates.install(ChatChannelGates.of(gates));
         assertEquals("a role to read leaves the link standing", MESSAGE,
-                DiscordCopyLiveness.inboundTarget(links, bindings, said, "111", "5"));
+                DiscordCopyLiveness.inboundTarget(links, channelLinks, said, "111", "5"));
 
         gates.put(ChatChannel.OOC, new ChatChannelGates.Gate(
                 Collections.<String>emptySet(), Collections.<String>emptySet(),
                 true, false));
         ChatChannelGates.install(ChatChannelGates.of(gates));
 
-        assertFalse(live(bindings, ChatChannel.OOC, "", posted, TO, hooks));
-        assertFalse(live(bindings, ChatChannel.OOC, "", posted, FROM, hooks));
+        assertFalse(live(channelLinks, ChatChannel.OOC, "", posted, TO, hooks));
+        assertFalse(live(channelLinks, ChatChannel.OOC, "", posted, FROM, hooks));
         assertEquals("no edit or deletion goes out", "",
-                DiscordCopyLiveness.correctionWebhook(bindings, ChatChannel.OOC, "",
+                DiscordCopyLiveness.correctionWebhook(channelLinks, ChatChannel.OOC, "",
                         posted, hooks));
         assertTrue("no reaction goes out", DiscordCopyLiveness.liveCopies(links,
-                bindings, OTHER, ChatChannel.OOC, "", TO, hooks).isEmpty());
+                channelLinks, OTHER, ChatChannel.OOC, "", TO, hooks).isEmpty());
         assertEquals("no edit, deletion or reaction comes in", ChatMessageIds.NONE,
-                DiscordCopyLiveness.inboundTarget(links, bindings, said, "111", "5"));
-        assertEquals(ChatMessageIds.NONE, DiscordCopyLiveness.quotedBy(links, bindings,
+                DiscordCopyLiveness.inboundTarget(links, channelLinks, said, "111", "5"));
+        assertEquals(ChatMessageIds.NONE, DiscordCopyLiveness.quotedBy(links, channelLinks,
                 said, "111", "5"));
 
         ChatChannelGates.install(ChatChannelGates.defaults());
-        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, bindings, said,
+        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, channelLinks, said,
                 "111", "5"));
-        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(channelLinks,
                 ChatChannel.OOC, "", posted, hooks));
     }
 
@@ -285,31 +285,31 @@ public final class DiscordCopyLivenessTest {
         DiscordMessageLinks links = new DiscordMessageLinks();
         links.link(MESSAGE, "111", "", "channel:5", "");
         Said said = new Said().put(MESSAGE, ChatChannel.OOC, "");
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A,
                 "ooc=BIDIRECTIONAL;channel=6;webhook=" + HOOK_B);
-        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, bindings, said,
+        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, channelLinks, said,
                 "111", "5"));
         // The channel a Discord event names is Discord's own word; a reply
         // quotes only a message with a copy in the channel it was written in.
-        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, bindings, said,
+        assertEquals(MESSAGE, DiscordCopyLiveness.inboundTarget(links, channelLinks, said,
                 "111", "6"));
-        assertEquals(ChatMessageIds.NONE, DiscordCopyLiveness.quotedBy(links, bindings,
+        assertEquals(ChatMessageIds.NONE, DiscordCopyLiveness.quotedBy(links, channelLinks,
                 said, "111", "6"));
         assertEquals(ChatMessageIds.NONE, DiscordCopyLiveness.inboundTarget(links,
-                bindings, said, "999", "5"));
+                channelLinks, said, "999", "5"));
         assertEquals("a message the history no longer keeps", ChatMessageIds.NONE,
-                DiscordCopyLiveness.inboundTarget(links, bindings, new Said(), "111", "5"));
+                DiscordCopyLiveness.inboundTarget(links, channelLinks, new Said(), "111", "5"));
     }
 
     @Test
     public void theDirectionDecidesWhichWayACopyIsLive() {
         DiscordMessageLinks.Copy line = memberLine("111", "5");
-        DiscordChannelBindings posting = bound(
+        DiscordChannelLinks posting = bound(
                 "ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A);
         assertTrue(live(posting, ChatChannel.OOC, "", line, TO, NOTHING_KNOWN));
         assertFalse(live(posting, ChatChannel.OOC, "", line, FROM, NOTHING_KNOWN));
-        DiscordChannelBindings reading = bound(
+        DiscordChannelLinks reading = bound(
                 "ooc=DISCORD_TO_GAME;channel=5;webhook=" + HOOK_A);
         assertFalse("the game never writes into a channel it only reads, "
                         + "so the bot does not react there",
@@ -319,28 +319,28 @@ public final class DiscordCopyLivenessTest {
 
     @Test
     public void aFactionCopyIsLiveForItsOwnFactionOnly() {
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "gondor=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
         DiscordMessageLinks.Copy line = memberLine("111", "5");
-        assertTrue(live(bindings, ChatChannel.FACTION, "lotr:gondor", line, FROM,
+        assertTrue(live(channelLinks, ChatChannel.FACTION, "lotr:gondor", line, FROM,
                 NOTHING_KNOWN));
-        assertTrue(live(bindings, ChatChannel.FACTION, "lotr:gondor", line, TO,
+        assertTrue(live(channelLinks, ChatChannel.FACTION, "lotr:gondor", line, TO,
                 NOTHING_KNOWN));
         assertTrue("faction ids compare case-insensitively",
-                live(bindings, ChatChannel.FACTION, "LOTR:Gondor", line, FROM,
+                live(channelLinks, ChatChannel.FACTION, "LOTR:Gondor", line, FROM,
                         NOTHING_KNOWN));
-        assertFalse(live(bindings, ChatChannel.FACTION, "lotr:rohan", line, FROM,
+        assertFalse(live(channelLinks, ChatChannel.FACTION, "lotr:rohan", line, FROM,
                 NOTHING_KNOWN));
-        assertFalse(live(bindings, ChatChannel.FACTION, "lotr:rohan", line, TO,
+        assertFalse(live(channelLinks, ChatChannel.FACTION, "lotr:rohan", line, TO,
                 NOTHING_KNOWN));
-        assertFalse(live(bindings, ChatChannel.FACTION, "", line, FROM,
+        assertFalse(live(channelLinks, ChatChannel.FACTION, "", line, FROM,
                 NOTHING_KNOWN));
         assertFalse("another game channel in the same Discord channel",
-                live(bindings, ChatChannel.OOC, "", line, FROM, NOTHING_KNOWN));
+                live(channelLinks, ChatChannel.OOC, "", line, FROM, NOTHING_KNOWN));
     }
 
     /**
-     * Reordering the entries moves the ordinals in the binding ids, so a
+     * Reordering the entries moves the ordinals in the link ids, so a
      * copy saved under {@code ooc} now names another entry; it is still
      * found by its game channel and its Discord channel.
      */
@@ -348,8 +348,8 @@ public final class DiscordCopyLivenessTest {
     public void reorderingTheEntriesKeepsEveryPairLive() {
         String first = "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A;
         String second = "ooc=BIDIRECTIONAL;channel=6;webhook=" + HOOK_B;
-        DiscordChannelBindings before = bound(first, second);
-        DiscordChannelBindings after = bound(second, first);
+        DiscordChannelLinks before = bound(first, second);
+        DiscordChannelLinks after = bound(second, first);
         assertEquals("5", before.byId("ooc").getDiscordChannelId());
         assertEquals("6", after.byId("ooc").getDiscordChannelId());
         Hooks hooks = new Hooks().posting(HOOK_A, "5").posting(HOOK_B, "6");
@@ -357,12 +357,12 @@ public final class DiscordCopyLivenessTest {
                 "channel:5", "", "", "ooc");
         DiscordMessageLinks.Copy posted = new DiscordMessageLinks.Copy("222",
                 "channel:5", HOOK_A, "", "ooc");
-        for (DiscordChannelBindings bindings : Arrays.asList(before, after)) {
-            assertTrue(live(bindings, ChatChannel.OOC, "", restored, TO, hooks));
-            assertTrue(live(bindings, ChatChannel.OOC, "", restored, FROM, hooks));
-            assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+        for (DiscordChannelLinks channelLinks : Arrays.asList(before, after)) {
+            assertTrue(live(channelLinks, ChatChannel.OOC, "", restored, TO, hooks));
+            assertTrue(live(channelLinks, ChatChannel.OOC, "", restored, FROM, hooks));
+            assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(channelLinks,
                     ChatChannel.OOC, "", restored, hooks));
-            assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+            assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(channelLinks,
                     ChatChannel.OOC, "", posted, hooks));
         }
     }
@@ -371,15 +371,15 @@ public final class DiscordCopyLivenessTest {
     public void aCopyKnownOnlyByItsWebhookGoesWithTheWebhook() {
         DiscordMessageLinks.Copy byWebhook = new DiscordMessageLinks.Copy("444",
                 HOOK_A, HOOK_A, "", "global");
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "global=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A);
-        assertTrue(live(bindings, ChatChannel.GLOBAL, "", byWebhook, TO, NOTHING_KNOWN));
-        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+        assertTrue(live(channelLinks, ChatChannel.GLOBAL, "", byWebhook, TO, NOTHING_KNOWN));
+        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(channelLinks,
                 ChatChannel.GLOBAL, "", byWebhook, NOTHING_KNOWN));
         assertFalse("word from Discord always names its channel",
-                live(bindings, ChatChannel.GLOBAL, "", byWebhook, FROM, NOTHING_KNOWN));
+                live(channelLinks, ChatChannel.GLOBAL, "", byWebhook, FROM, NOTHING_KNOWN));
         // The webhook given to another game channel takes the copy with it.
-        DiscordChannelBindings moved = bound(
+        DiscordChannelLinks moved = bound(
                 "ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A);
         assertFalse(live(moved, ChatChannel.GLOBAL, "", byWebhook, TO, NOTHING_KNOWN));
         assertEquals("", DiscordCopyLiveness.correctionWebhook(moved,
@@ -389,30 +389,30 @@ public final class DiscordCopyLivenessTest {
     @Test
     public void aWebhookPostingElsewhereOrRefusedPostsNothingThere() {
         // The entry names channel 7; where its webhook posts is Discord's word.
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "global=GAME_TO_DISCORD;channel=7;webhook=" + HOOK_A);
         DiscordMessageLinks.Copy inFive = new DiscordMessageLinks.Copy("222",
                 "channel:5", HOOK_A, "", "global");
-        assertTrue(live(bindings, ChatChannel.GLOBAL, "", inFive, TO,
+        assertTrue(live(channelLinks, ChatChannel.GLOBAL, "", inFive, TO,
                 new Hooks().posting(HOOK_A, "5")));
         assertFalse("the webhook now posts into another channel",
-                live(bindings, ChatChannel.GLOBAL, "", inFive, TO,
+                live(channelLinks, ChatChannel.GLOBAL, "", inFive, TO,
                         new Hooks().posting(HOOK_A, "6")));
         assertTrue("where nothing says, the webhook it went through places it",
-                live(bindings, ChatChannel.GLOBAL, "", inFive, TO, NOTHING_KNOWN));
+                live(channelLinks, ChatChannel.GLOBAL, "", inFive, TO, NOTHING_KNOWN));
         assertFalse("a webhook Discord refused posts nowhere",
-                live(bindings, ChatChannel.GLOBAL, "", inFive, TO,
+                live(channelLinks, ChatChannel.GLOBAL, "", inFive, TO,
                         new Hooks().posting(HOOK_A, "5").refusing(HOOK_A)));
     }
 
     @Test
     public void anEditOrDeletionGoesOnlyThroughTheWebhookThatMadeTheCopy() {
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
         Hooks hooks = new Hooks().posting(HOOK_A, "5");
         DiscordMessageLinks.Copy posted = new DiscordMessageLinks.Copy("222",
                 "channel:5", HOOK_A, "", "ooc");
-        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(channelLinks,
                 ChatChannel.OOC, "", posted, hooks));
         assertEquals("given another webhook", "",
                 DiscordCopyLiveness.correctionWebhook(
@@ -422,17 +422,17 @@ public final class DiscordCopyLivenessTest {
                 bound("ooc=DISCORD_TO_GAME;channel=5;webhook=" + HOOK_A),
                 ChatChannel.OOC, "", posted, hooks));
         assertEquals("another game channel's message", "",
-                DiscordCopyLiveness.correctionWebhook(bindings, ChatChannel.GLOBAL, "",
+                DiscordCopyLiveness.correctionWebhook(channelLinks, ChatChannel.GLOBAL, "",
                         posted, hooks));
         assertEquals("a Discord member's line was made by no webhook", "",
-                DiscordCopyLiveness.correctionWebhook(bindings, ChatChannel.OOC, "",
+                DiscordCopyLiveness.correctionWebhook(channelLinks, ChatChannel.OOC, "",
                         memberLine("111", "5"), hooks));
         DiscordMessageLinks.Copy restored = new DiscordMessageLinks.Copy("333",
                 "channel:5", "", "", "ooc");
-        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(bindings,
+        assertEquals(HOOK_A, DiscordCopyLiveness.correctionWebhook(channelLinks,
                 ChatChannel.OOC, "", restored, hooks));
         assertEquals("Discord never said where the webhook posts", "",
-                DiscordCopyLiveness.correctionWebhook(bindings, ChatChannel.OOC, "",
+                DiscordCopyLiveness.correctionWebhook(channelLinks, ChatChannel.OOC, "",
                         restored, NOTHING_KNOWN));
     }
 
@@ -441,10 +441,10 @@ public final class DiscordCopyLivenessTest {
         DiscordMessageLinks links = new DiscordMessageLinks();
         links.link(MESSAGE, "111", "", "channel:5", HOOK_A, "ooc");
         Said said = new Said().put(MESSAGE, ChatChannel.OOC, "");
-        DiscordChannelBindings bindings = bound(
+        DiscordChannelLinks channelLinks = bound(
                 "ooc=BIDIRECTIONAL;channel=5;webhook=" + HOOK_A);
         assertEquals("#ooc/1000", DiscordCopyLiveness.gameLink(links,
-                bindings, said, "5", "111"));
+                channelLinks, said, "5", "111"));
         assertEquals("posted there but not read", "", DiscordCopyLiveness.gameLink(
                 links, bound("ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A),
                 said, "5", "111"));
@@ -453,21 +453,21 @@ public final class DiscordCopyLivenessTest {
                         bound("global=DISCORD_TO_GAME;channel=5;webhook=" + HOOK_B),
                         said, "5", "111"));
         assertEquals("a message the history no longer keeps", "",
-                DiscordCopyLiveness.gameLink(links, bindings, new Said(), "5", "111"));
+                DiscordCopyLiveness.gameLink(links, channelLinks, new Said(), "5", "111"));
         assertEquals("never carried", "", DiscordCopyLiveness.gameLink(links,
-                bindings, said, "5", "999"));
+                channelLinks, said, "5", "999"));
         // A link's channel is typed by its author: one naming a read
         // channel for a copy that is somewhere else counts for nothing,
         // whether or not the message has another copy in that channel.
         DiscordMessageLinks elsewhere = new DiscordMessageLinks();
         elsewhere.link(MESSAGE, "222", "", "channel:6", HOOK_B, "ooc#2");
         assertEquals("the message has no copy in the channel the link names", "",
-                DiscordCopyLiveness.gameLink(elsewhere, bindings, said, "5", "222"));
+                DiscordCopyLiveness.gameLink(elsewhere, channelLinks, said, "5", "222"));
         links.link(MESSAGE, "222", "", "channel:6", HOOK_B, "ooc#2");
         assertEquals("the linked copy is not the one in that channel", "",
-                DiscordCopyLiveness.gameLink(links, bindings, said, "5", "222"));
+                DiscordCopyLiveness.gameLink(links, channelLinks, said, "5", "222"));
         assertEquals("#ooc/1000", DiscordCopyLiveness.gameLink(links,
-                bindings, said, "5", "111"));
+                channelLinks, said, "5", "111"));
     }
 
     @Test
@@ -477,18 +477,18 @@ public final class DiscordCopyLivenessTest {
         links.link(MESSAGE, "222", "", "channel:6", HOOK_B, "ooc#2");
         Said said = new Said().put(MESSAGE, ChatChannel.OOC, "");
         Hooks hooks = new Hooks().posting(HOOK_A, "5").posting(HOOK_B, "6");
-        DiscordChannelBindings both = bound(
+        DiscordChannelLinks both = bound(
                 "ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A,
                 "ooc=GAME_TO_DISCORD;channel=6;webhook=" + HOOK_B);
         assertEquals("222", DiscordCopyLiveness.jumpTarget(links, both, said, MESSAGE,
                 "channel:6", hooks).discordId);
         assertEquals("111", DiscordCopyLiveness.jumpTarget(links, both, said, MESSAGE,
                 "channel:7", hooks).discordId);
-        DiscordChannelBindings onlySix = bound(
+        DiscordChannelLinks onlySix = bound(
                 "ooc=GAME_TO_DISCORD;channel=6;webhook=" + HOOK_B);
         assertEquals("222", DiscordCopyLiveness.jumpTarget(links, onlySix, said,
                 MESSAGE, "channel:5", hooks).discordId);
-        assertNull(DiscordCopyLiveness.jumpTarget(links, DiscordChannelBindings.EMPTY,
+        assertNull(DiscordCopyLiveness.jumpTarget(links, DiscordChannelLinks.EMPTY,
                 said, MESSAGE, "channel:5", hooks));
         assertNull("a message the history no longer keeps",
                 DiscordCopyLiveness.jumpTarget(links, both, new Said(), MESSAGE,
@@ -497,13 +497,13 @@ public final class DiscordCopyLivenessTest {
     }
 
     @Test
-    public void onlyTheReadingBindingAnswersForADiscordChannel() {
-        DiscordChannelBindings bindings = bound(
+    public void onlyTheReadingLinkAnswersForADiscordChannel() {
+        DiscordChannelLinks channelLinks = bound(
                 "ooc=GAME_TO_DISCORD;channel=5;webhook=" + HOOK_A,
                 "global=DISCORD_TO_GAME;channel=6;webhook=" + HOOK_B);
-        assertNull(bindings.readerOf("5"));
-        assertEquals("global", bindings.readerOf("6").id());
-        assertNull(bindings.readerOf(""));
-        assertNull(bindings.readerOf(null));
+        assertNull(channelLinks.readerOf("5"));
+        assertEquals("global", channelLinks.readerOf("6").id());
+        assertNull(channelLinks.readerOf(""));
+        assertNull(channelLinks.readerOf(null));
     }
 }

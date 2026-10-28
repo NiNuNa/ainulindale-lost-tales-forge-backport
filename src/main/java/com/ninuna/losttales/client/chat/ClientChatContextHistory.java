@@ -22,9 +22,9 @@ import java.util.Set;
  */
 final class ClientChatContextHistory {
 
-    /** The conversations already asked about, by tab id. */
+    /** The conversations already asked about, by page id. */
     private static final Set<String> ASKED = new HashSet<String>();
-    /** The newest message seen in each conversation, by tab id. */
+    /** The newest message seen in each conversation, by page id. */
     private static final Map<String, Long> NEWEST = new HashMap<String, Long>();
 
     private ClientChatContextHistory() {}
@@ -33,37 +33,37 @@ final class ClientChatContextHistory {
      * Remembers the newest message a conversation has been shown, so a
      * later request asks only for what came after it.
      */
-    static synchronized void remember(ConversationPage tab, long messageId) {
-        if (tab == null || !ChatMessageIds.isServerId(messageId)
-                || !isScoped(tab)) {
+    static synchronized void remember(ConversationPage page, long messageId) {
+        if (page == null || !ChatMessageIds.isServerId(messageId)
+                || !isScoped(page)) {
             return;
         }
-        Long newest = NEWEST.get(tab.id());
+        Long newest = NEWEST.get(page.id());
         if (newest == null || messageId > newest.longValue()) {
-            NEWEST.put(tab.id(), Long.valueOf(messageId));
+            NEWEST.put(page.id(), Long.valueOf(messageId));
         }
     }
 
     /**
-     * Asks for the conversation the tab stands for, unless this session
+     * Asks for the conversation the page stands for, unless this session
      * already has.
      */
-    static synchronized void request(ConversationPage tab, String scopeValue) {
-        if (tab == null || !isScoped(tab) || scopeValue == null
-                || scopeValue.length() == 0 || !ASKED.add(tab.id())) {
+    static synchronized void request(ConversationPage page, String scopeValue) {
+        if (page == null || !isScoped(page) || scopeValue == null
+                || scopeValue.length() == 0 || !ASKED.add(page.id())) {
             return;
         }
-        Long newest = NEWEST.get(tab.id());
+        Long newest = NEWEST.get(page.id());
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesChatContextHistoryPacket(tab.getChannel(), scopeValue,
+                new LostTalesChatContextHistoryPacket(page.getChannel(), scopeValue,
                         newest == null ? ChatMessageIds.NONE : newest.longValue()));
     }
 
-    /** Whether the tab names one conversation of a channel that has several. */
-    private static boolean isScoped(ConversationPage tab) {
-        return tab != null && !tab.isWhisper() && tab.getChannel() != null
-                && tab.getChannel().isScoped()
-                && tab.getOwnerKey().length() > 0;
+    /** Whether the page names one conversation of a channel that has several. */
+    private static boolean isScoped(ConversationPage page) {
+        return page != null && !page.isWhisper() && page.getChannel() != null
+                && page.getChannel().isScoped()
+                && page.getOwnerKey().length() > 0;
     }
 
     /** The conversation is asked about again in the next world. */
@@ -73,11 +73,11 @@ final class ClientChatContextHistory {
     }
 
     /**
-     * The conversation the tab stands for; empty when it stands for
+     * The conversation the page stands for; empty when it stands for
      * none, which is what a request must not be made for. A scoped
-     * tab is named by its conversation, so the tab is the answer.
+     * page is named by its conversation, so the page is the answer.
      */
-    static String scopeOf(ConversationPage tab) {
-        return isScoped(tab) ? tab.getOwnerKey() : "";
+    static String scopeOf(ConversationPage page) {
+        return isScoped(page) ? page.getOwnerKey() : "";
     }
 }

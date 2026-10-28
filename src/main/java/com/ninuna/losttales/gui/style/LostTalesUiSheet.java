@@ -295,7 +295,7 @@ public enum LostTalesUiSheet {
     /**
      * The hatch laid over message rows the history does not reach: a
      * 45° line every eight texels. The pattern's period divides the
-     * cell in both directions, so whole cells meet seamlessly wherever
+     * cell in both directions, so whole cells meet without a seam wherever
      * the region is tiled with them.
      */
     EMPTY_HATCH(18, 44, 16, 16),

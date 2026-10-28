@@ -2,7 +2,7 @@ package com.ninuna.losttales.client.character;
 
 import com.ninuna.losttales.character.sync.CharacterCreationCatalog;
 
-/** Client-only copy of the server's validated character-creation options. */
+/** The choices the server offers a new character (factions, waypoints), as it last sent them. */
 public final class ClientCharacterCreationCatalogCache {
 
     private static CharacterCreationCatalog catalog;

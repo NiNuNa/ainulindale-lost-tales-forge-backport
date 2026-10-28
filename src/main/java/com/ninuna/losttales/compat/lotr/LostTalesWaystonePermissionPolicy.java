@@ -83,7 +83,10 @@ public final class LostTalesWaystonePermissionPolicy {
         return managesMarkers(player);
     }
 
-    /** Automated preset generation never overwrites a protected banner area. */
+    /**
+     * Whether a LOTR banner protects the place, so a generated waystone's
+     * house is not built there; true where the protection cannot be asked.
+     */
     public static boolean isProtectedFromWorldGeneration(
             World world, int x, int y, int z) {
         if (world == null || world.isRemote) {

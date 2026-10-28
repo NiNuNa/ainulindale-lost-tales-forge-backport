@@ -1,44 +1,17 @@
 package com.ninuna.losttales.chat.server;
 
 import com.ninuna.losttales.chat.ChatReplyReference;
-import com.ninuna.losttales.util.EnglishWords;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 
 /**
  * A quote of a line no server holds a record of reads as a message no
- * longer kept everywhere it is shown, Discord included: there it stands
- * in an author's place, with no words and no message to point at.
+ * longer kept everywhere it is shown; on Discord each linked channel
+ * words it in its own language (the bridge's {@code quoteAuthor}).
  */
 public final class LostTalesChatServiceUnkeptQuoteTest {
-
-    @Test
-    public void discordIsShownAMessageNoLongerKept() {
-        ChatReplyReference posted = LostTalesChatService.forDiscord(
-                ChatReplyReference.UNKEPT);
-        assertTrue(posted.exists());
-        assertFalse(posted.isAnchored());
-        assertFalse(posted.hasHead());
-        assertEquals("the lang line, in the server's words",
-                EnglishWords.INSTANCE.format(ChatReplyReference.UNKEPT_KEY),
-                posted.getAuthor());
-        assertEquals("", posted.getExcerpt());
-    }
-
-    @Test
-    public void everyOtherQuoteGoesToDiscordAsItIs() {
-        ChatReplyReference quote = ChatReplyReference.of(1234L, "Aldric",
-                "Well met.");
-        assertSame(quote, LostTalesChatService.forDiscord(quote));
-        assertSame(ChatReplyReference.NONE,
-                LostTalesChatService.forDiscord(ChatReplyReference.NONE));
-        assertNull(LostTalesChatService.forDiscord(null));
-    }
 
     @Test
     public void aQuoteNoLongerKeptWearsNoHeadAndIsNoAction() {

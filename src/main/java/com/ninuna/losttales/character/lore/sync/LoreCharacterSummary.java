@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.lore.sync;
 
 import java.util.UUID;
 
-/** Immutable client-safe lore-character definition and ownership projection. */
+/** One lore character as one player sees it: who it is, and whether it is free, claimed or theirs. */
 public final class LoreCharacterSummary {
 
     private final String id;

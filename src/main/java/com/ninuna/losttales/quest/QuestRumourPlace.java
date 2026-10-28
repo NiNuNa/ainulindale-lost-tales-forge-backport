@@ -4,9 +4,10 @@ import com.ninuna.losttales.mapmarker.LostTalesMapMarkerNames;
 
 /**
  * The place a rumour points to (QUEST-20), as the player's game is sent
- * it: the marker the rumour's file names, where that marker stands and
- * what it is called. The journal names it and the map pins it; nothing of
- * it is discovered until the player goes there.
+ * it: a marker, where it stands and what it is called, or a bare place
+ * with no marker (a block that gives the quest), which has no name. The
+ * journal names it and the map marks it; nothing of it is discovered until
+ * the player goes there.
  */
 public final class QuestRumourPlace {
     private final String questId;
@@ -34,9 +35,14 @@ public final class QuestRumourPlace {
         return this.questId;
     }
 
-    /** The marker standing at the place. */
+    /** The marker standing at the place; empty for a bare place. */
     public String getMarkerId() {
         return this.markerId;
+    }
+
+    /** Whether a marker stands at the place, which names it; a bare place has none. */
+    public boolean isMarker() {
+        return this.markerId.length() > 0;
     }
 
     /** The marker's own words for its name; empty for none. */
@@ -61,14 +67,25 @@ public final class QuestRumourPlace {
         return this.z;
     }
 
-    /** Whether the place stands where a map can draw it: a marker id and finite coordinates. */
+    /**
+     * Whether the place stands where a map can draw it: its quest, finite
+     * coordinates, and no name without a marker to bear it.
+     */
     public boolean isValid() {
-        return this.questId.length() > 0 && this.markerId.length() > 0
+        return this.questId.length() > 0
+                && (isMarker() || this.name.length() == 0
+                        && this.namedAfter.length() == 0)
                 && Double.isFinite(this.x) && Double.isFinite(this.z);
     }
 
-    /** The place's name as the reading side words it, as every marker's is ({@link LostTalesMapMarkerNames}). */
+    /**
+     * The marker's name as the reading side words it, as every marker's is
+     * ({@link LostTalesMapMarkerNames}); a bare place has none.
+     */
     public String shownName() {
+        if (!isMarker()) {
+            return "";
+        }
         return LostTalesMapMarkerNames.component(this.markerId, this.name,
                 this.namedAfter).getUnformattedText();
     }

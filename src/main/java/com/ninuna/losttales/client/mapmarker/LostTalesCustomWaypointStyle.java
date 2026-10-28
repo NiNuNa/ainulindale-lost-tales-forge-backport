@@ -1,6 +1,7 @@
 package com.ninuna.losttales.client.mapmarker;
 
 import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.config.server.ServerConfigChangeValidator;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import java.util.ArrayList;
@@ -157,7 +158,11 @@ public final class LostTalesCustomWaypointStyle {
         return entries;
     }
 
-    /** A note the config file round-trips safely, within its length limit. */
+    /**
+     * A note the config file round-trips safely, within its length limit.
+     * The note ends its line of the list, so a closing {@code <}, which
+     * Forge reads as a broken list, is taken off.
+     */
     static String normalizeNote(String note) {
         String trimmed = note == null ? "" : note.trim();
         if (trimmed.length() > MAX_NOTE_LENGTH) {
@@ -171,13 +176,19 @@ public final class LostTalesCustomWaypointStyle {
                 safe.append(character);
             }
         }
-        return safe.toString().trim();
+        String cleaned = safe.toString().trim();
+        while (!ServerConfigChangeValidator.staysInList(SEPARATOR + cleaned)) {
+            cleaned = cleaned.substring(0, cleaned.length() - 1).trim();
+        }
+        return cleaned;
     }
 
     /**
      * Waypoint names are compared case-insensitively and only in characters
      * the config file round-trips safely; anything else has no stored colour
-     * and simply falls back to the default.
+     * and simply falls back to the default. The name begins its line of the
+     * list, so one beginning with {@code >}, which Forge reads as the list's
+     * end, is among them.
      */
     static String normalizeKey(String waypointName) {
         String normalized = waypointName == null
@@ -192,6 +203,9 @@ public final class LostTalesCustomWaypointStyle {
                     || character == '"' || character == '\\') {
                 return "";
             }
+        }
+        if (!ServerConfigChangeValidator.staysInList(normalized + SEPARATOR)) {
+            return "";
         }
         return normalized;
     }

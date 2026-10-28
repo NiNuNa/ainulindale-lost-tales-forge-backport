@@ -9,7 +9,6 @@ import net.minecraft.world.WorldSavedData;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -17,8 +16,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Persistent server-owned collection of pending fellowship invitations, at
- * most {@link FellowshipInvitation#MAX_PER_FELLOWSHIP} open for a
+ * The invitations waiting, kept with the world: at most
+ * {@link FellowshipInvitation#MAX_PER_FELLOWSHIP} open for a
  * fellowship and {@link FellowshipInvitation#MAX_PER_TARGET_ACCOUNT}
  * waiting for one account.
  */
@@ -143,7 +142,7 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
     public synchronized Collection<FellowshipInvitation> getInvitations() {
         ArrayList<FellowshipInvitation> copy =
                 new ArrayList<FellowshipInvitation>(this.invitations.values());
-        Collections.sort(copy, INVITATION_ORDER);
+        Collections.sort(copy, FellowshipInvitationNbtCodec.INVITATION_ORDER);
         return Collections.unmodifiableList(copy);
     }
 
@@ -317,7 +316,7 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
 
         ArrayList<FellowshipInvitation> ordered =
                 new ArrayList<FellowshipInvitation>(this.invitations.values());
-        Collections.sort(ordered, INVITATION_ORDER);
+        Collections.sort(ordered, FellowshipInvitationNbtCodec.INVITATION_ORDER);
         LinkedHashSet<UUID> duplicateIds = new LinkedHashSet<UUID>();
         LinkedHashSet<FellowshipTargetKey> seenPairs =
                 new LinkedHashSet<FellowshipTargetKey>();
@@ -371,7 +370,7 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
                 }
             }
         }
-        Collections.sort(result, INVITATION_ORDER);
+        Collections.sort(result, FellowshipInvitationNbtCodec.INVITATION_ORDER);
         return Collections.unmodifiableList(result);
     }
 
@@ -439,22 +438,6 @@ public final class FellowshipInvitationWorldData extends WorldSavedData {
                             + this.unsupportedDataVersion);
         }
     }
-
-    private static final Comparator<FellowshipInvitation> INVITATION_ORDER =
-            new Comparator<FellowshipInvitation>() {
-                @Override
-                public int compare(FellowshipInvitation left,
-                                   FellowshipInvitation right) {
-                    if (left.getCreatedAt() < right.getCreatedAt()) {
-                        return -1;
-                    }
-                    if (left.getCreatedAt() > right.getCreatedAt()) {
-                        return 1;
-                    }
-                    return left.getInvitationId().toString().compareTo(
-                            right.getInvitationId().toString());
-                }
-            };
 
     private static final class FellowshipTargetKey {
         private final UUID fellowshipId;

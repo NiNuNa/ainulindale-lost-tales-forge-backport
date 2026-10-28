@@ -5,6 +5,7 @@ import com.ninuna.losttales.compat.discord.LostTalesDiscordBridge;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.LostTalesNetworkHandler;
 import com.ninuna.losttales.network.packet.LostTalesServerStatusPacket;
+import com.ninuna.losttales.util.LostTalesLangFile;
 import com.ninuna.losttales.util.LostTalesWords;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -46,9 +47,10 @@ public final class ChatServerStatus {
     private static int maxPlayers;
     private static String address = "";
     private static int ticksPerSecond;
-    /** The status in Discord's words, as it was last asked for; empty before the first look. */
-    private static List<String> parts = Collections.emptyList();
-    /** The topic's parts in Discord's words, as they were last asked for; empty before the first look. */
+    /**
+     * The topic's parts in English, as they were last looked at: what
+     * tells that the topic's words changed. Empty before the first look.
+     */
     private static List<String> topicParts = Collections.emptyList();
     /** When the server began to take players; 0 before. */
     private static long startedMillis;
@@ -97,10 +99,8 @@ public final class ChatServerStatus {
             ticksPerSecond = speed;
             LostTalesNetworkHandler.CHANNEL.sendToAll(packet());
         }
-        parts = Collections.unmodifiableList(partsOf(LostTalesWords.LANG, shown,
-                cap, named, speed, upMillis()));
-        List<String> topic = topicPartsOf(LostTalesWords.LANG, shown, cap, named,
-                speed);
+        List<String> topic = topicPartsOf(LostTalesLangFile.ENGLISH_WORDS, shown, cap,
+                named, speed);
         if (!topic.equals(topicParts)) {
             topicParts = Collections.unmodifiableList(topic);
             LostTalesDiscordBridge.getInstance().requestStatusRefresh();
@@ -125,14 +125,20 @@ public final class ChatServerStatus {
                 : Math.max(1L, System.currentTimeMillis() - startedMillis);
     }
 
-    /** The status in Discord's words, as it was last looked at; empty before the first look. */
-    public static synchronized List<String> parts() {
-        return parts;
+    /**
+     * The status in {@code words}, a linked Discord channel's, as it was
+     * last looked at, the time up as it is now; empty before the first look.
+     */
+    public static synchronized List<String> parts(LostTalesWords words) {
+        return !told ? Collections.<String>emptyList()
+                : partsOf(words, players, maxPlayers, address, ticksPerSecond,
+                        upMillis());
     }
 
-    /** The topic's parts in Discord's words, as they were last looked at; empty before the first look. */
-    public static synchronized List<String> topicParts() {
-        return topicParts;
+    /** The topic's parts in {@code words}, as they were last looked at; empty before the first look. */
+    public static synchronized List<String> topicParts(LostTalesWords words) {
+        return !told ? Collections.<String>emptyList()
+                : topicPartsOf(words, players, maxPlayers, address, ticksPerSecond);
     }
 
     /**
@@ -160,7 +166,7 @@ public final class ChatServerStatus {
 
     /**
      * The status's parts, worded from the lang file: the game's own words
-     * in each game and the server's for Discord. The players shown against
+     * in each game and a linked channel's for Discord. The players shown against
      * the cap ({@code 3/20 players}, or {@code 3 players} with none), the
      * address once one is written, the ticks a second ({@code 20 TPS}),
      * and how long the server has taken players ({@code up 2h 15m}) once
@@ -184,7 +190,7 @@ public final class ChatServerStatus {
     }
 
     /** The players shown against the cap: {@code 3/20 players}, {@code 3 players} or {@code 1 player} with none. */
-    public static String playersPart(LostTalesWords words, int players, int maxPlayers) {
+    private static String playersPart(LostTalesWords words, int players, int maxPlayers) {
         int online = Math.max(0, players);
         if (maxPlayers > 0) {
             return words.format("chat.losttales.server.status.players",
@@ -262,7 +268,6 @@ public final class ChatServerStatus {
         maxPlayers = 0;
         address = "";
         ticksPerSecond = 0;
-        parts = Collections.emptyList();
         topicParts = Collections.emptyList();
         startedMillis = 0L;
         ticks = 0;

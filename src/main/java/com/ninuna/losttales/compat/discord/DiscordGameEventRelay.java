@@ -6,7 +6,6 @@ import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.server.ChatPresenceService;
 import com.ninuna.losttales.util.LostTalesServerPlayers;
-import com.ninuna.losttales.util.LostTalesWords;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
 import java.util.Iterator;
@@ -87,7 +86,7 @@ public final class DiscordGameEventRelay {
             return;
         }
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
-        bridge.announce(DiscordServerNotices.playerJoined(LostTalesWords.LANG,
+        bridge.announce(DiscordServerNotices.playerJoined(
                 player.getCommandSenderName(),
                 DiscordAvatarUrl.forPlayer(player)),
                 takeLine(ChatSystemLineClassifier.Kind.JOIN,
@@ -110,7 +109,7 @@ public final class DiscordGameEventRelay {
         }
         EntityPlayerMP player = (EntityPlayerMP)event.player;
         LostTalesDiscordBridge bridge = LostTalesDiscordBridge.getInstance();
-        bridge.announce(DiscordServerNotices.playerLeft(LostTalesWords.LANG,
+        bridge.announce(DiscordServerNotices.playerLeft(
                 player.getCommandSenderName(),
                 DiscordAvatarUrl.forPlayer(player)),
                 takeLine(ChatSystemLineClassifier.Kind.LEAVE,

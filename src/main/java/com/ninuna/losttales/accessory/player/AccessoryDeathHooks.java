@@ -1,17 +1,38 @@
 package com.ninuna.losttales.accessory.player;
 
+import com.ninuna.losttales.config.LostTalesConfig;
+import com.ninuna.losttales.core.LostTalesClassTransformer;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 
-/** Runs inside EntityPlayer's Forge drop-capture transaction before PlayerDropsEvent. */
+/**
+ * Drops the worn ring inside a player's Forge drop capture, before
+ * {@code PlayerDropsEvent}: the coremod calls it from
+ * {@code EntityPlayer.onDeath} and from {@code EntityPlayerMP.onDeath},
+ * which a server's player runs instead (ACC-05). With {@code keepInventory},
+ * or with the server's {@code ringDropsAtDeath} off, the ring stays on.
+ */
 public final class AccessoryDeathHooks {
 
     private AccessoryDeathHooks() {}
 
+    /**
+     * Whether the server player's death drops the ring. The patch lands as
+     * {@code EntityPlayerMP} is loaded, so this loads the class first.
+     */
+    public static boolean serverDropLanded() {
+        // Naming the class loads it, and the coremod patches it as it loads.
+        Class<?> serverPlayer = EntityPlayerMP.class;
+        return serverPlayer != null && Boolean.getBoolean(
+                LostTalesClassTransformer.ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY);
+    }
+
     public static void captureAccessoryDrop(EntityPlayer player) {
         if (player == null || player.worldObj == null || player.worldObj.isRemote
                 || !player.captureDrops
+                || !LostTalesConfig.ringDropsAtDeath
                 || player.worldObj.getGameRules().getGameRuleBooleanValue(
                 "keepInventory")) {
             return;

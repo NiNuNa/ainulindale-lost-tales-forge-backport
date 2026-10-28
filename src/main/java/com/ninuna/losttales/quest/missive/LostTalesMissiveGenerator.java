@@ -25,8 +25,17 @@ public final class LostTalesMissiveGenerator {
 
     private LostTalesMissiveGenerator() {}
 
-    /** A new notice for a board, sealed by the world; null where no template is loaded or the missive is not valid. */
+    /**
+     * A new notice for a board, sealed by the world; null where the world
+     * cannot seal (its key cannot be used, which {@link MissiveSeals} logs
+     * once), where no template is loaded, or where the missive is not
+     * valid. A board posts nothing it could not seal, so no notice stands
+     * that nobody could accept.
+     */
     public static ItemStack createRandomMissiveLetter(World world, String boardKey, long worldTime, int sequence, Random random) {
+        if (MissiveSeals.keyOf(world) == null) {
+            return null;
+        }
         LostTalesMissiveData missive = createRandomMissive(world, boardKey, worldTime, sequence, random);
         if (missive == null || !missive.isValid()) {
             return null;

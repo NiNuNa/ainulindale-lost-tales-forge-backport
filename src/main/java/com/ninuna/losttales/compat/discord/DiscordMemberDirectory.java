@@ -143,7 +143,7 @@ public final class DiscordMemberDirectory implements DiscordMemberStatuses.Sourc
         clear();
         if (channelIds != null) {
             for (String id : channelIds) {
-                if (DiscordChannelBindings.isSnowflake(id)) {
+                if (DiscordChannelLinks.isSnowflake(id)) {
                     this.watched.add(id);
                 }
             }
@@ -528,7 +528,7 @@ public final class DiscordMemberDirectory implements DiscordMemberStatuses.Sourc
     private void putMember(Guild guild, JsonObject member) {
         JsonObject user = object(member, "user");
         String userId = string(user, "id");
-        if (!DiscordChannelBindings.isSnowflake(userId) || bool(user, "bot")) {
+        if (!DiscordChannelLinks.isSnowflake(userId) || bool(user, "bot")) {
             return;
         }
         // Named as their lines are named in the game: as the server shows them.

@@ -21,6 +21,8 @@ public final class ChatStatusLineTest {
         assertEquals("Brewing", ChatStatusLine.clean("Brewing"));
         // A code at the very end takes nothing with it.
         assertEquals("Tea", ChatStatusLine.clean("Tea§"));
+        // A direction mark could turn the words round; it goes too.
+        assertEquals("Out hunting", ChatStatusLine.clean("Out \u202ehunting\u2069"));
     }
 
     @Test

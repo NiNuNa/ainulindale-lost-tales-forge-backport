@@ -17,7 +17,7 @@ import net.minecraft.util.EnumChatFormatting;
  * Notices role changes the server never sees as an event. Operator status
  * is granted and revoked by {@code /op} and {@code /deop}, which fire
  * nothing a mod can subscribe to, so the role roster the chat access
- * carries — and with it the role card and the Operator tab — would
+ * carries — and with it the role card and the Operator page — would
  * stay stale until the affected player relogged. Once a minute, and on
  * the tick a command runs ({@link #checkSoon}), this compares a
  * fingerprint of the current roster against the last one that went out

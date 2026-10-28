@@ -12,7 +12,7 @@ import net.minecraft.util.IChatComponent;
  * colour past vanilla's shallow style copies, and says which chat state
  * the prefix belongs to: the closed HUD, where one feed carries every
  * channel and the prefix is what tells them apart. The open screen has
- * tabs for that, so it is skipped there.
+ * pages for that, so it is skipped there.
  *
  * <p>{@link #isHidden} is the one answer to "does this component take any
  * width right now"; every walk over a line — drawing, head placement,

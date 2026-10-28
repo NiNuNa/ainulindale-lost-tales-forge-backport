@@ -59,7 +59,7 @@ public final class ServerConfigSnapshot {
      */
     public static final Set<String> COMMAND_KEYS = Collections.unmodifiableSet(
             new HashSet<String>(Arrays.asList(
-                    LostTalesConfig.CATEGORY_DISCORD + ".channelbindings")));
+                    LostTalesConfig.CATEGORY_DISCORD + ".channellinks")));
     public static final int MAX_ENTRIES = 512;
 
     private static Set<String> excluded() {

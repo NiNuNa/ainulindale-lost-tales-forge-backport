@@ -2,14 +2,10 @@ package com.ninuna.losttales.client.chat;
 
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
-import com.ninuna.losttales.util.LostTalesCloseables;
+import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
+import com.ninuna.losttales.network.packet.LostTalesChatTypingSyncPacket;
 import com.ninuna.losttales.util.LostTalesTextFiles;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -20,41 +16,50 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The accounts this player has chosen not to hear. An ignore is keyed by
- * the Minecraft account, so no character an ignored player speaks as
- * reaches this client, and it is a per-installation preference like the
- * emoji favorites — file-backed under {@code config/}, never synchronized,
- * never cleared between worlds. The server still delivers the lines; this
- * client drops them on arrival, so ignoring is invisible to the ignored.
+ * Who this player has chosen not to hear (CHAT-61): whole accounts, or
+ * one character of an account, the account's other characters still
+ * heard. A character is kept by its id, never its name, so a rename keeps
+ * the ignore and a namesake is never hidden. Lines, typing and the dots
+ * over a head all ask here by the same ids. It is a per-installation
+ * preference like the emoji favorites — file-backed under {@code config/},
+ * never synchronized, never cleared between worlds. The server still
+ * delivers the lines; this client drops them on arrival, so ignoring is
+ * invisible to the ignored.
  *
- * <p>Beside the stored accounts the session learns names: every dropped
- * line teaches the identity it was signed with, so typing indicators —
- * which carry a name rather than an account — can be dropped too. Learned
- * names live only for the session; the file keeps accounts alone.</p>
+ * <p>A Discord member's typing names no id, only a name; every dropped
+ * line of an ignored Discord member teaches the session the name it was
+ * signed with, so that typing is dropped too. Learned names live only for
+ * the session; the file keeps ids alone.</p>
  */
 public final class ClientChatIgnores {
     /** The folder under the client's, one file per account. */
     static final String FOLDER = LostTalesConfigFiles.CHAT_IGNORES;
     /** Safety bound on stored ignores; adding past it is refused. */
     public static final int MAX_IGNORES = 256;
-    private static final Charset UTF_8 = Charset.forName("UTF-8");
+    /** What a line of the file ignoring an account begins with. */
+    private static final String ACCOUNT_LINE = "ignore";
+    /** What a line of the file ignoring one character begins with. */
+    private static final String CHARACTER_LINE = "ignore-character";
 
     private static File storeFile;
     private static final Map<UUID, String> ignoredAccounts =
             new LinkedHashMap<UUID, String>();
-    /** Lower-cased names known to belong to ignored accounts. */
+    /** Characters ignored on their own, by id: their account and the name they were last seen by. */
+    private static final Map<UUID, IgnoredCharacter> ignoredCharacters =
+            new LinkedHashMap<UUID, IgnoredCharacter>();
+    /** Lower-cased names known to belong to ignored accounts, for typing that names no id. */
     private static final Set<String> knownNames = new HashSet<String>();
-    /**
-     * Identities ignored on their own — one character of an account,
-     * the account's other characters still heard — keyed by the
-     * account id and the identity's lower-cased name, the name as it
-     * was seen kept for the file and the notices.
-     */
-    private static final Map<String, String> ignoredIdentities =
-            new LinkedHashMap<String, String>();
-    /** Lower-cased names of the ignored identities, for presence. */
-    private static final Set<String> ignoredIdentityNames =
-            new HashSet<String>();
+
+    /** One character ignored on its own. */
+    private static final class IgnoredCharacter {
+        final UUID accountId;
+        final String name;
+
+        IgnoredCharacter(UUID accountId, String name) {
+            this.accountId = accountId;
+            this.name = name == null ? "" : name.trim();
+        }
+    }
 
     private ClientChatIgnores() {}
 
@@ -72,8 +77,7 @@ public final class ClientChatIgnores {
                 : new File(new File(configDirectory, FOLDER), accountId + ".txt");
         ignoredAccounts.clear();
         knownNames.clear();
-        ignoredIdentities.clear();
-        ignoredIdentityNames.clear();
+        ignoredCharacters.clear();
         load();
     }
 
@@ -81,65 +85,72 @@ public final class ClientChatIgnores {
         return accountId != null && ignoredAccounts.containsKey(accountId);
     }
 
-    /** Whether one identity of an account is ignored on its own. */
-    public static synchronized boolean isIgnoredIdentity(UUID accountId,
-                                                         String identityName) {
-        String key = identityKey(accountId, identityName);
-        return key != null && ignoredIdentities.containsKey(key);
+    /** Whether one character is ignored on its own, by its id. */
+    public static synchronized boolean isIgnoredCharacter(UUID characterId) {
+        return characterId != null && ignoredCharacters.containsKey(characterId);
     }
 
     /**
-     * Whether the name is an identity ignored on its own — for presence,
-     * which carries a name and no account.
+     * Whether a line arriving is dropped: one said by an ignored account,
+     * or worn by an ignored character. The player's own lines, {@code
+     * localAccount}'s, are never dropped, and nor is a line that names
+     * nobody (the Narrator's, an unseen voice's).
      */
-    public static synchronized boolean isIgnoredIdentityName(String name) {
-        String key = nameKey(name);
-        return key.length() > 0 && ignoredIdentityNames.contains(key);
+    public static synchronized boolean isIgnoredLine(
+            LostTalesChatMessagePacket packet, UUID localAccount) {
+        if (packet == null || packet.getSenderId() == null
+                || packet.getSenderId().equals(localAccount)) {
+            return false;
+        }
+        return isIgnored(packet.getSenderId())
+                || isIgnoredCharacter(packet.getIdentityCharacterId());
     }
 
     /**
-     * Starts ignoring one identity of an account, the account's other
-     * identities still heard; false when the list is full. The list is
-     * one budget for accounts and identities alike.
+     * Whether a typing notice is dropped, by the same ids a line is: the
+     * typist's account or the character they type as. A notice naming no
+     * id — a Discord member's — goes by the names this session learned
+     * from that member's dropped lines; the Narrator and an unseen voice
+     * name nobody and are never dropped.
      */
-    public static synchronized boolean ignoreIdentity(UUID accountId,
-                                                      String identityName) {
-        String key = identityKey(accountId, identityName);
-        if (key == null) {
+    public static synchronized boolean isIgnoredTyping(
+            LostTalesChatTypingSyncPacket packet) {
+        if (packet == null || packet.isNarrator() || packet.isUnseen()) {
             return false;
         }
-        if (!ignoredIdentities.containsKey(key) && count() >= MAX_IGNORES) {
+        if (packet.getAccountId() != null) {
+            return isIgnored(packet.getAccountId())
+                    || isIgnoredCharacter(packet.getCharacterId());
+        }
+        return isIgnoredName(packet.getIdentityName());
+    }
+
+    /**
+     * Starts ignoring one character of an account, the account's other
+     * characters still heard; false when the list is full. The list is
+     * one budget for accounts and characters alike.
+     */
+    public static synchronized boolean ignoreCharacter(UUID accountId,
+                                                       UUID characterId,
+                                                       String name) {
+        if (accountId == null || characterId == null) {
             return false;
         }
-        ignoredIdentities.put(key, identityName.trim());
-        ignoredIdentityNames.add(nameKey(identityName));
+        if (!ignoredCharacters.containsKey(characterId) && count() >= MAX_IGNORES) {
+            return false;
+        }
+        ignoredCharacters.put(characterId, new IgnoredCharacter(accountId, name));
         save();
         return true;
     }
 
-    /** Stops ignoring one identity; false when it was not ignored. */
-    public static synchronized boolean unignoreIdentity(UUID accountId,
-                                                        String identityName) {
-        String key = identityKey(accountId, identityName);
-        if (key == null || ignoredIdentities.remove(key) == null) {
+    /** Stops ignoring one character; false when it was not ignored. */
+    public static synchronized boolean unignoreCharacter(UUID characterId) {
+        if (characterId == null || ignoredCharacters.remove(characterId) == null) {
             return false;
         }
-        rebuildIdentityNames();
         save();
         return true;
-    }
-
-    private static String identityKey(UUID accountId, String identityName) {
-        String name = nameKey(identityName);
-        return accountId == null || name.length() == 0 ? null
-                : accountId + "|" + name;
-    }
-
-    private static void rebuildIdentityNames() {
-        ignoredIdentityNames.clear();
-        for (String name : ignoredIdentities.values()) {
-            ignoredIdentityNames.add(nameKey(name));
-        }
     }
 
     /** Whether the name is known to belong to an ignored account. */
@@ -154,8 +165,7 @@ public final class ClientChatIgnores {
         if (accountId == null) {
             return false;
         }
-        if (!ignoredAccounts.containsKey(accountId)
-                && ignoredAccounts.size() >= MAX_IGNORES) {
+        if (!ignoredAccounts.containsKey(accountId) && count() >= MAX_IGNORES) {
             return false;
         }
         String name = accountName == null ? "" : accountName.trim();
@@ -181,9 +191,9 @@ public final class ClientChatIgnores {
 
     /**
      * Teaches the session a name an ignored account was seen wearing —
-     * the identity a dropped line was signed with — so presence carrying
-     * only that name can be dropped too. Nothing is learned for an
-     * account that is not ignored, and nothing learned is saved.
+     * the name a dropped line was signed with — so typing that names no
+     * id can be dropped too. Nothing is learned for an account that is
+     * not ignored, and nothing learned is saved.
      */
     public static synchronized void rememberName(UUID accountId,
                                                  String name) {
@@ -202,23 +212,26 @@ public final class ClientChatIgnores {
         rebuildKnownNames();
     }
 
-    /** Every ignore kept, accounts and identities together. */
+    /** Every ignore kept, accounts and characters together. */
     public static synchronized int count() {
-        return ignoredAccounts.size() + ignoredIdentities.size();
+        return ignoredAccounts.size() + ignoredCharacters.size();
     }
 
     /** One ignore as a list shows it. */
     public static final class Ignored {
         public final UUID accountId;
-        /** The name it goes by: the account's, or the one identity's. */
+        /** The character ignored on its own; null for the whole account. */
+        public final UUID characterId;
+        /** The name it goes by: the account's, or the character's as last seen. */
         public final String name;
-        /** Whether it is one identity of the account rather than all of it. */
+        /** Whether it is one character of the account rather than all of it. */
         public final boolean identity;
 
-        Ignored(UUID accountId, String name, boolean identity) {
+        Ignored(UUID accountId, UUID characterId, String name) {
             this.accountId = accountId;
+            this.characterId = characterId;
             this.name = name;
-            this.identity = identity;
+            this.identity = characterId != null;
         }
     }
 
@@ -226,19 +239,12 @@ public final class ClientChatIgnores {
     public static synchronized List<Ignored> ignored() {
         List<Ignored> all = new ArrayList<Ignored>(count());
         for (Map.Entry<UUID, String> account : ignoredAccounts.entrySet()) {
-            all.add(new Ignored(account.getKey(), account.getValue(), false));
+            all.add(new Ignored(account.getKey(), null, account.getValue()));
         }
-        for (Map.Entry<String, String> identity
-                : ignoredIdentities.entrySet()) {
-            String key = identity.getKey();
-            int bar = key.indexOf('|');
-            try {
-                all.add(new Ignored(UUID.fromString(key.substring(0, bar)),
-                        identity.getValue(), true));
-            } catch (RuntimeException unreadable) {
-                // Every key is made by identityKey; one that is not names
-                // nobody, and the list leaves it out.
-            }
+        for (Map.Entry<UUID, IgnoredCharacter> character
+                : ignoredCharacters.entrySet()) {
+            all.add(new Ignored(character.getValue().accountId,
+                    character.getKey(), character.getValue().name));
         }
         return all;
     }
@@ -262,48 +268,75 @@ public final class ClientChatIgnores {
         if (file == null || !file.isFile()) {
             return;
         }
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(file), UTF_8));
-            String line;
-            while ((line = reader.readLine()) != null) {
+        // Unreadable, the list starts empty.
+        List<String> lines = LostTalesTextFiles.readLines(file, 2 * MAX_IGNORES);
+        if (lines != null) {
+            for (String line : lines) {
                 parseLine(line.trim());
             }
-        } catch (IOException ignored) {
-            // Preferences are best-effort; starting empty is safe.
-        } finally {
-            LostTalesCloseables.closeQuietly(reader);
         }
         rebuildKnownNames();
     }
 
-    private static void parseLine(String line) {
+    /**
+     * One line of the file: {@code ignore <account> [name]} for an account,
+     * {@code ignore-character <account> <character> [name]} for one
+     * character, its name the rest of the line. A line that says anything
+     * else, or names no id, is dropped.
+     */
+    static void parseLine(String line) {
         String[] parts = line.split(" ");
         if (parts.length < 2 || count() >= MAX_IGNORES) {
             return;
         }
-        UUID accountId;
-        try {
-            accountId = UUID.fromString(parts[1]);
-        } catch (IllegalArgumentException ignored) {
-            // A malformed id names nobody; the line is dropped.
+        UUID accountId = idOf(parts[1]);
+        if (accountId == null) {
             return;
         }
-        if ("ignore".equals(parts[0]) && parts.length <= 3) {
+        if (ACCOUNT_LINE.equals(parts[0]) && parts.length <= 3) {
             ignoredAccounts.put(accountId, parts.length == 3 ? parts[2] : "");
-        } else if ("ignore-identity".equals(parts[0]) && parts.length >= 3) {
+        } else if (CHARACTER_LINE.equals(parts[0]) && parts.length >= 3) {
+            UUID characterId = idOf(parts[2]);
+            if (characterId == null) {
+                return;
+            }
             // A character's name may hold spaces: the rest of the line.
-            StringBuilder name = new StringBuilder(parts[2]);
+            StringBuilder name = new StringBuilder();
             for (int index = 3; index < parts.length; index++) {
-                name.append(' ').append(parts[index]);
+                if (name.length() > 0) {
+                    name.append(' ');
+                }
+                name.append(parts[index]);
             }
-            String key = identityKey(accountId, name.toString());
-            if (key != null) {
-                ignoredIdentities.put(key, name.toString().trim());
-                ignoredIdentityNames.add(nameKey(name.toString()));
-            }
+            ignoredCharacters.put(characterId,
+                    new IgnoredCharacter(accountId, name.toString()));
         }
+    }
+
+    private static UUID idOf(String text) {
+        try {
+            return UUID.fromString(text);
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
+    }
+
+    /** The file's lines, accounts first: what {@link #parseLine} reads back. */
+    static synchronized List<String> describe() {
+        List<String> lines = new ArrayList<String>(count());
+        for (Map.Entry<UUID, String> entry : ignoredAccounts.entrySet()) {
+            lines.add(ACCOUNT_LINE + " " + entry.getKey()
+                    + (entry.getValue().length() > 0
+                            ? " " + entry.getValue() : ""));
+        }
+        for (Map.Entry<UUID, IgnoredCharacter> entry
+                : ignoredCharacters.entrySet()) {
+            IgnoredCharacter character = entry.getValue();
+            lines.add(CHARACTER_LINE + " " + character.accountId + " "
+                    + entry.getKey()
+                    + (character.name.length() > 0 ? " " + character.name : ""));
+        }
+        return lines;
     }
 
     private static void save() {
@@ -311,18 +344,6 @@ public final class ClientChatIgnores {
         if (file == null) {
             return;
         }
-        List<String> lines = new ArrayList<String>(
-                ignoredAccounts.size() + ignoredIdentities.size());
-        for (Map.Entry<UUID, String> entry : ignoredAccounts.entrySet()) {
-            lines.add("ignore " + entry.getKey()
-                    + (entry.getValue().length() > 0
-                            ? " " + entry.getValue() : ""));
-        }
-        for (Map.Entry<String, String> entry : ignoredIdentities.entrySet()) {
-            lines.add("ignore-identity "
-                    + entry.getKey().substring(0, entry.getKey().indexOf('|'))
-                    + " " + entry.getValue());
-        }
-        LostTalesTextFiles.writeLines(file, lines);
+        LostTalesTextFiles.writeLines(file, describe());
     }
 }

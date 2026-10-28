@@ -5,13 +5,18 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * One server config key as an operator's client sees it: where it lives,
+ * One server config key as the Server Settings page sees it: where it lives,
  * what it holds, what it defaults to, its bounds and its words. Its name
  * and its tip are not carried: the client reads them from its own lang
  * file by the category and the key ({@code LostTalesConfigWords}), in the
  * player's language. A secret key travels without its value, as one
  * blank value while it is set and as none while it is not, and is only
  * ever written, never shown. Immutable; the value of a list is a copy.
+ *
+ * <p>A setting whose list holds more lines than a change may carry, or a
+ * value or default longer than a change may hold, is too long for the
+ * page (DATA-16): it travels without its values, stands greyed on the
+ * page and is never part of a save; it is edited in {@code server.cfg}.</p>
  */
 public final class ServerConfigEntry {
 
@@ -49,11 +54,20 @@ public final class ServerConfigEntry {
     private final String maxValue;
     private final boolean secret;
     private final List<String> validValues;
+    private final boolean tooLong;
 
     public ServerConfigEntry(String category, String key, Type type, boolean list,
                              List<String> values, List<String> defaults,
                              String minValue, String maxValue, boolean secret,
                              List<String> validValues) {
+        this(category, key, type, list, values, defaults, minValue, maxValue, secret,
+                validValues, false);
+    }
+
+    private ServerConfigEntry(String category, String key, Type type, boolean list,
+                              List<String> values, List<String> defaults,
+                              String minValue, String maxValue, boolean secret,
+                              List<String> validValues, boolean carriedWithoutValues) {
         if (category == null || category.length() == 0 || key == null
                 || key.length() == 0 || type == null) {
             throw new IllegalArgumentException("category, key and type are required");
@@ -68,6 +82,34 @@ public final class ServerConfigEntry {
         this.maxValue = maxValue == null ? "" : maxValue;
         this.secret = secret;
         this.validValues = copy(validValues);
+        this.tooLong = carriedWithoutValues || !fitsAChange(this.values)
+                || !fitsAChange(this.defaults);
+    }
+
+    /**
+     * A setting too long for the page as the page receives it: its name,
+     * kind, bounds and words, without its values (DATA-16).
+     */
+    public static ServerConfigEntry tooLongForThePage(String category, String key,
+                                                      Type type, boolean list,
+                                                      String minValue, String maxValue,
+                                                      boolean secret,
+                                                      List<String> validValues) {
+        return new ServerConfigEntry(category, key, type, list, null, null, minValue,
+                maxValue, secret, validValues, true);
+    }
+
+    /** Whether {@code values} fit one change: few enough lines, none too long. */
+    private static boolean fitsAChange(List<String> values) {
+        if (values.size() > ServerConfigChangeValidator.MAX_LIST_ITEMS) {
+            return false;
+        }
+        for (String value : values) {
+            if (value != null && value.length() > ServerConfigChangeValidator.MAX_VALUE_LENGTH) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static List<String> copy(List<String> source) {
@@ -133,5 +175,13 @@ public final class ServerConfigEntry {
 
     public List<String> getValidValues() {
         return this.validValues;
+    }
+
+    /**
+     * Whether the setting is too long for the Server Settings page: more
+     * lines, or a longer value, than a change may carry (DATA-16).
+     */
+    public boolean isTooLong() {
+        return this.tooLong;
     }
 }

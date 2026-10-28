@@ -29,8 +29,8 @@ public final class LostTalesUiFading {
      * {@code rightStrength} say (0..1, how far the words have gone past
      * that edge): the stretch at a fading edge is drawn in one-pixel
      * slices at falling opacity, so the words themselves fade rather
-     * than a wash being laid over them, and the fade is seamless over
-     * whatever surface they stand on, as a browser's cut tab name is.
+     * than a wash being laid over them, and the fade shows no edge on
+     * whatever surface they stand on, as a browser's cut tab name does.
      * The clip edges are in screen space; {@code x} and {@code fraction}
      * are in the caller's matrix, and {@code clipBottom} may be NaN.
      */
@@ -84,7 +84,7 @@ public final class LostTalesUiFading {
      * how far it has gone past that edge): the stretch at a fading edge
      * is drawn in one-pixel slices at falling opacity, so the thing
      * itself fades rather than a wash being laid over it, and the fade
-     * is seamless over whatever surface it stands on. The clip edges are
+     * shows no edge on whatever surface it stands on. The clip edges are
      * in screen space; either vertical one may be NaN.
      */
     public static void drawFading(Minecraft minecraft, double clipLeft,

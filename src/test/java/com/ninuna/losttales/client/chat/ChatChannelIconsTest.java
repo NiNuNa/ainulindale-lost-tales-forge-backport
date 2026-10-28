@@ -14,7 +14,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 /**
- * Every tab wears an emoji; conversations with players and NPCs differ.
+ * Every page wears an emoji; conversations with players and NPCs differ.
  * A server may choose a channel's emoji itself, and its choice goes with
  * the server.
  */
@@ -72,7 +72,7 @@ public final class ChatChannelIconsTest {
             assertNotNull(channel + " has no icon",
                     ChatChannelIcons.iconOf(channel));
             if (channel == ChatChannel.WHISPER) {
-                // A whisper has no plain tab: each names a partner.
+                // A whisper has no plain page: each names a partner.
                 assertNull(ConversationPage.of(channel));
                 continue;
             }

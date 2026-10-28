@@ -11,7 +11,9 @@ import com.ninuna.losttales.gui.style.LostTalesColors;
 import com.ninuna.losttales.gui.style.LostTalesUiCutName;
 import com.ninuna.losttales.gui.style.LostTalesUiInk;
 import com.ninuna.losttales.fellowship.model.FellowshipColor;
+import com.ninuna.losttales.client.fellowship.FellowshipMemberWords;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberAvailability;
+import com.ninuna.losttales.fellowship.sync.FellowshipMemberPresence;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipMemberStatusSnapshot;
 import com.ninuna.losttales.fellowship.sync.FellowshipSnapshot;
@@ -224,24 +226,28 @@ public final class LostTalesFellowshipHudRenderer {
                     Math.max(HEART_SIZE, contentRight - textX),
                     brightness);
         } else {
-            String statusText = describeUnavailableStatus(status, stale);
+            String statusText = describeUnavailableStatus(member, status, stale);
             LostTalesUiCutName.drawText(font, statusText, textX, y + 15,
                     Math.max(8, contentRight - textX),
                     statusRgb(status, stale), 255);
         }
     }
 
+    /**
+     * A member without hearts to show, in the Fellowships page's words
+     * (FEL-32): Away, as the character played instead, or Making a
+     * Character; Unavailable while neither the status nor the state says.
+     */
     private static String describeUnavailableStatus(
+            FellowshipMemberSnapshot member,
             FellowshipMemberStatusSnapshot status, boolean stale) {
         if (stale || status == null) {
             return I18n.format("gui.losttales.fellowship.hud.status_unavailable");
         }
-        FellowshipMemberAvailability availability = status.getAvailability();
-        if (availability == FellowshipMemberAvailability.OFFLINE) {
-            return I18n.format("gui.losttales.fellowship.hud.offline");
-        }
-        if (availability == FellowshipMemberAvailability.INACTIVE_CHARACTER) {
-            return I18n.format("gui.losttales.fellowship.hud.different_character");
+        FellowshipMemberPresence presence = FellowshipMemberWords.presenceOf(
+                status.getAvailability(), member.getPresence());
+        if (presence != null) {
+            return FellowshipMemberWords.of(presence, member.getElsewhereName());
         }
         return I18n.format("gui.losttales.fellowship.hud.unavailable");
     }

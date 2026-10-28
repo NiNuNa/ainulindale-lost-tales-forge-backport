@@ -43,7 +43,8 @@ import java.util.UUID;
  * identity (the account's own mask, each own character's mask, and each
  * roster holder's account mask beside the character they play, since a
  * role given to an account is worn by every character of it and one given
- * to a character by that character alone), the server's Proximity radius,
+ * to a character by that character alone), the server's three speech
+ * ranges (whisper, talk and shout, CHAT-37),
  * the icons the server puts on its channels, and the words the server
  * adds to the chat's profanity list.
  *
@@ -102,7 +103,7 @@ public final class LostTalesChatAccessPacket implements IMessage {
             + 1 + MAX_CHANNEL_IDS * (MAX_CHANNEL_ID_BYTES
                     + MAX_CHANNEL_NAME_BYTES + 4 * MAX_ENUM_NAME_BYTES + 16)
             + 4 + 2 + MAX_OWN_CHARACTERS * 20
-            + 2 + MAX_HOLDERS * 21 + 2
+            + 2 + MAX_HOLDERS * 21 + 2 + 2 + 2
             + 1 + ChatChannelIconCatalog.MAX_ICONS
                     * (MAX_CHANNEL_ID_BYTES + MAX_CHANNEL_ICON_BYTES + 4)
             + 2 + ChatProfanityWords.MAX_WORDS
@@ -166,8 +167,12 @@ public final class LostTalesChatAccessPacket implements IMessage {
     private int accountRoleMask;
     /** The roles assigned to each of the player's own characters, by id. */
     private Map<UUID, Integer> characterRoleMasks = Collections.emptyMap();
-    /** The server's Proximity radius in blocks; zero when unstated. */
+    /** The server's talk range in blocks; zero when unstated. */
     private int proximityRadius;
+    /** The server's whisper range in blocks; the talk range until stated. */
+    private int whisperRange;
+    /** The server's shout range in blocks; the talk range until stated. */
+    private int shoutRange;
     /** The icons the server puts on its channels, by channel id: the channels file's choice. */
     private Map<String, ChatChannelIconSpec> channelIcons =
             Collections.emptyMap();
@@ -226,6 +231,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
         this.characterRoleMasks = Collections.unmodifiableMap(characters);
         this.proximityRadius = Math.max(0,
                 Math.min(MAX_PROXIMITY_RADIUS, proximityRadius));
+        this.whisperRange = this.proximityRadius;
+        this.shoutRange = this.proximityRadius;
         List<String> held = new ArrayList<String>();
         if (capabilities != null) {
             for (String capability : capabilities) {
@@ -427,7 +434,10 @@ public final class LostTalesChatAccessPacket implements IMessage {
                         : null;
             }
             int radius = buffer.readUnsignedShort();
-            if (radius > MAX_PROXIMITY_RADIUS) {
+            int whisper = buffer.readUnsignedShort();
+            int shout = buffer.readUnsignedShort();
+            if (radius > MAX_PROXIMITY_RADIUS || whisper > MAX_PROXIMITY_RADIUS
+                    || shout > MAX_PROXIMITY_RADIUS) {
                 throw new LostTalesPacketCodec.DecodeException(
                         "invalid proximity radius");
             }
@@ -531,6 +541,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
                     : accountRoles & this.roleMask;
             this.characterRoleMasks = Collections.unmodifiableMap(characters);
             this.proximityRadius = radius;
+            this.whisperRange = whisper;
+            this.shoutRange = shout;
             this.roleHolders = Collections.unmodifiableList(stated);
             this.mutedSenders = Collections.unmodifiableList(muted);
             this.catalog = Collections.unmodifiableList(known.roles());
@@ -561,6 +573,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
             this.accountRoleMask = 0;
             this.characterRoleMasks = Collections.emptyMap();
             this.proximityRadius = 0;
+            this.whisperRange = 0;
+            this.shoutRange = 0;
             this.channelIcons = Collections.emptyMap();
             this.profanityWords = ChatProfanityWords.NONE;
             this.privateCommands = Collections.emptyList();
@@ -737,6 +751,8 @@ public final class LostTalesChatAccessPacket implements IMessage {
             }
         }
         buffer.writeShort(this.proximityRadius);
+        buffer.writeShort(this.whisperRange);
+        buffer.writeShort(this.shoutRange);
         // Then the icons the channels wear, by id.
         buffer.writeByte(this.channelIcons.size());
         for (Map.Entry<String, ChatChannelIconSpec> entry
@@ -870,8 +886,22 @@ public final class LostTalesChatAccessPacket implements IMessage {
     public Map<UUID, Integer> getCharacterRoleMasks() {
         return this.characterRoleMasks;
     }
-    /** The server's Proximity radius in blocks; zero when unstated. */
+    /** The server's talk range in blocks; zero when unstated. */
     public int getProximityRadius() { return this.proximityRadius; }
+    /** The server's whisper range in blocks; zero when unstated. */
+    public int getWhisperRange() { return this.whisperRange; }
+    /** The server's shout range in blocks; zero when unstated. */
+    public int getShoutRange() { return this.shoutRange; }
+
+    /**
+     * The same statement naming the whisper and shout ranges beside the
+     * talk range it was made with, each within the config's own bound.
+     */
+    public LostTalesChatAccessPacket withSpeechRanges(int whisper, int shout) {
+        this.whisperRange = Math.max(0, Math.min(MAX_PROXIMITY_RADIUS, whisper));
+        this.shoutRange = Math.max(0, Math.min(MAX_PROXIMITY_RADIUS, shout));
+        return this;
+    }
     /** The words the server adds to the chat's profanity list; none when it adds none. */
     public ChatProfanityWords getProfanityWords() { return this.profanityWords; }
     /** The icons the server puts on its channels, by id; empty when unstated. */

@@ -60,8 +60,9 @@ public final class MissiveAcceptance {
      * Starts the quest of a letter {@link #check} passed, through the
      * start gate, which checks its seal, once its notice's time is not
      * past and nobody took it before (QUEST-34): {@link
-     * MissiveBoardStateReason#ACCEPTED} once it runs, else why not. The
-     * gate says its own refusal line first.
+     * MissiveBoardStateReason#ACCEPTED} once it runs, else why not. Each
+     * refusal is said once: the gate says its own line, and the reason
+     * answered is said in the chat only where the gate said nothing.
      */
     public static MissiveBoardStateReason start(EntityPlayerMP player,
                                                 ItemStack letter) {
@@ -73,15 +74,24 @@ public final class MissiveAcceptance {
         if (refusal != null) {
             return refusal;
         }
-        QuestStartGate.StartResult result = QuestStartGate.start(player,
-                missive.getQuestId(), QuestStartProof.letter(letter));
+        return reasonFor(QuestStartGate.start(player, missive.getQuestId(),
+                QuestStartProof.letter(letter)));
+    }
+
+    /**
+     * The board's answer to what the start gate did with a letter: a
+     * reason said in the chat only for a refusal the gate kept quiet
+     * about (a letter that proves nothing, a missive the world could not
+     * record), every other refusal one the gate said already.
+     */
+    static MissiveBoardStateReason reasonFor(QuestStartGate.StartResult result) {
         switch (result) {
             case STARTED:
                 return MissiveBoardStateReason.ACCEPTED;
             case UNPROVEN:
                 return MissiveBoardStateReason.DAMAGED;
-            case UNKNOWN_QUEST:
-                return MissiveBoardStateReason.REFUSED;
+            case NOT_RECORDED:
+                return MissiveBoardStateReason.NOT_NOW;
             case ALREADY_ACTIVE:
                 return MissiveBoardStateReason.ALREADY_ACTIVE;
             case ALREADY_COMPLETED:
@@ -89,7 +99,7 @@ public final class MissiveAcceptance {
             case REQUIREMENTS_NOT_MET:
                 return MissiveBoardStateReason.REQUIREMENTS;
             default:
-                return MissiveBoardStateReason.NOT_NOW;
+                return MissiveBoardStateReason.REFUSED;
         }
     }
 }

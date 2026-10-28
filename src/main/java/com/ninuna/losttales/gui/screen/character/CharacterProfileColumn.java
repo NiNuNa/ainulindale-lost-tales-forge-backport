@@ -307,7 +307,7 @@ final class CharacterProfileColumn {
         Collection<LostTalesQuestProgress> active =
                 LostTalesClientQuestProgressStore.getActiveQuests();
         Collection<LostTalesQuestProgress> tracked =
-                LostTalesClientQuestProgressStore.getPinnedQuests();
+                LostTalesClientQuestProgressStore.getTrackedQuests();
         pair("gui.losttales.character.quests.active",
                 String.valueOf(active.size()));
         pair("gui.losttales.character.quests.tracked",

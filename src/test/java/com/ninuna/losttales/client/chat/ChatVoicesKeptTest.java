@@ -94,7 +94,7 @@ public final class ChatVoicesKeptTest {
         ClientChatIdentities.readVoice(new String[] {"voice", "p", "global", LEGOLAS.toString()});
         ClientChatIdentities.readVoice(new String[] {"voice", "p", "global", "not-an-id", "-"});
         ClientChatIdentities.readVoice(new String[] {"voice", "p", "npc:Barliman", LEGOLAS.toString(), "-"});
-        ClientChatIdentities.readVoice(new String[] {"voice", "p", "no such tab", LEGOLAS.toString(), "-"});
+        ClientChatIdentities.readVoice(new String[] {"voice", "p", "no such page", LEGOLAS.toString(), "-"});
         ClientChatIdentities.readVoice(new String[] {"voice", "p", "global", "-", "-"});
         ClientChatIdentities.readVoice(new String[] {"voice", "p", "global", LEGOLAS.toString(), "loud"});
         ClientChatIdentities.readVoice(new String[] {"voice", "", "global", LEGOLAS.toString(), "-"});
@@ -103,7 +103,7 @@ public final class ChatVoicesKeptTest {
         assertEquals(Collections.<String>emptyList(), lines);
     }
 
-    /** Leaving a place keeps its whisper tabs, even when the layout is saved right after. */
+    /** Leaving a place keeps its whisper pages, even when the layout is saved right after. */
     @Test
     public void aPlacesConversationsOutliveTheSaveAfterLeaving() {
         ChatLayout.restoreConversations("play.example.org");

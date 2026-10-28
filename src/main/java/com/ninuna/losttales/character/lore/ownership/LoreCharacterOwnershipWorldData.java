@@ -20,11 +20,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Durable one-record-per-identity ownership index.
- *
- * Mutations are synchronized and revision-checked. Corrupt or duplicate saved
- * ownership records make the entire store read-only: silently discarding one
- * could make an already-owned identity appear available and permit duplication.
+ * Who holds each lore figure, one record per figure. A claim or release
+ * checks the revision it was asked with. A record that cannot be read, or a
+ * second one for a figure or a character id, makes the whole store
+ * read-only: dropping it could show a held figure as free.
  */
 public final class LoreCharacterOwnershipWorldData extends WorldSavedData {
 

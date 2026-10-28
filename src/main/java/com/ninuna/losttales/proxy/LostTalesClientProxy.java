@@ -55,7 +55,7 @@ import com.ninuna.losttales.client.camera.ThirdPersonBlockActionHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonEntityActionHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonTargetingHooks;
 import com.ninuna.losttales.client.camera.ThirdPersonCameraRuntime;
-import com.ninuna.losttales.client.camera.ThirdPersonChargeFeedbackController;
+import com.ninuna.losttales.client.camera.ChargeFeedbackController;
 import com.ninuna.losttales.client.camera.CameraPresetFileStore;
 import com.ninuna.losttales.client.event.LostTalesClientEventHandler;
 import com.ninuna.losttales.client.gui.LostTalesMainMenuHandler;
@@ -68,9 +68,9 @@ import com.ninuna.losttales.client.fellowship.ClientFellowshipMemberStatusCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipStateCache;
 import com.ninuna.losttales.client.fellowship.ClientFellowshipTrackingCache;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestDefinitionStore;
-import com.ninuna.losttales.client.quest.LostTalesClientQuestNotificationStore;
+import com.ninuna.losttales.client.quest.LostTalesClientQuestBannerStore;
 import com.ninuna.losttales.client.quest.LostTalesClientQuestProgressStore;
-import com.ninuna.losttales.client.quest.LostTalesQuestDialogueHooks;
+import com.ninuna.losttales.client.quest.LostTalesQuestConversationHooks;
 import com.ninuna.losttales.client.render.player.LostTalesRaceAwarePlayerRenderer;
 import com.ninuna.losttales.client.render.renderer.item.LostTalesItemRendererArmor3D;
 import com.ninuna.losttales.client.render.renderer.tileentity.LostTalesTileEntityRendererLamp;
@@ -491,11 +491,11 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     public void handleQuestOffer(LostTalesQuestOfferPacket packet) {
         if (packet != null) {
             if (packet.isRumour()) {
-                LostTalesQuestDialogueHooks.rumourFrom(packet.getEntityId(),
+                LostTalesQuestConversationHooks.rumourFrom(packet.getEntityId(),
                         packet.getQuestId());
                 return;
             }
-            LostTalesQuestDialogueHooks.offerFrom(packet.getEntityId(),
+            LostTalesQuestConversationHooks.offerFrom(packet.getEntityId(),
                     packet.getQuestId());
         }
     }
@@ -511,13 +511,13 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleQuestSync(LostTalesQuestSyncPacket packet) {
         if (packet != null) {
-            LostTalesClientMapMarkerStore.setDynamicMarkers(packet.getDynamicMapMarkers());
-            LostTalesClientQuestDefinitionStore.setDynamicQuestDefinitions(packet.getDynamicQuestDefinitions());
+            LostTalesClientMapMarkerStore.setGiverMarkers(packet.getGiverMarkers());
+            LostTalesClientQuestDefinitionStore.setMissiveDefinitions(packet.getMissiveDefinitions());
             // Another character's log, after a switch, is no news.
             if (!packet.isReplacement()) {
-                LostTalesClientQuestNotificationStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getQuestHistory());
+                LostTalesClientQuestBannerStore.notifyForIncomingSync(packet.getActiveQuests(), packet.getQuestHistory());
             }
-            LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getQuestHistory(), packet.getPinnedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getPinnedMapMarkerId());
+            LostTalesClientQuestProgressStore.update(packet.getActiveQuests(), packet.getQuestHistory(), packet.getTrackedQuestIds(), packet.getDiscoveredMarkerIds(), packet.getTrackedMapMarkerId());
             LostTalesClientQuestProgressStore.setHeardRumours(packet.getHeardRumours());
             LostTalesClientQuestProgressStore.setWaitingRewards(packet.getWaitingRewards());
             LostTalesClientQuestProgressStore.setRumourPlaces(packet.getRumourPlaces());
@@ -532,7 +532,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
         }
         Collection<LostTalesQuestProgress> active =
                 LostTalesClientQuestProgressStore.withCounts(packet.getQuests());
-        LostTalesClientQuestNotificationStore.notifyForIncomingSync(active,
+        LostTalesClientQuestBannerStore.notifyForIncomingSync(active,
                 LostTalesClientQuestProgressStore.getQuestHistory());
         LostTalesClientQuestProgressStore.replaceActiveQuests(active);
     }
@@ -581,7 +581,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     @Override
     public void handleQuestFellows(LostTalesQuestFellowsPacket packet) {
         if (packet != null) {
-            com.ninuna.losttales.client.quest.ClientQuestFellows.set(packet.getCounts());
+            com.ninuna.losttales.client.quest.ClientQuestFellows.set(packet.getCounts(),
+                    packet.isShared());
         }
     }
 
@@ -624,7 +625,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void handleChargeTierSync(LostTalesChargeTierSyncPacket packet) {
-        ThirdPersonChargeFeedbackController.handle(packet);
+        ChargeFeedbackController.handle(packet);
     }
 
     @Override
@@ -828,11 +829,12 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void handleChatMessage(LostTalesChatMessagePacket packet) {
-        // A line from an ignored account is dropped before it exists
-        // anywhere on this client: no history entry, no tab, no unread,
-        // no ping, no whisper opening. The name it was signed with is
-        // learned first, so the account's typing presence can be dropped
-        // by name too. A player's own line is never dropped.
+        // A line from an ignored account or character is dropped before
+        // it exists anywhere on this client: no history entry, no tab, no
+        // unread, no ping, no whisper opening. The name it was signed
+        // with is learned first, so a Discord member's typing, which names
+        // no id, can be dropped by name too. A player's own line is never
+        // dropped.
         if (isIgnoredLine(packet)) {
             return;
         }
@@ -843,16 +845,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
     }
 
     private static boolean isIgnoredLine(LostTalesChatMessagePacket packet) {
-        if (packet == null || packet.getSenderId() == null
-                || !(ClientChatIgnores.isIgnored(packet.getSenderId())
-                        || ClientChatIgnores.isIgnoredIdentity(
-                                packet.getSenderId(),
-                                packet.getIdentityName()))) {
-            return false;
-        }
-        if (Minecraft.getMinecraft().thePlayer != null
-                && packet.getSenderId().equals(
-                        Minecraft.getMinecraft().thePlayer.getUniqueID())) {
+        if (!ClientChatIgnores.isIgnoredLine(packet,
+                Minecraft.getMinecraft().thePlayer == null ? null
+                        : Minecraft.getMinecraft().thePlayer.getUniqueID())) {
             return false;
         }
         ClientChatIgnores.rememberName(packet.getSenderId(),
@@ -903,8 +898,8 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
             ClientChatChannelState.setRoleMask(packet.getRoleMask());
             ClientChatChannelState.setRoleSplit(packet.getAccountRoleMask(),
                     packet.getCharacterRoleMasks());
-            ClientChatChannelState.setProximityRadius(
-                    packet.getProximityRadius());
+            ClientChatChannelState.setSpeechRanges(packet.getWhisperRange(),
+                    packet.getProximityRadius(), packet.getShoutRange());
             ClientChatChannelState.setChannelIcons(packet.getChannelIcons());
             ClientChatChannelState.setDiscordLinks(packet.getDiscordLinks());
             com.ninuna.losttales.client.chat.ClientChatPresence.setDiscordStatuses(
@@ -946,16 +941,9 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
 
     @Override
     public void handleChatTyping(LostTalesChatTypingSyncPacket packet) {
-        // Presence names a sender without an account, so it is dropped
-        // by the names known to belong to ignored accounts: the stored
-        // account names, plus every identity a dropped line has taught
-        // this session.
-        if (packet != null
-                && (ClientChatIgnores.isIgnoredName(packet.getPartner())
-                        || ClientChatIgnores.isIgnoredName(
-                                packet.getIdentityName())
-                        || ClientChatIgnores.isIgnoredIdentityName(
-                                packet.getIdentityName()))) {
+        // Typing is dropped by the same ids a line is: the typist's
+        // account and the character they type as (CHAT-61).
+        if (ClientChatIgnores.isIgnoredTyping(packet)) {
             return;
         }
         ClientChatTypingState.accept(packet);
@@ -984,7 +972,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
      * ones the server replays on joining, which sound no cue and are
      * filed against where this player last read the Console — one read
      * before is not unread again. An entry from before this player
-     * arrived is history: it stands in the Console, and the closed feed
+     * arrived is history: it stands in the Console, and the feed
      * passes over it.
      */
     @Override
@@ -1007,7 +995,7 @@ public class LostTalesClientProxy extends LostTalesCommonProxy {
      * — without the cues a live line earns: no sound, no echo to
      * confirm, and no speech bubble over a head that spoke before this
      * player arrived. A line said before the player arrived is history:
-     * it stands in its tab, and the closed feed, which shows what is
+     * it stands in its tab, and the feed, which shows what is
      * happening, passes over it.
      */
     @Override

@@ -1,5 +1,6 @@
 package com.ninuna.losttales.quest.missive;
 
+import com.ninuna.losttales.network.packet.LostTalesMissiveCodec;
 import com.ninuna.losttales.quest.LostTalesQuestDefinitionNbt;
 import com.ninuna.losttales.quest.LostTalesQuestIds;
 import com.ninuna.losttales.storage.NbtTags;
@@ -17,11 +18,12 @@ import net.minecraftforge.common.util.Constants;
  * its words as template ids and a target ({@link MissiveWords}), or, for a
  * letter from a server's template, its title, issuer and flavour as
  * written ({@code Written}, QUEST-42). A letter with any field out of
- * bounds reads as one that cannot be read.
+ * bounds, more objectives than its page is sent
+ * ({@link LostTalesMissiveCodec#MAX_OBJECTIVES}) or an objective that
+ * cannot be read reads as one that cannot be read.
  */
 public final class LostTalesMissiveNbt {
     public static final String TAG_MISSIVE = "LostTalesMissive";
-    public static final int MAX_OBJECTIVES = 512;
     public static final int MAX_IDENTIFIER_CHARACTERS = 256;
 
     private LostTalesMissiveNbt() {}
@@ -80,6 +82,11 @@ public final class LostTalesMissiveNbt {
         if (!isStructurallyReasonable(tag)) {
             return null;
         }
+        List<LostTalesMissiveObjectiveData> objectives = readObjectives(
+                tag.getTagList("Objectives", Constants.NBT.TAG_COMPOUND));
+        if (objectives == null) {
+            return null;
+        }
 
         LostTalesMissiveData missive = new LostTalesMissiveData(
                 tag.getString("QuestId"),
@@ -93,7 +100,7 @@ public final class LostTalesMissiveNbt {
                 tag.getLong("GenerationWorldTime"),
                 tag.getLong("TimeLimitTicks"),
                 readStringMap(tag.getTagList("GenerationContext", Constants.NBT.TAG_COMPOUND)),
-                readObjectives(tag.getTagList("Objectives", Constants.NBT.TAG_COMPOUND)),
+                objectives,
                 new LostTalesMissiveRewardData(readStringMap(tag.getTagList("Rewards", Constants.NBT.TAG_COMPOUND)))
         );
         return missive.isValid() ? missive : null;
@@ -121,7 +128,7 @@ public final class LostTalesMissiveNbt {
                 || !LostTalesQuestDefinitionNbt.isStringMapReasonable(tag, "GenerationContext")
                 || !LostTalesQuestDefinitionNbt.isStringMapReasonable(tag, "Rewards")
                 || !NbtTags.hasCompoundListWithinLimit(
-                tag, "Objectives", MAX_OBJECTIVES)) {
+                tag, "Objectives", LostTalesMissiveCodec.MAX_OBJECTIVES)) {
             return false;
         }
         NBTTagList objectives = tag.getTagList(
@@ -158,6 +165,7 @@ public final class LostTalesMissiveNbt {
         return list;
     }
 
+    /** The letter's objectives; null where one cannot be read, so the whole letter cannot. */
     private static List<LostTalesMissiveObjectiveData> readObjectives(NBTTagList list) {
         ArrayList<LostTalesMissiveObjectiveData> objectives = new ArrayList<LostTalesMissiveObjectiveData>();
         if (list == null) {
@@ -171,9 +179,10 @@ public final class LostTalesMissiveNbt {
                     objectiveTag.getBoolean("Optional"),
                     readStringMap(objectiveTag.getTagList("Params", Constants.NBT.TAG_COMPOUND))
             );
-            if (objective.isValid()) {
-                objectives.add(objective);
+            if (!objective.isValid()) {
+                return null;
             }
+            objectives.add(objective);
         }
         return objectives;
     }

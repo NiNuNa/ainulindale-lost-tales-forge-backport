@@ -28,7 +28,7 @@ import java.util.Map;
  * was read from. Every copy names its destination — the Discord channel
  * it lives in where that is known, else the webhook it went through —
  * which is how a reply finds the copy in the very channel it is being
- * posted to, and how a quote is kept from carrying words from one bound
+ * posted to, and how a quote is kept from carrying words from one linked
  * channel into another: the bridge checks the destination before asking
  * for one.</p>
  *
@@ -40,8 +40,8 @@ import java.util.Map;
  * stops or reloads keeps them, and the world save keeps them across a
  * restart through {@link DiscordMessageLinkWorldData}, without their
  * webhooks — a copy brought back names its Discord channel and the
- * binding it went through, and the bridge finds its webhook again among
- * the bindings of its message's channel. What may be done with a copy at all is
+ * link it went through, and the bridge finds its webhook again among
+ * the links of its message's channel. What may be done with a copy at all is
  * {@link DiscordCopyLiveness}'s to say; a link is never dropped because
  * its pair is unbound. Written from the server thread
  * (inbound) and the bridge's worker (outbound), so every touch is
@@ -64,29 +64,29 @@ final class DiscordMessageLinks {
         final String discordId;
         /**
          * The Discord channel the copy is in ({@code channel:<id>}); for a
-         * post made through no binding the bridge holds, the webhook it
+         * post made through no link the bridge holds, the webhook it
          * went through, which the save leaves out.
          */
         final String destination;
         /**
          * The webhook the copy was posted through; empty for a Discord
          * line, and for a copy brought back from the save, whose webhook
-         * the bridge finds again among the bindings of its message's
+         * the bridge finds again among the links of its message's
          * channel.
          */
         final String webhookUrl;
         /** The reply header the copy opened with; empty for none. */
         final String header;
-        /** The id of the binding the copy was posted through; empty for a Discord line. */
-        final String bindingId;
+        /** The id of the link the copy was posted through; empty for a Discord line. */
+        final String channelLinkId;
 
         Copy(String discordId, String destination, String webhookUrl,
-             String header, String bindingId) {
+             String header, String channelLinkId) {
             this.discordId = discordId;
             this.destination = destination == null ? "" : destination;
             this.webhookUrl = webhookUrl == null ? "" : webhookUrl;
             this.header = header == null ? "" : header;
-            this.bindingId = bindingId == null ? "" : bindingId;
+            this.channelLinkId = channelLinkId == null ? "" : channelLinkId;
         }
     }
 
@@ -104,21 +104,21 @@ final class DiscordMessageLinks {
 
     /**
      * One copy as the save keeps it. It names no webhook, since a
-     * webhook URL is a credential: the binding stands in for it.
+     * webhook URL is a credential: the link stands in for it.
      */
     static final class SavedCopy {
         final String discordId;
-        /** {@code channel:<id>}, or {@code binding:<id>} for a post whose channel Discord never named. */
+        /** {@code channel:<id>}, or {@code link:<id>} for a post whose channel Discord never named. */
         final String destination;
-        /** The binding the copy was posted through; empty for a Discord line. */
-        final String bindingId;
+        /** The link the copy was posted through; empty for a Discord line. */
+        final String channelLinkId;
         final String header;
 
-        SavedCopy(String discordId, String destination, String bindingId,
+        SavedCopy(String discordId, String destination, String channelLinkId,
                   String header) {
             this.discordId = discordId == null ? "" : discordId;
             this.destination = destination == null ? "" : destination;
-            this.bindingId = bindingId == null ? "" : bindingId;
+            this.channelLinkId = channelLinkId == null ? "" : channelLinkId;
             this.header = header == null ? "" : header;
         }
     }
@@ -154,12 +154,12 @@ final class DiscordMessageLinks {
     }
 
     /**
-     * The same, naming the binding a post went through as well: what
+     * The same, naming the link a post went through as well: what
      * the save keeps of the copy in place of its webhook.
      */
     synchronized void link(long messageId, String discordId, String header,
                            String destination, String webhookUrl,
-                           String bindingId) {
+                           String channelLinkId) {
         if (!ChatMessageIds.isServerId(messageId) || discordId == null
                 || discordId.length() == 0) {
             return;
@@ -170,7 +170,7 @@ final class DiscordMessageLinks {
             copies = new ArrayList<Copy>(2);
         }
         Copy replacement = new Copy(discordId, destination, webhookUrl, header,
-                bindingId);
+                channelLinkId);
         for (Iterator<Copy> held = copies.iterator(); held.hasNext();) {
             Copy copy = held.next();
             if (copy.destination.equals(replacement.destination)) {
@@ -260,7 +260,7 @@ final class DiscordMessageLinks {
             for (Copy copy : entry.getValue()) {
                 if (copy.destination.startsWith(DiscordMessageLinkNbtCodec.CHANNEL_PREFIX)) {
                     copies.add(new SavedCopy(copy.discordId, copy.destination,
-                            copy.bindingId, copy.header));
+                            copy.channelLinkId, copy.header));
                 }
             }
             if (!copies.isEmpty()) {
@@ -303,7 +303,7 @@ final class DiscordMessageLinks {
                     continue;
                 }
                 copies.add(new Copy(copy.discordId, copy.destination, "",
-                        copy.header, copy.bindingId));
+                        copy.header, copy.channelLinkId));
                 this.messageIdByDiscord.put(copy.discordId, key);
             }
             if (!copies.isEmpty()) {
@@ -335,7 +335,7 @@ final class DiscordMessageLinks {
         }
         for (List<Copy> copies : this.copiesByMessage.values()) {
             for (Copy copy : copies) {
-                if (copy.bindingId.length() == 0 && copy.webhookUrl.length() == 0
+                if (copy.channelLinkId.length() == 0 && copy.webhookUrl.length() == 0
                         && copy.destination.equals(destination)) {
                     ids.add(copy.discordId);
                 }

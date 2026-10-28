@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
  * per font pixel and is as tall as the text it is drawn in, and each
  * stands on the line a message's words stand on, so the room a row gains
  * or gives back is above it. Which step each kind of row takes is the
- * config's, asked apart for the open window and the closed feed: the
+ * config's, asked apart for the open window and the feed: the
  * window shows the speaker a step up, and the feed shows the voice plain
  * and takes what it says a step down. A row is laid out against the room
  * its own size leaves it, and a message's stamp is centred in the rows of

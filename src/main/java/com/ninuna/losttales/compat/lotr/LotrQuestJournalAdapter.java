@@ -17,13 +17,13 @@ import net.minecraft.entity.player.EntityPlayer;
 public final class LotrQuestJournalAdapter {
     private LotrQuestJournalAdapter() {}
 
-    public static boolean pin(EntityPlayer player, String reference,
+    public static boolean track(EntityPlayer player, String reference,
             LostTalesQuestPlayerData lostTalesData) {
         LOTRMiniQuest quest = findActive(player, reference);
         if (quest == null || lostTalesData == null) {
             return false;
         }
-        boolean changed = lostTalesData.pinQuestReference(reference);
+        boolean changed = lostTalesData.trackQuestReference(reference);
         LOTRPlayerData lotrData = LOTRLevelData.getData(player);
         if (lotrData != null) {
             lotrData.setTrackingMiniQuest(quest);
@@ -31,12 +31,12 @@ public final class LotrQuestJournalAdapter {
         return changed;
     }
 
-    public static boolean unpin(EntityPlayer player, String reference,
+    public static boolean untrack(EntityPlayer player, String reference,
             LostTalesQuestPlayerData lostTalesData) {
         if (lostTalesData == null || !LotrQuestReference.isLotrQuest(reference)) {
             return false;
         }
-        boolean changed = lostTalesData.unpinQuestId(reference);
+        boolean changed = lostTalesData.untrackQuestId(reference);
         LOTRPlayerData lotrData = LOTRLevelData.getData(player);
         UUID questId = LotrQuestReference.parse(reference);
         LOTRMiniQuest tracked = lotrData == null
@@ -54,11 +54,11 @@ public final class LotrQuestJournalAdapter {
             return false;
         }
         boolean changed = false;
-        Set<String> references = lostTalesData.getPinnedQuestIds();
+        Set<String> references = lostTalesData.getTrackedQuestIds();
         for (String reference : references) {
             if (LotrQuestReference.isLotrQuest(reference)
                     && findActive(player, reference) == null) {
-                changed |= lostTalesData.unpinQuestId(reference);
+                changed |= lostTalesData.untrackQuestId(reference);
             }
         }
         return changed;
@@ -118,7 +118,7 @@ public final class LotrQuestJournalAdapter {
     private static void remove(EntityPlayer player, LOTRMiniQuest quest,
             boolean completedList, String reference,
             LostTalesQuestPlayerData lostTalesData) {
-        unpin(player, reference, lostTalesData);
+         untrack(player, reference, lostTalesData);
         LOTRLevelData.getData(player).removeMiniQuest(quest, completedList);
     }
 

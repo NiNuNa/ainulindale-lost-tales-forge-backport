@@ -21,7 +21,11 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.event.entity.EntityEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
-/** Registers, copies, and syncs the Forge 1.7.10 player quest data container. */
+/**
+ * Attaches the quest log to each player, copies it across death, sends it
+ * on login, respawn and change of world, and forgets a player's quest state
+ * as they leave.
+ */
 public final class LostTalesQuestPlayerEventHandler {
     private static final int FELLOWSHIP_SYNC_INTERVAL_TICKS = 100;
     private final Map<UUID, Set<UUID>> fellowshipIdsByPlayer =

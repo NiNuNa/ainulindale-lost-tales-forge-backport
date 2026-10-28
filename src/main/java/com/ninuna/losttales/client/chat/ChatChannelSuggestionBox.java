@@ -15,7 +15,7 @@ import net.minecraft.client.gui.FontRenderer;
  * prefix names, each with its icon and its {@code #Name} in its own
  * colour, exactly as the emoji and mention lists open on {@code :}
  * and {@code @}. Picking one writes the channel's code name into the
- * message ({@code #gondor} for the Faction tab read as Gondor), which
+ * message ({@code #gondor} for the Faction page read as Gondor), which
  * is drawn as a link to the channel.
  */
 final class ChatChannelSuggestionBox extends ChatSuggestionBox {
@@ -124,7 +124,7 @@ final class ChatChannelSuggestionBox extends ChatSuggestionBox {
         }
     }
 
-    /** What a row reads: the channel's shown name behind the hash, a faction's for the Faction tab. */
+    /** What a row reads: the channel's shown name behind the hash, a faction's for the Faction page. */
     static String label(ChatChannel channel) {
         return "#" + ClientChatChannelState.displayName(channel);
     }

@@ -39,7 +39,7 @@ public final class LostTalesQuestWordsTest {
     private static final String PREFIX = "quest.losttales.tutorial.meet_nia";
     private static final List<String> GERMAN_KEYS = Arrays.asList(
             PREFIX + ".title", PREFIX + ".objective.gather_sticks",
-            PREFIX + ".journal.10", PREFIX + ".dialogue.offer");
+            PREFIX + ".journal.10", PREFIX + ".conversation.offer");
 
     @BeforeClass
     public static void readInEnglish() {
@@ -67,8 +67,8 @@ public final class LostTalesQuestWordsTest {
                 LostTalesQuestWords.objectiveKey(NIA, "gather_sticks"));
         assertEquals(PREFIX + ".journal.20",
                 LostTalesQuestWords.journalKey(NIA, "20"));
-        assertEquals(PREFIX + ".dialogue.handIn",
-                LostTalesQuestWords.dialogueKey(NIA, "handIn"));
+        assertEquals(PREFIX + ".conversation.handIn",
+                LostTalesQuestWords.conversationKey(NIA, "handIn"));
         assertEquals("quest.losttales.path.survivalist.first_sparks.title",
                 LostTalesQuestWords.titleKey(
                         "losttales:path/survivalist/first_sparks"));
@@ -104,9 +104,9 @@ public final class LostTalesQuestWordsTest {
                         LostTalesQuestWords.journalKey(id, line.getKey())),
                         line.getValue());
             }
-            for (Map.Entry<String, String> line : quest.getDialogue().entrySet()) {
+            for (Map.Entry<String, String> line : quest.getConversation().entrySet()) {
                 assertEquals(EnglishWords.INSTANCE.format(
-                        LostTalesQuestWords.dialogueKey(id, line.getKey())),
+                        LostTalesQuestWords.conversationKey(id, line.getKey())),
                         line.getValue());
             }
         }
@@ -164,7 +164,7 @@ public final class LostTalesQuestWordsTest {
                 open(BundledQuestFiles.INDEX_FILE))) {
             JsonObject quest = new JsonParser().parse(open(file)).getAsJsonObject();
             for (String field : new String[] {"title", "description",
-                    "journalLog", "dialogue"}) {
+                    "journalLog", "conversation"}) {
                 assertFalse(file + " writes " + field, quest.has(field));
             }
             for (JsonElement stage : quest.getAsJsonArray("stages")) {
@@ -186,7 +186,7 @@ public final class LostTalesQuestWordsTest {
         inject(PREFIX + ".title=Ein Gespräch mit Nia\n"
                 + PREFIX + ".objective.gather_sticks=Bringe Nia 4 Stöcke.\n"
                 + PREFIX + ".journal.10=Nia bat mich um ein paar Stöcke.\n"
-                + PREFIX + ".dialogue.offer=Der Sturm hat meinen Dachbalken gebrochen.\n");
+                + PREFIX + ".conversation.offer=Der Sturm hat meinen Dachbalken gebrochen.\n");
         LostTalesQuestDefinition quest = nia();
         assertEquals("Ein Gespräch mit Nia", LostTalesQuestWords.title(quest));
         assertEquals("Bringe Nia 4 Stöcke.", LostTalesQuestObjectiveTextHelper
@@ -195,9 +195,9 @@ public final class LostTalesQuestWordsTest {
                 LostTalesQuestWords.journalParagraphs(quest,
                         Arrays.asList("10"), false));
         assertEquals("Der Sturm hat meinen Dachbalken gebrochen.",
-                LostTalesQuestDialogue.of(quest).line(LostTalesQuestDialogue.OFFER));
+                LostTalesQuestConversation.of(quest).line(LostTalesQuestConversation.OFFER));
         assertTrue("the offer still makes it a conversation",
-                LostTalesQuestDialogue.of(quest).isOffered());
+                LostTalesQuestConversation.of(quest).isOffered());
     }
 
     /** In English a bundled quest reads word for word as its English lines say. */
@@ -212,8 +212,8 @@ public final class LostTalesQuestWordsTest {
                 "I gathered the sticks Nia requested and should hand them over."),
                 LostTalesQuestWords.journalParagraphs(quest,
                         Arrays.asList("10", "20"), false));
-        assertEquals("Take care, Nia.", LostTalesQuestDialogue.of(quest)
-                .line(LostTalesQuestDialogue.LEAVE));
+        assertEquals("Take care, Nia.", LostTalesQuestConversation.of(quest)
+                .line(LostTalesQuestConversation.LEAVE));
     }
 
     /** What an operator wrote is theirs: no key is ever made from their quest's id. */

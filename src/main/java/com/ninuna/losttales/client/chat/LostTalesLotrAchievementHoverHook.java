@@ -16,7 +16,7 @@ import net.minecraft.client.gui.GuiScreen;
  * lines never met the palette every other card in the chat is drawn
  * in. The coremod puts a call to {@link #drawLines} at the head of
  * that routine: the same lines, drawn by
- * {@link LostTalesChatHoverCard#drawTextCard}, which maps every colour
+ * {@link LostTalesChatCard#drawTextCard}, which maps every colour
  * code onto the palette exactly as the cards for vanilla achievements
  * and text components are. The hook answers whether it drew; when it
  * did not, LOTR's own drawing runs as before, so a failure here costs
@@ -45,7 +45,7 @@ public final class LostTalesLotrAchievementHoverHook {
             for (Object line : lines) {
                 text.add(line == null ? "" : line.toString());
             }
-            LostTalesChatHoverCard.drawTextCard(minecraft, text, mouseX,
+            LostTalesChatCard.drawTextCard(minecraft, text, mouseX,
                     mouseY, screen.width, screen.height);
             return true;
         } catch (RuntimeException failed) {

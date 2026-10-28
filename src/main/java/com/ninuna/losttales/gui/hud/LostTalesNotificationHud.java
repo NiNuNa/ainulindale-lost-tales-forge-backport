@@ -4,16 +4,14 @@ import com.ninuna.losttales.config.LostTalesConfig;
 
 /**
  * The one place on the screen where passing notices appear: quest
- * banners, location discoveries and area names. One slot, placed once in
- * the HUD editor, rather than a position per kind of notice.
+ * banners, location discoveries and area names, in one slot placed on
+ * the HUD Placement page.
  *
  * <p>Within a frame each notice claims a strip of the slot, top down, in
  * the order it is drawn, so two notices shown at once stack under each
- * other instead of landing on the same pixels. The frame is begun once
- * before the HUD is drawn; a renderer that forgets to claim draws over
- * whatever else is there, which is what claiming exists to avoid.</p>
+ * other. The frame begins once before the HUD is drawn.</p>
  *
- * <p>The slot's box is the footprint the editor shows and what its two
+ * <p>The slot's box is the footprint the page shows and what its two
  * numbers place ({@link HudPlacementLayout}): wide enough for the widest
  * notice, tall enough for a discovery and one banner. More than that
  * spills below it.</p>

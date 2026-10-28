@@ -28,9 +28,9 @@ public final class ConversationPageTest {
     }
 
     /**
-     * A channel a server defines has a tab like any other. The set of
+     * A channel a server defines has a page like any other. The set of
      * channels is open and they are registered long after this class is
-     * first read, so a tab made once for each channel up front would
+     * first read, so a page made once for each channel up front would
      * leave every server-defined one with none at all.
      */
     @Test
@@ -40,15 +40,15 @@ public final class ConversationPageTest {
         ChatChannel trade = ChatChannel.fromId("trade");
         assertNotNull(trade);
 
-        ConversationPage tab = ConversationPage.of(trade);
-        assertNotNull("a server's own channel is a tab like any other", tab);
-        assertEquals("trade", tab.id());
-        assertSame(tab, ConversationPage.of(trade));
-        assertEquals(tab, ConversationPage.fromId("trade"));
+        ConversationPage page = ConversationPage.of(trade);
+        assertNotNull("a server's own channel is a page like any other", page);
+        assertEquals("trade", page.id());
+        assertSame(page, ConversationPage.of(trade));
+        assertEquals(page, ConversationPage.fromId("trade"));
         // It starts as every channel does: chiming for mentions alone,
         // every line in the feed.
-        assertEquals(ChatLineChoice.ONLY_MENTIONS, ChatLayout.notification(tab));
-        assertEquals(ChatLineChoice.EVERYTHING, ChatLayout.feedChoice(tab));
+        assertEquals(ChatLineChoice.ONLY_MENTIONS, ChatLayout.notification(page));
+        assertEquals(ChatLineChoice.EVERYTHING, ChatLayout.feedChoice(page));
     }
 
     /**
@@ -101,11 +101,11 @@ public final class ConversationPageTest {
     /**
      * The registry hands out a new object for a channel every time it is
      * filled, and an access broadcast fills it on every login, logout,
-     * mute and role change. A tab has to survive that, or a window's
-     * tabs and its choices all quietly stop matching.
+     * mute and role change. A page has to survive that, or a window's
+     * pages and its choices all quietly stop matching.
      */
     @Test
-    public void aTabSurvivesItsChannelBeingRegisteredAgain() {
+    public void aPageSurvivesItsChannelBeingRegisteredAgain() {
         ChatChannel.installDefined(java.util.Collections.singletonList(
                 tradeDescriptor()), null);
         ConversationPage before = ConversationPage.of(ChatChannel.fromId("trade"));
@@ -114,7 +114,7 @@ public final class ConversationPageTest {
                 tradeDescriptor()), null);
         ConversationPage after = ConversationPage.of(ChatChannel.fromId("trade"));
 
-        assertEquals("the same tab, whichever object names the channel",
+        assertEquals("the same page, whichever object names the channel",
                 before, after);
         assertEquals(before.hashCode(), after.hashCode());
     }
@@ -129,7 +129,7 @@ public final class ConversationPageTest {
     }
 
     @Test
-    public void plainTabsAreSharedAndWhispersCompareByPartner() {
+    public void plainPagesAreSharedAndWhispersCompareByPartner() {
         assertSame(ConversationPage.of(ChatChannel.OOC), ConversationPage.of(ChatChannel.OOC));
         assertFalse(ConversationPage.of(ChatChannel.OOC).isWhisper());
         assertEquals("ooc", ConversationPage.of(ChatChannel.OOC).id());
@@ -169,8 +169,8 @@ public final class ConversationPageTest {
         ConversationPage steve = ChatLayout.openWhisper("Steve", "", "w2");
         assertNotNull(steve);
         assertTrue(WindowLayout.window("w2").contains(steve));
-        // Opened again, the same tab with its original casing, wherever
-        // it was asked for; the front tab is left alone.
+        // Opened again, the same page with its original casing, wherever
+        // it was asked for; the front page is left alone.
         ConversationPage again = ChatLayout.openWhisper("steve", "", "w1");
         assertEquals(steve, again);
         assertEquals("Steve", again.getPartner());
@@ -184,7 +184,7 @@ public final class ConversationPageTest {
         ConversationPage alex = ChatLayout.openWhisper("Alex", "", "w1");
         assertFalse(WindowLayout.window("w1").contains(alex));
         assertTrue(WindowLayout.window("w2").contains(alex));
-        // Whispers cycle like any tab and never count as closed channels.
+        // Whispers cycle like any page and never count as closed channels.
         ClientChatChannelState.select(steve);
         assertEquals(steve, ClientChatChannelState.getSelected());
         assertTrue(ChatLayout.closedChannels().isEmpty());
@@ -192,8 +192,8 @@ public final class ConversationPageTest {
         assertTrue(ChatLayout.closedChannels().isEmpty());
         assertFalse(ChatLayout.isOpen(steve));
         assertNull(ChatLayout.openWhisper("", "", "w2"));
-        // A conversation's tab is not a window's: no window line names
-        // it, and an older file's whisper tab is dropped on load. Its
+        // A conversation's page is not a window's: no window line names
+        // it, and an older file's whisper page is dropped on load. Its
         // The notification choice is kept, on a line of its own; an NPC
         // conversation's never is.
         ChatLayout.setNotification(alex, ChatLineChoice.NOTHING);
@@ -230,8 +230,8 @@ public final class ConversationPageTest {
     private static int countWhispers() {
         int count = 0;
         for (WindowPage each : WindowLayout.order()) {
-            ConversationPage tab = ConversationPage.from(each);
-            if (tab != null && tab.isWhisper()) {
+            ConversationPage page = ConversationPage.from(each);
+            if (page != null && page.isWhisper()) {
                 count++;
             }
         }
@@ -274,7 +274,7 @@ public final class ConversationPageTest {
     /**
      * What this player says as one character is that character's
      * conversation: held as another identity, the same partner is
-     * another tab, and the key survives the id.
+     * another page, and the key survives the id.
      */
     @Test
     public void eachOwnIdentityHoldsItsOwnConversations() {

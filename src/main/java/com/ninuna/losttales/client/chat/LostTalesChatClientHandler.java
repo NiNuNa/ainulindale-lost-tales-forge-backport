@@ -80,7 +80,7 @@ public final class LostTalesChatClientHandler {
      * Files every incoming vanilla or third-party line under a channel —
      * Global for what the whole server sees, the console for the rest —
      * and prints it with the channel prefix, a timestamp and a tracked
-     * line id, so the feed and the tabs treat it like any other line.
+     * line id, so the feed and the pages treat it like any other line.
      * Runs last so every other mod has had its say on the component.
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -148,7 +148,7 @@ public final class LostTalesChatClientHandler {
      * already filed by the time the tick runs, so only genuinely stray
      * lines match. A stray printed under a deletable id of its own is
      * left as it is — its printer may still replace it by that id — and
-     * only brings the console tab back.
+     * only brings the console page back.
      */
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
@@ -181,7 +181,7 @@ public final class LostTalesChatClientHandler {
                 if (line == previous) {
                     break;
                 }
-                if (line != null && ClientChatChannelViews.tabOf(
+                if (line != null && ClientChatChannelViews.pageOf(
                         line.getChatLineID()) == null) {
                     adopted |= LostTalesChatPresentation.adoptStrayLine(
                             messages, index);

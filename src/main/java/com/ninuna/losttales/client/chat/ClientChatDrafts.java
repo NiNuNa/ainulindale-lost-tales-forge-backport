@@ -66,17 +66,17 @@ public final class ClientChatDrafts {
     }
 
     /** The conversation's unsent text on that server; empty when it has none. */
-    static synchronized String get(String serverKey, ConversationPage tab) {
-        String value = tab == null ? null : DRAFTS.get(key(serverKey, tab));
+    static synchronized String get(String serverKey, ConversationPage page) {
+        String value = page == null ? null : DRAFTS.get(key(serverKey, page));
         return value == null ? "" : value;
     }
 
     /** Remembers the conversation's unsent text on that server; empty text forgets it. */
-    static synchronized void set(String serverKey, ConversationPage tab, String text) {
-        if (tab == null) {
+    static synchronized void set(String serverKey, ConversationPage page, String text) {
+        if (page == null) {
             return;
         }
-        String key = key(serverKey, tab);
+        String key = key(serverKey, page);
         String value = text == null ? "" : text;
         String held = DRAFTS.get(key);
         if (value.equals(held == null ? "" : held)) {
@@ -173,14 +173,14 @@ public final class ClientChatDrafts {
     }
 
     /** A server key that holds the separator names no place. */
-    private static String key(String serverKey, ConversationPage tab) {
+    private static String key(String serverKey, ConversationPage page) {
         String server = serverKey == null
                 || serverKey.indexOf(SEPARATOR) >= 0 ? "" : serverKey;
-        return server + SEPARATOR + tab.id().toLowerCase(Locale.ROOT)
+        return server + SEPARATOR + page.id().toLowerCase(Locale.ROOT)
                 .replace(SEPARATOR, ' ');
     }
 
-    /** The text on one line: its breaks, tabs and backslashes written out. */
+    /** The text on one line: its breaks, pages and backslashes written out. */
     private static String escaped(String text) {
         StringBuilder line = new StringBuilder(text.length() + 8);
         for (int index = 0; index < text.length(); index++) {

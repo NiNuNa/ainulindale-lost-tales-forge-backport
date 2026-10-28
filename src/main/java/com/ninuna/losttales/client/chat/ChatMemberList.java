@@ -85,7 +85,7 @@ import org.lwjgl.opengl.GL11;
  * while the words give it their room. Its left edge is a handle: dragged,
  * the list grows to a third of the window or narrows to its heads alone,
  * and a name its row cuts short slides along while the pointer rests on
- * it, as a tab's does. A window made narrower narrows its list with it,
+ * it, as a page's does. A window made narrower narrows its list with it,
  * so the words keep {@link #MIN_MESSAGE_WIDTH} beside it, down to the
  * heads alone; the list never leaves by itself.</p>
  */
@@ -182,9 +182,9 @@ public final class ChatMemberList {
         /** How far the rested-on row's name and title have slid, in the list's units. */
         float nameSlide;
         float titleSlide;
-        /** The answer and the tab the rows were laid out for; they are laid out again for others. */
+        /** The answer and the page the rows were laid out for; they are laid out again for others. */
         ClientChatMembers.Answer laidFor;
-        ConversationPage laidTab;
+        ConversationPage laidPage;
         /** How far the list is scrolled, in the chat's pixels, as drawn. */
         float scroll;
         /** Where the scroll is heading. */
@@ -274,19 +274,19 @@ public final class ChatMemberList {
             };
 
     /**
-     * The members a tab's list shows: the server's answer, and those the
+     * The members a page's list shows: the server's answer, and those the
      * server knows nothing of — in a conversation with an NPC the NPC, and
      * in the Console the Client, this computer's own voice there —
      * in the order the list keeps, its factions by the names this game
      * gives them.
      */
-    static List<LostTalesChatMembersPacket.Member> membersOf(ConversationPage tab,
+    static List<LostTalesChatMembersPacket.Member> membersOf(ConversationPage page,
             List<LostTalesChatMembersPacket.Member> answered) {
         List<LostTalesChatMembersPacket.Member> members =
                 new ArrayList<LostTalesChatMembersPacket.Member>(answered);
-        boolean console = tab != null && tab.getChannel() == ChatChannel.CLIENT_CONSOLE;
-        if (tab != null && (tab.isNpc() || console)) {
-            members.add(console ? clientMember() : npcOf(tab, answered));
+        boolean console = page != null && page.getChannel() == ChatChannel.CONSOLE;
+        if (page != null && (page.isNpc() || console)) {
+            members.add(console ? clientMember() : npcOf(page, answered));
         }
         Collections.sort(members, LostTalesChatMembersPacket.order(GROUP_NAMES));
         return members;
@@ -294,7 +294,7 @@ public final class ChatMemberList {
 
     /** The Client as the Console's list shows it: here, in the consoles' colour, with no status. */
     static LostTalesChatMembersPacket.Member clientMember() {
-        int color = ChatChannel.CLIENT_CONSOLE.getDisplayColor();
+        int color = ChatChannel.CONSOLE.getDisplayColor();
         return new LostTalesChatMembersPacket.Member(
                 LostTalesChatMessagePacket.CLIENT_SENDER_ID, "", null,
                 ChatNames.client(LostTalesWords.LANG),
@@ -308,11 +308,11 @@ public final class ChatMemberList {
      * game already calls by that name, so the two stand under one heading
      * — or the plain one where no faction was captured.
      */
-    static LostTalesChatMembersPacket.Member npcOf(ConversationPage tab,
+    static LostTalesChatMembersPacket.Member npcOf(ConversationPage page,
             List<LostTalesChatMembersPacket.Member> answered) {
-        UUID id = ChatChannelIcons.npcId(tab);
+        UUID id = ChatChannelIcons.npcId(page);
         if (id == null) {
-            id = UUID.nameUUIDFromBytes(("npc:" + tab.getPartnerIdentity())
+            id = UUID.nameUUIDFromBytes(("npc:" + page.getPartnerIdentity())
                     .getBytes(UTF_8));
         }
         String faction = ChatChannelIcons.npcFaction(id);
@@ -331,9 +331,9 @@ public final class ChatMemberList {
                 }
             }
         }
-        return LostTalesChatMembersPacket.Member.npc(id, tab.getPartnerIdentity(),
-                ClientChatChannelState.displayColor(tab),
-                ChatChannelIcons.npcPortrait(tab), groupKey, groupName,
+        return LostTalesChatMembersPacket.Member.npc(id, page.getPartnerIdentity(),
+                ClientChatChannelState.displayColor(page),
+                ChatChannelIcons.npcPortrait(page), groupKey, groupName,
                 groupOrder);
     }
 
@@ -594,17 +594,17 @@ public final class ChatMemberList {
             state.clearDrawn();
             return;
         }
-        ConversationPage tab = frame.view;
-        ClientChatMembers.requestIfDue(tab);
-        ClientChatMembers.Answer answer = ClientChatMembers.of(tab);
+        ConversationPage page = frame.view;
+        ClientChatMembers.requestIfDue(page);
+        ClientChatMembers.Answer answer = ClientChatMembers.of(page);
         if (answer == null) {
             state.rows = Collections.emptyList();
             state.laidFor = null;
-            state.laidTab = null;
-        } else if (state.laidFor != answer || !tab.equals(state.laidTab)) {
-            state.rows = layOut(membersOf(tab, answer.members), answer.unlisted);
+            state.laidPage = null;
+        } else if (state.laidFor != answer || !page.equals(state.laidPage)) {
+            state.rows = layOut(membersOf(page, answer.members), answer.unlisted);
             state.laidFor = answer;
-            state.laidTab = tab;
+            state.laidPage = page;
         }
         float unit = unit();
         state.contentHeight = heightOf(state.rows) * unit;
@@ -660,7 +660,7 @@ public final class ChatMemberList {
                     continue;
                 }
                 if (row.member == null) {
-                    drawHeading(minecraft, font, tab, row, rowsLeft, rowTop,
+                    drawHeading(minecraft, font, page, row, rowsLeft, rowTop,
                             unit, roomRight, rowsOriginX, scale,
                             state.screenRight, clipTop, clipBottom, alpha);
                     continue;
@@ -719,12 +719,12 @@ public final class ChatMemberList {
      * A heading, or the line counting the absent left out: the chat's
      * small text in its aside tone, its capitals centred in the row, the
      * odd pixel up, sinking into the list's edge where it is cut. A
-     * heading stands behind its group's icon, as a tab's name stands
-     * behind the tab's. Nothing of it shows past {@code listRight}, the
+     * heading stands behind its group's icon, as a page's name stands
+     * behind the page's. Nothing of it shows past {@code listRight}, the
      * window's edge on screen.
      */
     private static void drawHeading(Minecraft minecraft, FontRenderer font,
-                                    ConversationPage tab, Row row, float rowsLeft,
+                                    ConversationPage page, Row row, float rowsLeft,
                                     float rowTop, float unit, float roomRight,
                                     float rowsOriginX, float scale,
                                     float listRight, float clipTop,
@@ -741,7 +741,7 @@ public final class ChatMemberList {
                         textTop, alpha);
                 textLeft += HEADING_ICON_SIZE + HEADING_ICON_GAP;
             } else if (row.groupOf != null) {
-                drawHeadingIcon(minecraft, tab, row.groupOf, INSET, textTop,
+                drawHeadingIcon(minecraft, page, row.groupOf, INSET, textTop,
                         alpha);
                 textLeft += HEADING_ICON_SIZE + HEADING_ICON_GAP;
             }
@@ -787,14 +787,14 @@ public final class ChatMemberList {
      * The icon the heading of a group of those here stands behind
      * ({@link #headingIconOf}), in an emoji's box at {@code x} beside
      * capitals whose top is {@code textTop}. A faction with no banner
-     * wears the Faction tab's emoji.
+     * wears the Faction page's emoji.
      */
-    private static void drawHeadingIcon(Minecraft minecraft, ConversationPage tab,
+    private static void drawHeadingIcon(Minecraft minecraft, ConversationPage page,
                                         LostTalesChatMembersPacket.Member first,
                                         int x, int textTop, int alpha) {
         int boxTop = textTop - WindowStyle.ROW_TEXT_TOP;
         String group = first.getGroupKey();
-        ChatChannel channel = tab == null ? null : tab.getChannel();
+        ChatChannel channel = page == null ? null : page.getChannel();
         switch (headingIconOf(group, channel != null
                 && ChatRolePresentation.isInCharacter(channel))) {
             case SERVER:
@@ -953,7 +953,7 @@ public final class ChatMemberList {
         final float pixelsPerUnit = unitScale
                 * LostTalesDisplayPixels.scaleFactor();
         // A line cut short slides along while the pointer rests on its
-        // row, as a cut tab name does, and glides home after; one row at
+        // row, as a cut page name does, and glides home after; one row at
         // a time, the one last lit, and every other stays home.
         boolean lit = member == state.lit;
         boolean rested = member == state.hovered;
@@ -1056,7 +1056,7 @@ public final class ChatMemberList {
     /**
      * A line of pieces, each in its own colour and its emojis drawn, from
      * {@code x}, cut at {@code right} and sinking into that edge — and
-     * into the left one as far as it has slid past it — as a cut tab name
+     * into the left one as far as it has slid past it — as a cut page name
      * does. {@code originX} and {@code scale} carry the line's space onto
      * the screen, where it stays between the history's rules and left of
      * {@code listRight}, the window's edge.

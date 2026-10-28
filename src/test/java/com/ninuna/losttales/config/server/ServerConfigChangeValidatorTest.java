@@ -104,8 +104,8 @@ public final class ServerConfigChangeValidatorTest {
         ServerConfigEntry single = entry(ServerConfigEntry.Type.STRING, false, "", "", null);
         ServerConfigEntry list = entry(ServerConfigEntry.Type.STRING, true, "", "", null);
         String[] broken = {
-                "a\nS:channelBindings=x", "a\rb", "tab\there", "§cred",
-                "a b", "a b", "a\u0085b", "a\u0000b"};
+                "a\nS:channelLinks=x", "a\rb", "tab\there", "§cred",
+                "a b", "a b", "a\u0085b", "a\u0000b", "a\u202eb", "a\u2066b"};
         for (String value : broken) {
             assertEquals(value, "holds a line break, a control character or a formatting code",
                     reason(ServerConfigChangeValidator.refusal(single,
@@ -121,5 +121,28 @@ public final class ServerConfigChangeValidatorTest {
                         new ServerConfigChange("chat", "key", "3\n"))));
         assertNull(ServerConfigChangeValidator.refusal(single,
                 new ServerConfigChange("chat", "key", "Éomer's hall: 3 <> & \"quotes\"")));
+    }
+
+    /**
+     * Forge reads a list's line that begins with {@code >} as the list's
+     * end and one that ends with {@code <} as a broken list, and renames
+     * the whole file aside on the next read: a list refuses both, a single
+     * value takes them.
+     */
+    @Test
+    public void aListItemThatWouldEndItsListIsRefused() {
+        ServerConfigEntry single = entry(ServerConfigEntry.Type.STRING, false, "", "", null);
+        ServerConfigEntry list = entry(ServerConfigEntry.Type.STRING, true, "", "", null);
+        for (String value : new String[] {"> Read the rules", " >", "Find us <", "<"}) {
+            assertEquals(value, "a list's line cannot begin with > or end with <",
+                    reason(ServerConfigChangeValidator.refusal(list,
+                            new ServerConfigChange("chat", "key", true,
+                                    Arrays.asList("fine", value)))));
+            assertNull(value, ServerConfigChangeValidator.refusal(single,
+                    new ServerConfigChange("chat", "key", value)));
+        }
+        assertNull(ServerConfigChangeValidator.refusal(list,
+                new ServerConfigChange("chat", "key", true,
+                        Arrays.asList("a > b", "<3 a", "x < y"))));
     }
 }

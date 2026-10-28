@@ -5,7 +5,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 
-/** Resolves the one authoritative fellowship store from dimension-zero MapStorage. */
+/** The world's fellowships, kept in dimension 0's MapStorage; the server's alone. */
 public final class FellowshipStorage {
 
     private FellowshipStorage() {}

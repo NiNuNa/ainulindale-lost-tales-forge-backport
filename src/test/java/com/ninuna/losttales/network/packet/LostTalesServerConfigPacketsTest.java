@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
 public final class LostTalesServerConfigPacketsTest {
 
     private static ServerConfigEntry entry() {
-        return new ServerConfigEntry("discord", "channelBindings",
+        return new ServerConfigEntry("discord", "channelLinks",
                 ServerConfigEntry.Type.STRING, true,
                 Arrays.asList("ooc=BIDIRECTIONAL;channel=1;webhook=x", "global=DISABLED;webhook="),
                 Collections.singletonList("ooc=DISABLED;channel=;webhook="),
@@ -69,7 +69,7 @@ public final class LostTalesServerConfigPacketsTest {
         ByteBuf buffer = Unpooled.buffer();
         new LostTalesServerConfigApplyPacket(Arrays.asList(
                 new ServerConfigChange("discord", "pollIntervalSeconds", "5"),
-                new ServerConfigChange("discord", "channelBindings", true,
+                new ServerConfigChange("discord", "channelLinks", true,
                         Arrays.asList("ooc=DISABLED;channel=;webhook=")))).toBytes(buffer);
         LostTalesServerConfigApplyPacket decoded = new LostTalesServerConfigApplyPacket();
         decoded.fromBytes(buffer);

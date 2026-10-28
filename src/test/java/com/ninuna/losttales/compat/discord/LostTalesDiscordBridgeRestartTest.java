@@ -24,8 +24,8 @@ public final class LostTalesDiscordBridgeRestartTest {
     private static final String HOOK_A = "https://discord.com/api/webhooks/1/a";
     private static final String HOOK_B = "https://discord.com/api/webhooks/2/b";
 
-    private static DiscordChannelBindings bound(String... entries) {
-        return DiscordChannelBindings.parse(entries, true, null);
+    private static DiscordChannelLinks bound(String... entries) {
+        return DiscordChannelLinks.parse(entries, true, null);
     }
 
     /**
@@ -38,7 +38,7 @@ public final class LostTalesDiscordBridgeRestartTest {
     public void aChannelWhoseTopicIsNoLongerKeptIsLeftForTheOfflineTopic() {
         List<String> kept = Arrays.asList("111", "222", "333");
         // Global's entry posts through OOC's webhook, so it is switched off.
-        DiscordChannelBindings next = bound(
+        DiscordChannelLinks next = bound(
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + HOOK_A,
                 "global=GAME_TO_DISCORD;channel=222;webhook=" + HOOK_A);
         assertEquals(Arrays.asList("222", "333"),
@@ -46,9 +46,9 @@ public final class LostTalesDiscordBridgeRestartTest {
         assertEquals("no topic kept at all", kept,
                 LostTalesDiscordBridge.topicsLeft(kept, next, false));
         assertEquals("the bridge switched off", kept,
-                LostTalesDiscordBridge.topicsLeft(kept, DiscordChannelBindings.EMPTY,
+                LostTalesDiscordBridge.topicsLeft(kept, DiscordChannelLinks.EMPTY,
                         false));
-        DiscordChannelBindings same = bound(
+        DiscordChannelLinks same = bound(
                 "ooc=BIDIRECTIONAL;channel=111;webhook=" + HOOK_A,
                 "global=GAME_TO_DISCORD;channel=222;webhook=" + HOOK_B,
                 "operator=GAME_TO_DISCORD;channel=333;webhook=" + HOOK_B + "-p");
@@ -97,7 +97,7 @@ public final class LostTalesDiscordBridgeRestartTest {
                 bound(oocInFive, "global=DISCORD_TO_GAME;channel=7;webhook=" + HOOK_B));
         assertEquals(Collections.singletonMap("5", "100"), seen);
         LostTalesDiscordBridge.keepSeenOfChannelsStillRead(seen,
-                DiscordChannelBindings.EMPTY, bound(oocInFive));
+                DiscordChannelLinks.EMPTY, bound(oocInFive));
         assertTrue("a start after a stop reads from the newest line", seen.isEmpty());
     }
 }

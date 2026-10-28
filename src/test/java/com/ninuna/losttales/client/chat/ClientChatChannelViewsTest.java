@@ -60,7 +60,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.noteArrival(700L);
         assertEquals(700L, ClientChatReadMarks.arrival("server:new.example"));
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
-        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage console = ConversationPage.of(ChatChannel.CONSOLE);
         for (int index = 0; index < 200; index++) {
             ClientChatChannelViews.record(-100 - index, global, console,
                     index % 10 == 0, 500L + index, 1000L, true);
@@ -70,7 +70,7 @@ public final class ClientChatChannelViewsTest {
                 1000L, true);
         assertFalse(ClientChatChannelViews.hasUnread(ConversationPage.of(ChatChannel.GLOBAL)));
         assertEquals(0, ClientChatChannelViews.unreadCount(global));
-        // Said after they arrived, in a tab they are not looking at.
+        // Said after they arrived, in a page they are not looking at.
         ClientChatChannelViews.record(-400, global, console, false, 900L,
                 1000L, false);
         assertEquals(1, ClientChatChannelViews.unreadCount(global));
@@ -86,7 +86,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatSession.resume("server:known.example");
         ClientChatReadMarks.markArrival("server:known.example", 100L);
         ConversationPage global = ConversationPage.of(ChatChannel.GLOBAL);
-        ConversationPage console = ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage console = ConversationPage.of(ChatChannel.CONSOLE);
         ClientChatReadMarks.markRead("server:known.example", global, 500L);
         ClientChatChannelViews.record(-1, global, console, false, 500L,
                 1000L, true);
@@ -129,9 +129,9 @@ public final class ClientChatChannelViewsTest {
                 ClientChatChannelViews.unreadDividerLine(proximity));
     }
 
-    /** A line said while the player is here, in a tab not in front, is unread. */
+    /** A line said while the player is here, in a page not in front, is unread. */
     @Test
-    public void aLiveLineInAnotherTabIsUnread() {
+    public void aLiveLineInAnotherPageIsUnread() {
         ClientChatSession.resume("server:live.example");
         ClientChatChannelViews.noteArrival(100L);
         ConversationPage proximity = ConversationPage.of(ChatChannel.PROXIMITY);
@@ -140,7 +140,7 @@ public final class ClientChatChannelViewsTest {
                 1000L, false);
         assertEquals(1,
                 ClientChatChannelViews.unreadCount(ConversationPage.of(ChatChannel.PROXIMITY)));
-        // In the tab in front, at the newest line, it is read as it comes.
+        // In the page in front, at the newest line, it is read as it comes.
         ClientChatChannelViews.record(-2, global, global, false, 151L,
                 1000L, false);
         assertEquals(0, ClientChatChannelViews.unreadCount(global));
@@ -171,12 +171,12 @@ public final class ClientChatChannelViewsTest {
         assertEquals(1, all.size());
         assertEquals(-11, all.get(0).getChatLineID());
         List<ChatLine> console = ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.CONSOLE)));
         assertEquals(1, console.size());
         assertEquals(0, console.get(0).getChatLineID());
         // Same list, same head, same view: the cached instance is reused.
         assertSame(console, ClientChatChannelViews.visibleLines(
-                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.CLIENT_CONSOLE))));
+                drawn, ChatLineFilter.of(ConversationPage.of(ChatChannel.CONSOLE))));
         assertNull(channelOf(0));
         assertEquals(ChatChannel.FELLOWSHIP, channelOf(-10));
     }
@@ -207,7 +207,7 @@ public final class ClientChatChannelViewsTest {
         // The console channel brings the untracked line with it.
         List<ChatLine> withConsole = ClientChatChannelViews.visibleLines(
                 drawn, ChatLineFilter.of(java.util.Arrays.asList(
-                        ConversationPage.of(ChatChannel.OOC), ConversationPage.of(ChatChannel.CLIENT_CONSOLE)), java.util.Collections.<ConversationPage>emptySet()));
+                        ConversationPage.of(ChatChannel.OOC), ConversationPage.of(ChatChannel.CONSOLE)), java.util.Collections.<ConversationPage>emptySet()));
         assertEquals(2, withConsole.size());
         assertEquals(-12, withConsole.get(0).getChatLineID());
         assertEquals(0, withConsole.get(1).getChatLineID());
@@ -215,7 +215,7 @@ public final class ClientChatChannelViewsTest {
                 ChatLineFilter.of(java.util.Collections.<ConversationPage>emptyList(),
                         java.util.Collections.<ConversationPage>emptySet()))
                 .isEmpty());
-        assertTrue(ChatLineFilter.of(ConversationPage.of(ChatChannel.CLIENT_CONSOLE)).accepts(null));
+        assertTrue(ChatLineFilter.of(ConversationPage.of(ChatChannel.CONSOLE)).accepts(null));
         assertFalse(ChatLineFilter.of(ConversationPage.of(ChatChannel.GLOBAL)).accepts(null));
         // Separate filters keep separate cached results.
         assertEquals(1, ClientChatChannelViews.visibleLines(drawn,
@@ -292,9 +292,9 @@ public final class ClientChatChannelViewsTest {
     }
 
     /**
-     * Unread state does not care whether a channel has a tab: a closed
+     * Unread state does not care whether a channel has a page: a closed
      * channel keeps counting, and restoring it (which selects it and
-     * marks it viewed) clears the count the same way a tab switch does.
+     * marks it viewed) clears the count the same way a page switch does.
      */
     @Test
     public void closedChannelsAccumulateUnreadUntilRestoredAndViewed() {
@@ -330,17 +330,17 @@ public final class ClientChatChannelViewsTest {
      */
     @Test
     public void scrollToPlacesTheViewAtALineAndClamps() {
-        ConversationPage tab = ConversationPage.of(ChatChannel.GLOBAL);
-        ClientChatChannelViews.scrollTo(tab, 12.0D, 30, 10.0D);
-        assertEquals(12.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
+        ConversationPage page = ConversationPage.of(ChatChannel.GLOBAL);
+        ClientChatChannelViews.scrollTo(page, 12.0D, 30, 10.0D);
+        assertEquals(12.0D, ClientChatChannelViews.getScroll(page, 30, 10.0D),
                 0.0001D);
         // Past the oldest line it comes to rest on the oldest line.
-        ClientChatChannelViews.scrollTo(tab, 500.0D, 30, 10.0D);
-        assertEquals(20.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
+        ClientChatChannelViews.scrollTo(page, 500.0D, 30, 10.0D);
+        assertEquals(20.0D, ClientChatChannelViews.getScroll(page, 30, 10.0D),
                 0.0001D);
         // A target above the newest line is simply the newest line.
-        ClientChatChannelViews.scrollTo(tab, -5.0D, 30, 10.0D);
-        assertEquals(0.0D, ClientChatChannelViews.getScroll(tab, 30, 10.0D),
+        ClientChatChannelViews.scrollTo(page, -5.0D, 30, 10.0D);
+        assertEquals(0.0D, ClientChatChannelViews.getScroll(page, 30, 10.0D),
                 0.0001D);
         ClientChatChannelViews.clear();
     }
@@ -394,7 +394,7 @@ public final class ClientChatChannelViewsTest {
         ClientChatChannelViews.clear();
     }
 
-    /** The bound follows the history's capacity, so every kept line has its tab. */
+    /** The bound follows the history's capacity, so every kept line has its page. */
     @Test
     public void trackingIsBoundedByTheHistoryCapacity() {
         int bound = ClientChatChannelViews.maxTrackedLines();
@@ -404,7 +404,7 @@ public final class ClientChatChannelViewsTest {
             ClientChatChannelViews.record(-index - 1, ConversationPage.of(ChatChannel.GLOBAL),
                     ConversationPage.of(ChatChannel.GLOBAL), false, ChatMessageIds.NONE, System.currentTimeMillis(), false);
         }
-        // The newest `bound` lines keep their tab; every older one is let go.
+        // The newest `bound` lines keep their page; every older one is let go.
         assertNull(channelOf(-1));
         assertNull(channelOf(-(recorded - bound)));
         assertEquals(ChatChannel.GLOBAL, channelOf(-(recorded - bound + 1)));
@@ -413,14 +413,14 @@ public final class ClientChatChannelViewsTest {
     }
 
     /** Scrolls a view by whole lines the way the wheel does: from where it stands. */
-    private static void scroll(ConversationPage tab, int lines, int totalLines, double roomLines) {
-        double current = ClientChatChannelViews.getScroll(tab, totalLines, roomLines);
-        ClientChatChannelViews.scrollTo(tab, current + lines, totalLines, roomLines);
+    private static void scroll(ConversationPage page, int lines, int totalLines, double roomLines) {
+        double current = ClientChatChannelViews.getScroll(page, totalLines, roomLines);
+        ClientChatChannelViews.scrollTo(page, current + lines, totalLines, roomLines);
     }
 
     /** The recorded line's channel, or null for vanilla and untracked lines. */
     private static ChatChannel channelOf(int chatLineId) {
-        ConversationPage tab = ClientChatChannelViews.tabOf(chatLineId);
-        return tab == null ? null : tab.getChannel();
+        ConversationPage page = ClientChatChannelViews.pageOf(chatLineId);
+        return page == null ? null : page.getChannel();
     }
 }

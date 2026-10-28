@@ -1,7 +1,7 @@
 package com.ninuna.losttales.command;
 
 import com.ninuna.losttales.quest.LostTalesQuestDefinition;
-import com.ninuna.losttales.quest.LostTalesQuestDialogue;
+import com.ninuna.losttales.quest.LostTalesQuestConversation;
 import com.ninuna.losttales.quest.LostTalesQuestWords;
 import com.ninuna.losttales.quest.LostTalesQuestManager;
 import com.ninuna.losttales.quest.LostTalesQuestRegistry;
@@ -50,7 +50,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|pin|unpin|revealmarkers|world> [id] [player]";
+        return commandPrefix() + " <defs|list|scan|starter|start|complete|reset|abandon|track|untrack|revealmarkers|world> [id] [player]";
     }
 
     @Override
@@ -89,19 +89,19 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             return;
         }
 
-        if ("unpin".equalsIgnoreCase(action)) {
+        if ("untrack".equalsIgnoreCase(action)) {
             if (args.length >= 2 && LostTalesQuestRegistry.getQuest(args[1]) != null) {
                 EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 2);
                 if (player != null) {
-                    say(sender, WHITE, LostTalesQuestManager.unpinQuest(player, args[1])
-                            ? SAY + "unpin.done" : SAY + "unpin.nothing", args[1],
+                    say(sender, WHITE, LostTalesQuestManager.untrackQuest(player, args[1])
+                            ? SAY + "untrack.done" : SAY + "untrack.nothing", args[1],
                             player.getCommandSenderName());
                 }
             } else {
                 EntityPlayerMP player = LostTalesCommandSubject.inPerson(sender, args, 1);
                 if (player != null) {
-                    say(sender, WHITE, LostTalesQuestManager.unpinQuest(player)
-                            ? SAY + "unpin_all.done" : SAY + "unpin_all.nothing",
+                    say(sender, WHITE, LostTalesQuestManager.untrackQuest(player)
+                            ? SAY + "untrack_all.done" : SAY + "untrack_all.nothing",
                             player.getCommandSenderName());
                 }
             }
@@ -141,9 +141,9 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         } else if ("abandon".equalsIgnoreCase(action)) {
             say(sender, WHITE, LostTalesQuestManager.abandonQuest(player, questId)
                     ? SAY + "abandon.done" : SAY + "abandon.nothing", questId, name);
-        } else if ("pin".equalsIgnoreCase(action)) {
-            say(sender, WHITE, LostTalesQuestManager.pinQuest(player, questId)
-                    ? SAY + "pin.done" : SAY + "pin.failed", questId, name);
+        } else if ("track".equalsIgnoreCase(action)) {
+            say(sender, WHITE, LostTalesQuestManager.trackQuest(player, questId)
+                    ? SAY + "track.done" : SAY + "track.failed", questId, name);
         } else if ("revealmarkers".equalsIgnoreCase(action)) {
             say(sender, WHITE, LostTalesQuestManager.revealQuestMarkers(player, questId)
                     ? SAY + "reveal.done" : SAY + "reveal.nothing", questId, name);
@@ -179,14 +179,14 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     private void sendPlayerQuests(ICommandSender sender, EntityPlayerMP player) {
         Collection<LostTalesQuestProgress> active = LostTalesQuestManager.getActiveQuests(player);
         Set<String> completed = LostTalesQuestManager.getCompletedQuestIds(player);
-        Set<String> pinnedQuestIds = LostTalesQuestManager.getPinnedQuestIds(player);
-        String pinnedMarkerId = LostTalesQuestManager.getPinnedMapMarkerId(player);
+        Set<String> trackedQuestIds = LostTalesQuestManager.getTrackedQuestIds(player);
+        String trackedMarkerId = LostTalesQuestManager.getTrackedMapMarkerId(player);
         Set<String> discoveredMarkers = LostTalesQuestManager.getDiscoveredMarkerIds(player);
 
         say(sender, WHITE, SAY + "list.header", player.getCommandSenderName());
-        say(sender, WHITE, SAY + "list.tracked", listOrNone(pinnedQuestIds));
-        say(sender, WHITE, SAY + "list.marker", pinnedMarkerId.length() == 0
-                ? words(SAY + "list.none") : pinnedMarkerId);
+        say(sender, WHITE, SAY + "list.tracked", listOrNone(trackedQuestIds));
+        say(sender, WHITE, SAY + "list.marker", trackedMarkerId.length() == 0
+                ? words(SAY + "list.none") : trackedMarkerId);
         say(sender, WHITE, SAY + "list.discovered", listOrNone(discoveredMarkers));
         if (active.isEmpty()) {
             say(sender, WHITE, SAY + "list.active", words(SAY + "list.none"));
@@ -267,7 +267,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
         player.inventory.markDirty();
 
         say(sender, WHITE, SAY + "starter.given", questId, player.getCommandSenderName());
-        if (LostTalesQuestDialogue.of(quest).isOffered()) {
+        if (LostTalesQuestConversation.of(quest).isOffered()) {
             say(sender, WHITE, SAY + "starter.offered");
         } else if (!quest.canStartFromItem()) {
             say(sender, WHITE, SAY + "starter.note", quest.getStartMode());
@@ -342,7 +342,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
                 "scan <player>",
                 "starter losttales:tutorial/starter_note",
                 "abandon losttales:tutorial/starter_note",
-                "pin losttales:tutorial/starter_note",
+                "track losttales:tutorial/starter_note",
                 "revealmarkers losttales:tutorial/meet_nia"
         };
         for (String example : examples) {
@@ -372,7 +372,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
     @Override
     public List addTabCompletionOptions(ICommandSender sender, String[] args) {
         if (args.length == 1) {
-            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "pin", "unpin", "revealmarkers", "world");
+            return getListOfStringsMatchingLastWord(args, "defs", "list", "scan", "starter", "start", "complete", "reset", "abandon", "track", "untrack", "revealmarkers", "world");
         }
         if (args.length == 2 && "world".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "start", "stop", "list");
@@ -386,7 +386,7 @@ public class LostTalesCommandQuest extends LostTalesCommandBase {
             }
             return getListOfStringsMatchingLastWord(args, ids.toArray(new String[ids.size()]));
         }
-        if (args.length == 2 && ("starter".equalsIgnoreCase(args[0]) || "start".equalsIgnoreCase(args[0]) || "complete".equalsIgnoreCase(args[0]) || "reset".equalsIgnoreCase(args[0]) || "abandon".equalsIgnoreCase(args[0]) || "pin".equalsIgnoreCase(args[0]) || "revealmarkers".equalsIgnoreCase(args[0]))) {
+        if (args.length == 2 && ("starter".equalsIgnoreCase(args[0]) || "start".equalsIgnoreCase(args[0]) || "complete".equalsIgnoreCase(args[0]) || "reset".equalsIgnoreCase(args[0]) || "abandon".equalsIgnoreCase(args[0]) || "track".equalsIgnoreCase(args[0]) || "revealmarkers".equalsIgnoreCase(args[0]))) {
             List<String> ids = new ArrayList<String>();
             for (LostTalesQuestDefinition quest : LostTalesQuestRegistry.getQuests()) {
                 ids.add(quest.getId());

@@ -9,7 +9,7 @@ import net.minecraft.client.gui.FontRenderer;
 import org.lwjgl.input.Keyboard;
 
 /**
- * The skins, as a grid of faces: every appearance the race and sex allow,
+ * The skins, as a grid of faces: every skin the race and body type allow,
  * each tile the head that skin would give the character, standing on the
  * window's surface, the chosen tile and the one under the pointer lit as
  * a menu's rows are. The label is a heading that names the chosen skin. A

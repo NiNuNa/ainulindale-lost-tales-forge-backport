@@ -1,8 +1,9 @@
 package com.ninuna.losttales.character.server;
 
 /**
- * Narrow server input for character creation. Authoritative fields such as
- * owner UUID, character UUID, level, progression, and timestamps are absent.
+ * What a player asks for when making a character. The owner, the
+ * character's id and when it was made are the server's to set, and are
+ * not here.
  */
 public final class CharacterCreationRequest {
 
@@ -108,7 +109,7 @@ public final class CharacterCreationRequest {
         return this.showMinecraftCape;
     }
 
-    /** The cosmetic cape's catalogue id; zero for none. The server checks it. */
+    /** The cape file's id; empty for none. The server checks it. */
     public String getCosmeticCapeId() {
         return this.cosmeticCapeId;
     }

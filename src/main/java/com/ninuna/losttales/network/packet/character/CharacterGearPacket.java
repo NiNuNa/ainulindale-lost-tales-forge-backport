@@ -58,8 +58,20 @@ public final class CharacterGearPacket implements IMessage {
 
     /** The stack as it goes on the wire: itself, or without its tag where that is too long. */
     static ItemStack bounded(ItemStack stack) {
-        if (stack == null || encodedBytes(stack) <= MAX_STACK_BYTES) {
-            return stack == null ? null : stack.copy();
+        return bounded(stack, MAX_STACK_BYTES);
+    }
+
+    /**
+     * A copy of the stack for the wire: whole while Forge writes it in
+     * {@code maxBytes} or fewer, else without its tag. A stack with no tag
+     * is never measured.
+     */
+    public static ItemStack bounded(ItemStack stack, int maxBytes) {
+        if (stack == null) {
+            return null;
+        }
+        if (!stack.hasTagCompound() || encodedBytes(stack) <= maxBytes) {
+            return stack.copy();
         }
         ItemStack bare = stack.copy();
         bare.setTagCompound(null);

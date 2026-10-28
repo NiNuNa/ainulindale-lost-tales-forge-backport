@@ -38,12 +38,12 @@ public final class ChatCommandContextsTest {
     }
 
     /**
-     * A running command answers line by line under its tab, while fresh
+     * A running command answers line by line under its page, while fresh
      * and for a bounded number of lines; a command with no note answers
      * nothing, and neither does anyone after the command is stale.
      */
     @Test
-    public void aRunningCommandAnswersItsLinesUnderItsTab() {
+    public void aRunningCommandAnswersItsLinesUnderItsPage() {
         ChatCommandContexts.note(STEVE, "ooc", 1000L);
         assertEquals("ooc", ChatCommandContexts.beginCommand(STEVE, 1200L));
         assertEquals("", ChatCommandContexts.take(STEVE, 1200L));

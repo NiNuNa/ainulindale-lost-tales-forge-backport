@@ -5,7 +5,7 @@ import com.ninuna.losttales.character.lore.sync.LoreCharacterSummary;
 
 import java.util.UUID;
 
-/** Client-only, non-authoritative lore-character availability cache. */
+/** The lore figures, who holds each and which are yours, as the server last sent them. */
 public final class ClientLoreCharacterCache {
 
     private static LoreCharacterSnapshot snapshot;

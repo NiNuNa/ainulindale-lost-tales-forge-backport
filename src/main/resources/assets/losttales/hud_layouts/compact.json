@@ -3,7 +3,7 @@
   "panels": {
     "compass": {"across": 50, "down": 9},
     "fellowship": {"across": 2, "down": 40},
-    "quickloot": {"across": 100, "down": 93},
+    "quick_loot": {"across": 100, "down": 93},
     "quest": {"across": 2, "down": 78},
     "notifications": {"across": 50, "down": 30}
   }

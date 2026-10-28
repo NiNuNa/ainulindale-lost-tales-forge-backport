@@ -26,8 +26,9 @@ import java.util.Set;
  * that validates each change against the file, writes the file once,
  * reloads the static values and restarts whatever the changed categories
  * own — the Discord bridge for its category, the chat access sync for the
- * chat's. Server thread only; the operator check is the caller's on the
- * network path and the command permission's on the command path.
+ * chat's. Server thread only; the {@code server.config} check is the
+ * packet handler's on the network path and the command's on the command
+ * path.
  */
 public final class LostTalesServerConfigService {
 
@@ -55,6 +56,16 @@ public final class LostTalesServerConfigService {
                 ServerConfigSnapshot.EXCLUDED_CATEGORIES,
                 ServerConfigSnapshot.COMMAND_KEYS,
                 ServerConfigSnapshot.SECRET_KEYS);
+    }
+
+    /**
+     * The refusal of {@code category.key} when it is not on the settings
+     * surface, saying why, as the page says it: a client setting, the role
+     * command's, the Discord command's, or no such key. The config command
+     * answers a key it cannot find with it.
+     */
+    public static ServerConfigApplyResult.Refusal offTheSurface(String category, String key) {
+        return offTheSurface(new ServerConfigChange(category, key, ""));
     }
 
     /** The refusal of a key that is not on the settings surface, saying why. */
@@ -85,6 +96,17 @@ public final class LostTalesServerConfigService {
     }
 
     /**
+     * As {@link #apply}, for a save from the Server Settings page: a
+     * change to a setting too long for the page is refused, saying it is
+     * edited in {@code server.cfg} (DATA-16). The page never sends one;
+     * the server does not take its word for it.
+     */
+    public static ServerConfigApplyResult applyFromPage(List<ServerConfigChange> changes) {
+        return apply(changes, Collections.<String>emptySet(), Collections.<String>emptySet(),
+                true);
+    }
+
+    /**
      * As {@link #apply}, for a command writing a part of the file the
      * settings surface leaves alone and that command owns: the role
      * command the roles and the channel gates ({@code ownedCategories}),
@@ -95,6 +117,12 @@ public final class LostTalesServerConfigService {
     public static ServerConfigApplyResult applyOwned(List<ServerConfigChange> changes,
                                                      Set<String> ownedCategories,
                                                      Set<String> ownedKeys) {
+        return apply(changes, ownedCategories, ownedKeys, false);
+    }
+
+    private static ServerConfigApplyResult apply(List<ServerConfigChange> changes,
+                                                 Set<String> ownedCategories,
+                                                 Set<String> ownedKeys, boolean fromPage) {
         Configuration config = openFile();
         if (config == null) {
             return ServerConfigApplyResult.refusedOutright(ServerConfigApplyResult.NO_FILE);
@@ -126,6 +154,11 @@ public final class LostTalesServerConfigService {
             }
             if (entry.isSecret() && !change.isList() && change.getValue().length() == 0) {
                 // An empty secret is the page saying "leave it".
+                continue;
+            }
+            if (fromPage && entry.isTooLong()) {
+                refused.add(ServerConfigChangeValidator.refused(entry.qualifiedName(),
+                        "too_long_for_page"));
                 continue;
             }
             ServerConfigApplyResult.Refusal refusal =
@@ -180,11 +213,6 @@ public final class LostTalesServerConfigService {
                 && LostTalesDiscordBridge.getInstance().restartIfGatesMoved()) {
             // The bridge refuses a link to a channel nobody may read, so
             // a gate that opened or closed one changes what it carries.
-            restarted.add(ServerConfigApplyResult.RESTARTED_DISCORD);
-        } else if (categories.contains(LostTalesConfig.CATEGORY_CHAT)
-                && LostTalesDiscordBridge.getInstance().restartIfLanguageMoved()) {
-            // The slash commands Discord shows are worded in the
-            // server's language as the bridge starts.
             restarted.add(ServerConfigApplyResult.RESTARTED_DISCORD);
         }
         // The chat access names the channels linked to Discord, so the

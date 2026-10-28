@@ -53,7 +53,7 @@ public final class LostTalesPaletteUseTest {
                     "0x6B3F2A", "0x8A5A38", "0x9A6B3F", "0x4F5A33"),
             new Allowed("ELostTalesBiome.java",
                     "each biome's key in LOTR's map image, one colour per biome",
-                    "0x78A85A", "0x627E4B"),
+                    "0xD153DC", "0xC883D9", "0x78A85A", "0x627E4B"),
             new Allowed("LostTalesBiomeGenOdaneIsland.java",
                     "grass and leaves in the world, tinted by vanilla",
                     "0x6FA557", "0x5C8F46"),

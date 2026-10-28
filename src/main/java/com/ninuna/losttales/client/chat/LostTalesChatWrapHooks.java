@@ -49,7 +49,8 @@ public final class LostTalesChatWrapHooks {
                         }
                     }, root, width, false,
                     LostTalesChatVisualStyle.speakerRowScale(false),
-                    LostTalesChatVisualStyle.messageRowScale(false),
+                    LostTalesChatVisualStyle.messageRowScale(false,
+                            ChatLayoutMarker.bodyStepOf(root)),
                     LostTalesChatVisualStyle.quoteRowScale(false), null);
             if (lines == null || lines.isEmpty()) {
                 return vanillaLines;

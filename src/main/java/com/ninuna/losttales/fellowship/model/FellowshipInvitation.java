@@ -3,11 +3,10 @@ package com.ninuna.losttales.fellowship.model;
 import java.util.UUID;
 
 /**
- * Immutable server-owned invitation for one character to join one
- * fellowship. It waits a day, whether its character is played or not.
- *
- * Account UUIDs and names are validation/display snapshots. The character
- * ids are what the fellowship goes by.
+ * An invitation for one character to join one fellowship. It waits a day,
+ * whether its character is played or not. It goes by the two characters'
+ * ids; their accounts and names are kept as they were when it was sent, to
+ * check it against the rosters and to show it.
  */
 public final class FellowshipInvitation {
 

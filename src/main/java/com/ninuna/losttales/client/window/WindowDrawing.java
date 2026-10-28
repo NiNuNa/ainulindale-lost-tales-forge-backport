@@ -36,7 +36,7 @@ public final class WindowDrawing {
                                   int screenWidth, int screenHeight,
                                   LostTalesGuiAnimationSample opening) {
         frame.showPage(page);
-        frame.advanceFill(ContentView.fillOf(window));
+        frame.advanceFill(Borderless.fillOf(window));
         WindowPlacement.Box box = WindowPlacement.windowBounds(
                 window, minecraft, screenWidth, screenHeight);
         GuiNewChat chat = WindowPlacement.chat(minecraft);
@@ -498,7 +498,7 @@ public final class WindowDrawing {
     }
 
     /**
-     * What a window its page fills ({@link ContentView}) is cut to while
+     * What a window its page fills ({@link Borderless}) is cut to while
      * it is drawn: the box it shows, and its frame's ring beside it, so
      * the ring's sides are drawn as they always are, in the surface each
      * stretch runs beside. Null for a window shown whole.

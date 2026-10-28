@@ -56,6 +56,17 @@ public final class CharacterNameLookTest {
     }
 
     @Test
+    public void aNameHoldsNoLetterTheGameDrawsAsNothing() {
+        // A mathematical bold A (U+1D400) after Aldric, and a Hangul filler.
+        assertFalse(CharacterValidator.isWellFormedName("Aldric𝐀"));
+        assertFalse(CharacterValidator.isWellFormedName("ㅤㅤ"));
+        assertFalse(CharacterValidator.isWellFormedName("Alᅠdric"));
+        assertEquals(CharacterErrorId.INVALID_NAME_CHARACTERS,
+                validate(new CharacterRoster(OWNER), "Aldric𝐀").getErrorId());
+        assertTrue(CharacterValidator.isWellFormedName("Aldric"));
+    }
+
+    @Test
     public void theValidatorRefusesTwoScriptsAndALookAlikeName() {
         assertEquals(CharacterErrorId.INVALID_NAME_SCRIPT,
                 validate(new CharacterRoster(OWNER), "Sеrver").getErrorId());

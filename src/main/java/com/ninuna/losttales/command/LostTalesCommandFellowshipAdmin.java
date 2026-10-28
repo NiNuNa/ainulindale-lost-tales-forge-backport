@@ -19,9 +19,10 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.world.World;
 
 /**
- * The fellowship stores for an operator: status counts them, validate says what
- * no longer stands without changing anything, repair removes it (members,
- * stale invitations, marks), clearcombat forgets the combat markers.
+ * The fellowship stores for whoever holds {@code fellowship.admin}: status
+ * counts them, validate says what is broken without changing anything,
+ * repair removes it (members, stale invitations, marks), clearcombat
+ * forgets the combat markers.
  */
 public final class LostTalesCommandFellowshipAdmin extends LostTalesCommandBase {
 

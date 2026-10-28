@@ -89,7 +89,7 @@ public final class LostTalesQuestDefinitionValidator {
                     + quest.getStartMode() + "'; it is item, interaction, any"
                     + " or locked");
         }
-        validateDialogue(quest, out);
+        validateConversation(quest, out);
         validateInteraction(quest, out);
         validatePrerequisites(quest, out);
         validateRewards(quest.getRewards(), "quest=" + quest.getId()
@@ -393,8 +393,8 @@ public final class LostTalesQuestDefinitionValidator {
             } else if (!namesGiver) {
                 out.warn(where + " returns to its giver, but its interaction"
                         + " names no 'entity' to return to");
-            } else if (!LostTalesQuestDialogue.of(quest).isHandedIn()) {
-                out.warn(where + " returns to its giver, but its dialogue has"
+            } else if (!LostTalesQuestConversation.of(quest).isHandedIn()) {
+                out.warn(where + " returns to its giver, but its conversation has"
                         + " no 'handIn' line for the giver to say");
             }
         }
@@ -643,7 +643,7 @@ public final class LostTalesQuestDefinitionValidator {
         }
     }
 
-    /** Whom an objective names: an {@code entity} or a {@code group}, each group one of the five. */
+    /** Whom an objective names: an {@code entity} or a {@code group}, each group one of the six. */
     private static void validateWhom(Warnings out, LostTalesQuestDefinition quest,
             LostTalesQuestStageDefinition stage, LostTalesQuestObjectiveDefinition objective,
             String doing) {
@@ -725,30 +725,30 @@ public final class LostTalesQuestDefinitionValidator {
 
     /**
      * A quest's conversation: every entry has to be one
-     * {@link LostTalesQuestDialogue} knows, since a misspelt one would
-     * simply never be said, and a quest that is offered in conversation
+     * {@link LostTalesQuestConversation} knows, since a misspelt one is never
+     * said, and a quest that is offered in conversation
      * needs a giver to have it with.
      */
-    private static void validateDialogue(LostTalesQuestDefinition quest,
+    private static void validateConversation(LostTalesQuestDefinition quest,
                                          Warnings out) {
-        Map<String, String> dialogue = quest.getDialogue();
-        if (dialogue.isEmpty()) {
+        Map<String, String> conversation = quest.getConversation();
+        if (conversation.isEmpty()) {
             return;
         }
-        for (Map.Entry<String, String> line : dialogue.entrySet()) {
+        for (Map.Entry<String, String> line : conversation.entrySet()) {
             String key = line.getKey() == null ? "" : line.getKey().trim();
-            if (!DIALOGUE_LINES.contains(key)) {
-                out.warn("quest=" + quest.getId() + " dialogue names '"
+            if (!CONVERSATION_LINES.contains(key)) {
+                out.warn("quest=" + quest.getId() + " conversation names '"
                         + line.getKey() + "', which nothing says");
             }
             if (line.getValue() != null
-                    && line.getValue().length() > LostTalesQuestDialogue.MAX_LINE) {
-                out.warn("quest=" + quest.getId() + " dialogue line '"
+                    && line.getValue().length() > LostTalesQuestConversation.MAX_LINE) {
+                out.warn("quest=" + quest.getId() + " conversation line '"
                         + key + "' is longer than "
-                        + LostTalesQuestDialogue.MAX_LINE + " characters");
+                        + LostTalesQuestConversation.MAX_LINE + " characters");
             }
         }
-        LostTalesQuestDialogue spoken = LostTalesQuestDialogue.of(quest);
+        LostTalesQuestConversation spoken = LostTalesQuestConversation.of(quest);
         if (spoken.isOffered()
                 && !hasAny(quest.getInteraction(), "entity")) {
             out.warn("quest=" + quest.getId() + " is offered in conversation "
@@ -757,8 +757,8 @@ public final class LostTalesQuestDefinitionValidator {
     }
 
     /** The entries a conversation may hold. */
-    private static final Set<String> DIALOGUE_LINES =
-            new HashSet<String>(LostTalesQuestDialogue.LINES);
+    private static final Set<String> CONVERSATION_LINES =
+            new HashSet<String>(LostTalesQuestConversation.LINES);
 
     private static boolean hasAny(Map<String, String> params, String... keys) {
         if (params == null || keys == null) {

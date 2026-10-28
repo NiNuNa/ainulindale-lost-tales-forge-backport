@@ -29,7 +29,7 @@ public enum ChatChannelScope {
 
     /**
      * Whether a channel of this scope is more than one conversation. The
-     * row holds one tab for it either way; which conversation that tab
+     * row holds one page for it either way; which conversation that page
      * stands for follows the scope's own rule.
      */
     public boolean isScoped() {

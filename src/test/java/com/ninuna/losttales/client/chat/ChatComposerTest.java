@@ -32,7 +32,7 @@ public final class ChatComposerTest {
     }
 
     @Test
-    public void aReplyIsComposedInItsOwnTabOnly() {
+    public void aReplyIsComposedInItsOwnPageOnly() {
         ChatComposer composer = new ChatComposer();
         assertFalse(composer.isReplying());
         assertFalse(composer.replyReference().exists());
@@ -42,11 +42,11 @@ public final class ChatComposerTest {
         ChatReplyReference reference = composer.replyReference();
         assertEquals(42L, reference.getMessageId());
         assertEquals("Beren", reference.getAuthor());
-        // Selecting another tab is moving away from the message.
+        // Selecting another page is moving away from the message.
         ClientChatChannelState.select(ConversationPage.of(ChatChannel.OOC));
         assertFalse(composer.isReplying());
         assertFalse(composer.replyReference().exists());
-        composer.onTabSelected(ConversationPage.of(ChatChannel.OOC));
+        composer.onPageSelected(ConversationPage.of(ChatChannel.OOC));
         ClientChatChannelState.select(ConversationPage.of(ChatChannel.GLOBAL));
         assertFalse(composer.isReplying());
     }
@@ -188,12 +188,12 @@ public final class ChatComposerTest {
     }
 
     @Test
-    public void composingBelongsToTheTabItStartedIn() {
+    public void composingBelongsToThePageItStartedIn() {
         ChatComposer composer = new ChatComposer();
         composer.startEdit(ConversationPage.of(ChatChannel.GLOBAL), 43L);
-        composer.onTabSelected(ConversationPage.of(ChatChannel.GLOBAL));
+        composer.onPageSelected(ConversationPage.of(ChatChannel.GLOBAL));
         assertTrue(composer.isEditing());
-        composer.onTabSelected(ConversationPage.of(ChatChannel.OOC));
+        composer.onPageSelected(ConversationPage.of(ChatChannel.OOC));
         assertFalse(composer.isEditing());
         assertEquals(ChatMessageIds.NONE, composer.editingMessageId());
     }

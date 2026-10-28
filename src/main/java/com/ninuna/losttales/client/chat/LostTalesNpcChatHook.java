@@ -96,7 +96,7 @@ public final class LostTalesNpcChatHook {
     /**
      * Called by the coremod right after LOTR shows its immersive
      * floating speech: the same words are filed into the NPC's
-     * conversation tab, which is the only chat delivery this player gets
+     * conversation page, which is the only chat delivery this player gets
      * while LOTR's chat log is off. The floating speech itself, and
      * whether LOTR also prints a chat line, are untouched.
      */
@@ -132,14 +132,14 @@ public final class LostTalesNpcChatHook {
     /**
      * Somebody saying something to this player, filed the way an NPC's
      * speech always is: a bubble over their head and a line in their own
-     * conversation tab. What a quest conversation uses, so a giver's
+     * conversation page. What a quest conversation uses, so a giver's
      * words are read where every other word is read and stay in the log
      * once the talk is over.
      *
      * <p>{@code nameColor} is the colour their name is written in, and
      * {@code faction} what stands under it; either may be empty. With
      * the NPC chat styling off, the words come as LOTR's own NPC lines
-     * do: {@code <Name> words}, with no bubble and no tab.</p>
+     * do: {@code <Name> words}, with no bubble and no page.</p>
      */
     public static void sayToPlayer(EntityLivingBase speaker, String speech,
                                    int nameColor, String faction) {
@@ -181,9 +181,9 @@ public final class LostTalesNpcChatHook {
                     nameColor, plain);
             ResourceLocation texture =
                     EntityRenderTextureAccess.resolveEntityTexture(speaker);
-            ConversationPage tab = ConversationPage.npc(name);
-            LostTalesChatPresentation.receiveNpcSpeech(tab,
-                    tab.npcSpeakerId(), name,
+            ConversationPage page = ConversationPage.npc(name);
+            LostTalesChatPresentation.receiveNpcSpeech(page,
+                    page.npcSpeakerId(), name,
                     texture == null ? "" : texture.toString(), plain,
                     nameColor, faction == null ? "" : faction, answers);
         } catch (Throwable throwable) {
@@ -212,16 +212,16 @@ public final class LostTalesNpcChatHook {
     private static boolean fileSpeech(LOTREntityNPC npc, String name,
                                       String speech) {
         // LOTR addresses its speech to this one player, so it is a
-        // whisper from the NPC: a tab of its own, named after it, in the
+        // whisper from the NPC: a page of its own, named after it, in the
         // NPC's own faction colour like a role-playing character's line.
         ResourceLocation texture =
                 EntityRenderTextureAccess.resolveEntityTexture(npc);
         // Signed as the conversation, not as the creature: the bubble
         // above keeps the creature's own id, which is what finds it in
         // the world this moment.
-        ConversationPage tab = ConversationPage.npc(name);
-        return LostTalesChatPresentation.receiveNpcSpeech(tab,
-                tab.npcSpeakerId(), name,
+        ConversationPage page = ConversationPage.npc(name);
+        return LostTalesChatPresentation.receiveNpcSpeech(page,
+                page.npcSpeakerId(), name,
                 texture == null ? "" : texture.toString(), speech,
                 nameColor(npc), factionName(npc));
     }

@@ -31,7 +31,7 @@ public final class ClientWorldQuests {
             }
         }
         if (received) {
-            LostTalesClientQuestNotificationStore.notifyWorldQuests(previous,
+            LostTalesClientQuestBannerStore.notifyWorldQuests(previous,
                     VIEWS);
         }
         received = true;

@@ -87,7 +87,7 @@ public final class LostTalesMapMarkerRecord {
             throw new IllegalArgumentException("marker id must be namespaced");
         }
         this.source = builder.source == null
-                ? LostTalesMapMarkerSource.QUEST_DYNAMIC : builder.source;
+                ? LostTalesMapMarkerSource.QUEST_GIVER : builder.source;
         if (!LostTalesMapMarkerNamedAfter.isKept(builder.namedAfter)) {
             throw new IllegalArgumentException("marker is named after nothing it can be");
         }

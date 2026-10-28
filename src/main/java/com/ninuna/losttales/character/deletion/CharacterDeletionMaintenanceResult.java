@@ -1,6 +1,6 @@
 package com.ninuna.losttales.character.deletion;
 
-/** Stable outcomes for operator-only deletion maintenance operations. */
+/** What an operator's restore, rollback or purge of a character came to. */
 public enum CharacterDeletionMaintenanceResult {
     SUCCESS,
     RECONCILED,
@@ -11,6 +11,8 @@ public enum CharacterDeletionMaintenanceResult {
     NAME_TAKEN,
     CHARACTER_ID_CONFLICT,
     CHARACTER_ACTIVE,
+    /** The account's switch journal is held; it names generations a rollback would replace. */
+    JOURNAL_HELD,
     PREVIOUS_GENERATION_UNAVAILABLE,
     RETENTION_ACTIVE,
     RETENTION_OVER,

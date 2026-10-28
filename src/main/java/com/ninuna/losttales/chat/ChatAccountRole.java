@@ -30,8 +30,9 @@ import java.util.regex.Pattern;
  * force are the {@link ChatRoleCatalog}; the wire form of a set of them
  * is a bit set, one bit per role in the catalogue's order, so a role can
  * be added without disturbing the layout. Precedence — which role
- * colours the name — is the catalogue's order, by rank. Rank is presentation only: what a role lets its holders
- * <em>do</em> is the permissions the config grants it, read by
+ * colours the name — is the catalogue's order, by rank. Rank also sets
+ * which roles a role manager may manage (DATA-14). What a role lets its
+ * holders <em>do</em> is the permissions the config grants it, read by
  * {@code LostTalesPermissions} against the permissions in force and
  * never sent to a client.</p>
  *

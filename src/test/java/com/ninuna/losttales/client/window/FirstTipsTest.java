@@ -39,7 +39,7 @@ public final class FirstTipsTest {
         assertTrue(FirstTips.dismiss());
         assertSame(FirstTips.Tip.PLUS, FirstTips.current());
         assertTrue(FirstTips.dismiss());
-        assertSame(FirstTips.Tip.HEAD, FirstTips.current());
+        assertSame(FirstTips.Tip.IDENTITY, FirstTips.current());
         assertTrue(FirstTips.dismiss());
         assertSame(FirstTips.Tip.SWITCHER, FirstTips.current());
         assertTrue(FirstTips.dismiss());

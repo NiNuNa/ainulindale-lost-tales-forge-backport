@@ -55,9 +55,11 @@ import net.minecraft.util.IChatComponent;
 import net.minecraft.world.World;
 
 /**
- * Operator-only switch-state diagnostics and recovery controls. The
- * status lines name each store's fields as the code does and show their
- * values as they are: ids, numbers, true and false. The account is named
+ * The characters' diagnostics and repairs for whoever holds
+ * {@code character.admin}: switch state, recovery, cooldowns, deleted
+ * characters, renames and the lore characters. The status lines name
+ * each store's fields as the code does and show their values as they
+ * are: ids, numbers, true and false. The account is named
  * as every command names a person ({@link LostTalesCommandSubject},
  * DATA-05): any account or character this world has seen, a character
  * standing for the account that owns it, here or away; only a recovery
@@ -147,6 +149,9 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                 // pre-death snapshot is never restored.
                 result = coordinator.handleRespawn(target);
             }
+            // A player held as a ghost for the journal goes free once it is
+            // settled (CHAR-45).
+            com.ninuna.losttales.character.server.CharacterJoin.settleJournalHold(target);
             if (result == CharacterErrorId.NONE) {
                 CharacterLifecycleStateTracker.markReady(target);
                 if (restoring) {
@@ -245,9 +250,11 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
             case RESTORED:
                 say(sender, EnumChatFormatting.GREEN, SAY + "journal.restored",
                         account, source);
-                // Switching is open again without a reconnect, and everyone
-                // is told whom the player plays, as after a switch.
+                // Switching is open again without a reconnect, the ghost's
+                // hold goes (CHAR-45), and everyone is told whom the player
+                // plays, as after a switch.
                 CharacterLifecycleStateTracker.markReady(online);
+                com.ninuna.losttales.character.server.CharacterJoin.settleJournalHold(online);
                 followPlayed(online);
                 reportStatus(sender, world, ownerId, subject.label);
                 return;
@@ -742,6 +749,9 @@ public final class LostTalesCommandCharacterAdmin extends LostTalesCommandBase {
                 break;
             case CHARACTER_ACTIVE:
                 detail = words(SAY + "failure.active");
+                break;
+            case JOURNAL_HELD:
+                detail = words(SAY + "failure.journal_held");
                 break;
             case PREVIOUS_GENERATION_UNAVAILABLE:
                 detail = words(SAY + "failure.no_previous");

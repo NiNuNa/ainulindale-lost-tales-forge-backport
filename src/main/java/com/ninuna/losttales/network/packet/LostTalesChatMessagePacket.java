@@ -14,6 +14,7 @@ import com.ninuna.losttales.chat.share.ChatShareKind;
 import com.ninuna.losttales.chat.share.ChatShareTokenParser;
 import com.ninuna.losttales.chat.share.ChatShowcase;
 import com.ninuna.losttales.chat.ChatNarrator;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.chat.ChatTypedText;
 import com.ninuna.losttales.chat.ChatUnseenVoice;
 import cpw.mods.fml.common.network.simpleimpl.IMessage;
@@ -162,7 +163,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + LostTalesChatNamedPlayerCodec.MAX_BYTES
             // The reactions on the line as this reader is shown them.
             + LostTalesChatReactionCodec.MAX_BYTES
-            // The roles the line calls, after the tab a command's answer is filed under.
+            // The roles the line calls, after the page a command's answer is filed under.
             + LostTalesChatRoleMentionCodec.MAX_BYTES
             // Whether the character it wears was not in the world.
             + 1
@@ -170,6 +171,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
             + 5 + ChatTypedText.MAX_UTF8_BYTES
             // Whether an unseen voice said it, and whether its quote is
             // of a line one said.
+            + 1 + 1
+            // How far it carried, and the size step this reader reads it at.
             + 1 + 1;
     private static final int MAX_CHANNEL_BYTES = 16;
     private static final int MAX_IDENTITY_BYTES = 256;
@@ -179,8 +182,8 @@ public final class LostTalesChatMessagePacket implements IMessage {
     private static final int MAX_FACTION_ID_BYTES = 128;
     /** A scope value is a normalized faction id; well past any of them. */
     private static final int MAX_SCOPE_VALUE_BYTES = 128;
-    /** The most bytes a tab id may take: the console's own bound on a context. */
-    private static final int MAX_TAB_ID_BYTES = ChatConsoleEvent.MAX_CONTEXT_LENGTH;
+    /** The most bytes a page id may take: the console's own bound on a context. */
+    private static final int MAX_PAGE_ID_BYTES = ChatConsoleEvent.MAX_CONTEXT_LENGTH;
 
     private String channelId = "";
     private UUID senderId;
@@ -214,7 +217,7 @@ public final class LostTalesChatMessagePacket implements IMessage {
     /**
      * For a whisper, the identity of that other party the conversation
      * is with — the character they were speaking as, or their account's
-     * own name. What the tab is kept under, so one player's characters
+     * own name. What the page is kept under, so one player's characters
      * are separate conversations.
      */
     private String partnerIdentity = "";
@@ -249,19 +252,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
     /**
      * Which conversation on a scoped channel the line belongs to: the
      * faction it was spoken to, normalized. Empty on every channel that
-     * is one conversation. The client files the line under the tab of
+     * is one conversation. The client files the line under the page of
      * the identity that conversation is read as, so an account with
      * characters in two factions keeps the two apart.
      */
     private String scopeValue = "";
     /**
      * For a line of the server's own that answers a command, the id of
-     * the tab the command was typed in, as the client reported it: the
-     * client files the answer under that tab, wherever the line's
+     * the page the command was typed in, as the client reported it: the
+     * client files the answer under that page, wherever the line's
      * channel would have put it. Empty on every other line, and carried
      * only by a system sender.
      */
-    private String tabId = "";
+    private String pageId = "";
     /**
      * For a whisper, the character of the receiving side this copy is
      * held as — the sender's worn character on the sender's copy, the
@@ -339,6 +342,18 @@ public final class LostTalesChatMessagePacket implements IMessage {
      * spoke is sent the masked copy ({@link #unseenForOthers}).
      */
     private boolean unseen;
+    /**
+     * How far the line carried (CHAT-37): whispered, talked or shouted.
+     * Only a line heard nearby is anything but talk.
+     */
+    private ChatSpeechRange speechRange = ChatSpeechRange.TALK;
+    /**
+     * The size this reader reads the words at, by how far the speaker
+     * stood when the server measured it ({@link ChatSpeechRange#stepFor}):
+     * one step larger, the usual size or one step smaller. Only a line
+     * heard nearby carries anything but the usual size.
+     */
+    private int distanceStep = ChatSpeechRange.USUAL_STEP;
     private boolean malformed;
 
     public LostTalesChatMessagePacket() {}
@@ -588,11 +603,11 @@ public final class LostTalesChatMessagePacket implements IMessage {
             }
             this.bodyJson = body;
             this.namedPlayers = LostTalesChatNamedPlayerCodec.read(buffer);
-            // The reactions as this reader is shown them, then the tab a
+            // The reactions as this reader is shown them, then the page a
             // command's answer is filed under.
             this.reactions = LostTalesChatReactionCodec.read(buffer);
-            this.tabId = LostTalesPacketCodec.readUtf8String(buffer,
-                    MAX_TAB_ID_BYTES);
+            this.pageId = LostTalesPacketCodec.readUtf8String(buffer,
+                    MAX_PAGE_ID_BYTES);
             this.mentionedRoles = LostTalesChatRoleMentionCodec.read(buffer);
             this.notInWorld = buffer.readBoolean();
             this.typed = LostTalesPacketCodec.readUtf8String(buffer,
@@ -610,6 +625,19 @@ public final class LostTalesChatMessagePacket implements IMessage {
                         "an unseen voice's quote of nothing");
             }
             this.reply = this.reply.asUnseen(quotedUnseen);
+            // How far it carried, then the size step this reader reads
+            // it at, stored one up so it is never negative.
+            this.speechRange = ChatSpeechRange.fromCode(
+                    buffer.readUnsignedByte());
+            if (this.speechRange == null) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "an unknown speech range");
+            }
+            this.distanceStep = buffer.readUnsignedByte() - 1;
+            if (!ChatSpeechRange.isStep(this.distanceStep)) {
+                throw new LostTalesPacketCodec.DecodeException(
+                        "an unknown size step");
+            }
             LostTalesPacketCodec.requireFinished(buffer);
             validate(false);
         } catch (RuntimeException exception) {
@@ -627,11 +655,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
             this.ownCharacterId = null;
             this.partnerCharacterId = null;
             this.scopeValue = "";
-            this.tabId = "";
+            this.pageId = "";
             this.mentionedRoles = Collections.emptyList();
             this.notInWorld = false;
             this.typed = "";
             this.unseen = false;
+            this.speechRange = ChatSpeechRange.TALK;
+            this.distanceStep = ChatSpeechRange.USUAL_STEP;
             this.messageId = ChatMessageIds.NONE;
             this.reply = ChatReplyReference.NONE;
             this.partnerIdentity = "";
@@ -907,13 +937,15 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 MAX_BODY_BYTES);
         LostTalesChatNamedPlayerCodec.write(buffer, this.namedPlayers);
         LostTalesChatReactionCodec.write(buffer, this.reactions);
-        LostTalesPacketCodec.writeUtf8String(buffer, this.tabId, MAX_TAB_ID_BYTES);
+        LostTalesPacketCodec.writeUtf8String(buffer, this.pageId, MAX_PAGE_ID_BYTES);
         LostTalesChatRoleMentionCodec.write(buffer, this.mentionedRoles);
         buffer.writeBoolean(this.notInWorld);
         LostTalesPacketCodec.writeUtf8String(buffer, this.typed,
                 ChatTypedText.MAX_UTF8_BYTES);
         buffer.writeBoolean(this.unseen);
         buffer.writeBoolean(this.reply.isAnchored() && this.reply.isUnseen());
+        buffer.writeByte(this.speechRange.code());
+        buffer.writeByte(this.distanceStep + 1);
     }
 
     /** A presence flag and a UUID, 17 bytes whether the id is there or not. */
@@ -1002,10 +1034,10 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || (ChatUnseenVoice.SENDER_ID.equals(this.senderId)
                         && (this.accountLine
                                 || this.identityCharacterId != null))
-                || !LostTalesPacketCodec.isUtf8WithinLimit(this.tabId,
-                        MAX_TAB_ID_BYTES)
-                || !ChatConsoleEvent.isContext(this.tabId)
-                || (this.tabId.length() > 0 && !isSystemSender(this.senderId))
+                || !LostTalesPacketCodec.isUtf8WithinLimit(this.pageId,
+                        MAX_PAGE_ID_BYTES)
+                || !ChatConsoleEvent.isContext(this.pageId)
+                || (this.pageId.length() > 0 && !isSystemSender(this.senderId))
                 || this.namedPlayers.size() > ChatNamedPlayer.MAX_PER_LINE
                 || !LostTalesChatRoleMentionCodec.isValid(this.mentionedRoles)
                 || !ChatTypedText.isValid(this.typed)
@@ -1015,6 +1047,13 @@ public final class LostTalesChatMessagePacket implements IMessage {
                 || (ChatChannel.fromId(this.channelId) == ChatChannel.WHISPER
                         && this.partner.length() == 0)
                 || this.timestampMillis <= 0L
+                || this.speechRange == null
+                || !ChatSpeechRange.isStep(this.distanceStep)
+                // Only a line heard nearby carries a range or a size of
+                // its own; a channel's rule is known to the side that has it.
+                || (known && !ChatSpeechRange.appliesTo(ChatChannel.fromId(
+                        this.channelId)) && (this.speechRange != ChatSpeechRange.TALK
+                                || this.distanceStep != ChatSpeechRange.USUAL_STEP))
                 || (known && !ChatAccountRole.isValidMask(this.roles))
                 || this.showcases.size() > ChatShareTokenParser.MAX_TOKENS
                 || ChatShowcase.serializedBytes(this.showcases)
@@ -1118,12 +1157,14 @@ public final class LostTalesChatMessagePacket implements IMessage {
         copy.bodyJson = this.bodyJson;
         copy.namedPlayers = this.namedPlayers;
         copy.reactions = this.reactions;
-        copy.tabId = this.tabId;
+        copy.pageId = this.pageId;
         copy.mentionedRoles = this.mentionedRoles;
         copy.notInWorld = this.notInWorld
                 && !copy.accountLine && copy.identityCharacterId != null;
         copy.typed = this.typed;
         copy.unseen = this.unseen;
+        copy.speechRange = this.speechRange;
+        copy.distanceStep = this.distanceStep;
         return copy;
     }
 
@@ -1142,23 +1183,23 @@ public final class LostTalesChatMessagePacket implements IMessage {
     public boolean isAction() { return this.action; }
 
     /**
-     * The same line filed under the tab {@code tabId} names on the
+     * The same line filed under the page {@code pageId} names on the
      * client: what a line of the server's own that answers a command
      * carries. Anything but a system sender keeps none, whatever it is
      * handed, and so does an id that would not be a context.
      */
-    public LostTalesChatMessagePacket withTabId(String tabId) {
+    public LostTalesChatMessagePacket withPageId(String pageId) {
         LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
-        String id = tabId == null ? "" : tabId.trim();
-        copy.tabId = isSystemSender(this.senderId)
+        String id = pageId == null ? "" : pageId.trim();
+        copy.pageId = isSystemSender(this.senderId)
                 && ChatConsoleEvent.isContext(id)
-                && LostTalesPacketCodec.isUtf8WithinLimit(id, MAX_TAB_ID_BYTES)
+                && LostTalesPacketCodec.isUtf8WithinLimit(id, MAX_PAGE_ID_BYTES)
                 ? id : "";
         return copy;
     }
 
-    /** The tab a command's answer is filed under; empty for every other line. */
-    public String getTabId() { return this.tabId; }
+    /** The page a command's answer is filed under; empty for every other line. */
+    public String getPageId() { return this.pageId; }
 
     /**
      * The same line calling {@code roleIds}: at most
@@ -1215,6 +1256,38 @@ public final class LostTalesChatMessagePacket implements IMessage {
 
     /** Whether an unseen voice said the line, masked or not. */
     public boolean isUnseen() { return this.unseen; }
+
+    /**
+     * The same line said at {@code range} (CHAT-37). A line not heard
+     * nearby is talk, whatever it is handed.
+     */
+    public LostTalesChatMessagePacket withSpeechRange(ChatSpeechRange range) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        copy.speechRange = ChatSpeechRange.forChannel(getChannel(), range);
+        if (!ChatSpeechRange.appliesTo(getChannel())) {
+            copy.distanceStep = ChatSpeechRange.USUAL_STEP;
+        }
+        return copy;
+    }
+
+    /** How far the line carried: whispered, talked or shouted. */
+    public ChatSpeechRange getSpeechRange() { return this.speechRange; }
+
+    /**
+     * The same line as a reader {@code step} sizes from the usual reads
+     * it ({@link ChatSpeechRange#stepFor}). A line not heard nearby, and
+     * a step that is none, keep the usual size.
+     */
+    public LostTalesChatMessagePacket withDistanceStep(int step) {
+        LostTalesChatMessagePacket copy = withNameColor(this.nameColor);
+        copy.distanceStep = ChatSpeechRange.appliesTo(getChannel())
+                && ChatSpeechRange.isStep(step) ? step
+                : ChatSpeechRange.USUAL_STEP;
+        return copy;
+    }
+
+    /** The size step this reader reads the words at; the usual size for most lines. */
+    public int getDistanceStep() { return this.distanceStep; }
 
     /** Whether the line is masked: signed by the unseen voice, naming nobody. */
     public boolean isUnseenVoice() {

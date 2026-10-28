@@ -16,6 +16,8 @@ public final class LostTalesContainerPlayer extends ContainerPlayer {
     public static final int TOTAL_SLOT_COUNT = 46;
     public static final int ACCESSORY_X = 77;
     public static final int ACCESSORY_Y = 62;
+    /** The click mode of a hotbar number key over a slot. */
+    private static final int HOTBAR_SWAP = 2;
 
     private final EntityPlayer owner;
 
@@ -86,6 +88,53 @@ public final class LostTalesContainerPlayer extends ContainerPlayer {
         }
         slot.onPickupFromSlot(player, source);
         return original;
+    }
+
+    /**
+     * A hotbar number key over the empty ring slot moves one ring in and
+     * leaves the rest in the hotbar, as shift-click does (ACC-06); vanilla
+     * would hand the slot the whole stack, which it refuses unseen. Both
+     * sides answer the same, so a changed client changes nothing.
+     */
+    @Override
+    public ItemStack slotClick(int slotId, int button, int mode, EntityPlayer player) {
+        if (mode == HOTBAR_SWAP && slotId == ACCESSORY_SLOT_INDEX
+                && player == this.owner
+                && moveOneFromHotbar((Slot)this.inventorySlots.get(ACCESSORY_SLOT_INDEX),
+                player.inventory, button, player)) {
+            return null;
+        }
+        return super.slotClick(slotId, button, mode, player);
+    }
+
+    /**
+     * Moves one item of hotbar slot {@code hotbar} into the empty
+     * {@code ring} slot, when the key names a hotbar slot, the ring slot is
+     * empty and may be taken from, and it takes the item. Answers whether
+     * it moved one; when not, nothing is touched and vanilla's own
+     * handling stands.
+     */
+    static boolean moveOneFromHotbar(Slot ring, InventoryPlayer inventory,
+                                     int hotbar, EntityPlayer player) {
+        if (ring == null || inventory == null || hotbar < 0
+                || hotbar >= InventoryPlayer.getHotbarSize()
+                || ring.getHasStack() || !ring.canTakeStack(player)) {
+            return false;
+        }
+        ItemStack held = inventory.getStackInSlot(hotbar);
+        if (held == null || held.stackSize <= 0 || !ring.isItemValid(held)) {
+            return false;
+        }
+        ItemStack one = held.copy();
+        one.stackSize = 1;
+        ring.putStack(one);
+        if (ring.getStack() == null) {
+            return false;
+        }
+        held.stackSize--;
+        inventory.setInventorySlotContents(hotbar, held.stackSize <= 0 ? null : held);
+        inventory.markDirty();
+        return true;
     }
 
     private boolean moveOneIntoAccessory(ItemStack source) {

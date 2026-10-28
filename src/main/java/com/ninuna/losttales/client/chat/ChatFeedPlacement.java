@@ -10,8 +10,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraftforge.client.GuiIngameForge;
 
 /**
- * Where the closed feed sits: one stack of every unmuted channel's
- * messages, shown only while the chat is closed. It is placed like a
+ * Where the feed sits: one stack of the lines each
+ * conversation's Chat Feed Settings let through, shown only while the
+ * chat is closed. It is placed like a
  * window, by the baseline its newest message sits on, but has no frame,
  * no row and no bar, keeps the screen margin alone and never hangs off
  * the screen. It is as wide and holds as many lines as its settings say

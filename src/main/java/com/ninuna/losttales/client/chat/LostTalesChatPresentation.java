@@ -5,7 +5,7 @@ import com.ninuna.losttales.chat.ChatSystemLineClassifier;
 import com.ninuna.losttales.chat.ChatBroadcastMarkers;
 import com.ninuna.losttales.chat.ChatChannel;
 import com.ninuna.losttales.chat.ChatFellowship;
-import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.chat.ChatPageIds;
 import com.ninuna.losttales.chat.ChatChannelSuggester;
 import com.ninuna.losttales.chat.ChatConsoleEvent;
 import com.ninuna.losttales.chat.ChatEpithet;
@@ -21,6 +21,7 @@ import com.ninuna.losttales.chat.ChatTranslatedWords;
 import com.ninuna.losttales.chat.ChatPresentationMode;
 import com.ninuna.losttales.chat.ChatReplyReference;
 import com.ninuna.losttales.chat.ChatRolePresentation;
+import com.ninuna.losttales.chat.ChatSpeechRange;
 import com.ninuna.losttales.chat.ChatMessageValidator;
 import com.ninuna.losttales.chat.emoji.ChatEmojiParser;
 import com.ninuna.losttales.chat.share.ChatShareKind;
@@ -82,7 +83,7 @@ import com.ninuna.losttales.fellowship.model.FellowshipMark;
 /**
  * Turns every line that arrives into the chat's own line: a player's or a
  * Discord member's message, a server line, a console entry. It builds the
- * line the chat draws, files it under its tab, pings the player where the
+ * line the chat draws, files it under its page, pings the player where the
  * line names them, applies edits and reactions to lines already shown, and
  * keeps what the drawing asks of a line: its hover, flash and arrival time.
  */
@@ -99,7 +100,7 @@ public final class LostTalesChatPresentation {
      */
     private static volatile int lastMessageChatLineId;
     private static volatile boolean hasLastMessage;
-    private static volatile ConversationPage lastMessageTab;
+    private static volatile ConversationPage lastMessagePage;
     private static int nextChatLineId = Integer.MIN_VALUE;
     /** Pinged line ids remembered: as many as the history can hold. */
     private static final int MAX_PINGED_LINES =
@@ -154,7 +155,7 @@ public final class LostTalesChatPresentation {
     /**
      * As above for a replayed line said {@code beforeArrival}: before
      * this player arrived. Such a line is history rather than news — it
-     * stands in its tab, and the closed feed, which shows what is
+     * stands in its page, and the feed, which shows what is
      * happening, passes over it.
      */
     /**
@@ -256,74 +257,74 @@ public final class LostTalesChatPresentation {
                         && localMentioned[0]);
             }
         }
-        // A whisper lands in the tab of its conversation, opened on the
+        // A whisper lands in the page of its conversation, opened on the
         // first message in the window the player is typing in; a plain
         // channel the player closed reopens the same way. Operator Chat
-        // and the consoles, which open only by hand, and a tab with no
+        // and the consoles, which open only by hand, and a page with no
         // window left to open in stay closed: their lines are still filed
-        // and counted unread, they still show in the closed-chat feed, and
-        // the tab shows them all once it is opened again. A whisper tab
+        // and counted unread, they still show in the feed, and
+        // the page shows them all once it is opened again. A whisper page
         // closed by hand is closed only until somebody speaks in it again,
         // and a replay is not that.
-        ConversationPage tab = tabOf(packet);
+        ConversationPage page = pageOf(packet);
         // The layout holds one entry per channel, so a conversation of a
         // scoped channel is asked about as the row entry it belongs to.
-        // Asking with the conversation's own tab would find no window
-        // holding it and open a second Faction tab beside the first.
+        // Asking with the conversation's own page would find no window
+        // holding it and open a second Faction page beside the first.
         // A whisper held as a character no copy speaks as opens a copy
         // speaking as it, beside the others of that person.
-        ConversationPage row = ConversationPage.row(tab);
+        ConversationPage row = ConversationPage.row(page);
         if (row != null && !ChatLayout.isOpen(row)) {
             if (ChatLayout.opensByItself(row)) {
-                ChatLayout.openReader(tab, windowIdOfSelection(), false);
+                ChatLayout.openReader(page, windowIdOfSelection(), false);
             } else if (!replayed && row.isPlaceConversation()) {
-                ChatLayout.reopenConversation(tab, windowIdOfSelection());
+                ChatLayout.reopenConversation(page, windowIdOfSelection());
             }
-        } else if (row != null && tab.isWhisper() && !replayed
-                && ChatLayout.readersOf(tab).isEmpty()) {
-            ChatLayout.openReader(tab, windowIdOfSelection(), false);
+        } else if (row != null && page.isWhisper() && !replayed
+                && ChatLayout.readersOf(page).isEmpty()) {
+            ChatLayout.openReader(page, windowIdOfSelection(), false);
         }
-        if (tab == null) {
+        if (page == null) {
             return;
         }
-        if (tab.isWhisper() && minecraft.thePlayer != null
+        if (page.isWhisper() && minecraft.thePlayer != null
                 && !minecraft.thePlayer.getUniqueID().equals(
                         packet.getSenderId())) {
             // Their half of the conversation says what colour it is in,
-            // and which identity the tab names them by.
-            ClientChatChannelState.rememberPartnerColor(tab,
+            // and which identity the page names them by.
+            ClientChatChannelState.rememberPartnerColor(page,
                     packet.getNameColor());
-            ClientChatChannelState.rememberPartnerName(tab,
+            ClientChatChannelState.rememberPartnerName(page,
                     packet.getIdentityName());
         }
-        if (tab.isWhisper()) {
+        if (page.isWhisper()) {
             // Both copies say which character of the other party the
             // conversation is with, so a reply is addressed by id.
-            ClientChatChannelState.rememberPartnerCharacterId(tab,
+            ClientChatChannelState.rememberPartnerCharacterId(page,
                     packet.getPartnerCharacterId());
         }
         // A replayed line older than everything the view holds is a page
         // of older history: laid in above the view's oldest line, filed
         // and remembered, but neither unread, nor a cue, nor the newest.
         if (replayed) {
-            Integer above = ClientChatOlderHistory.anchorFor(minecraft, tab,
+            Integer above = ClientChatOlderHistory.anchorFor(minecraft, page,
                     packet.getMessageId());
             if (above != null) {
-                printOlder(minecraft, packet, tab, above.intValue(), body);
+                printOlder(minecraft, packet, page, above.intValue(), body);
                 return;
             }
         }
         // A message this client already showed is not printed again:
         // the line it is standing on becomes the real one, in place.
         int confirmed = replayed ? 0
-                : confirmPendingEcho(minecraft, packet, tab);
+                : confirmPendingEcho(minecraft, packet, page);
         int chatLineId;
         receivingReplayed = replayed;
         receivingBeforeArrival = (replayed && beforeArrival)
-                || !ClientChatChannelState.isAvailable(tab);
+                || !ClientChatChannelState.isAvailable(page);
         try {
             chatLineId = confirmed != 0 ? confirmed
-                    : print(minecraft, packet, tab, mentioned,
+                    : print(minecraft, packet, page, mentioned,
                             body == null ? ChatBodyKind.MESSAGE
                                     : ChatBodyKind.ANSWER, body);
         } finally {
@@ -335,24 +336,24 @@ public final class LostTalesChatPresentation {
         }
         // A message somebody forwarded to this player in a whisper waits
         // in the inbox, as a mention does.
-        if (tab.isWhisper() && packet.getReply() != null
+        if (page.isWhisper() && packet.getReply() != null
                 && packet.getReply().isForward()
                 && !isLocalAccount(packet.getSenderId())) {
             markForwarded(chatLineId);
         }
-        // The highlight stays for when the tab is read; the cue is the
-        // conversation's Notifications alone, a closed tab receiving as
+        // The highlight stays for when the page is read; the cue is the
+        // conversation's Notifications alone, a closed page receiving as
         // an open one does. The player's own line sounds no cue, the copy
         // of a whisper they sent included; a replayed line was said
         // before this player arrived and sounds none either, and neither
-        // does a whisper to a character the player is not playing right
-        // now: it waits, counted, for that identity.
-        if (lineChimes(tab, mentioned, isLocalAccount(packet.getSenderId()),
-                replayed) && ClientChatChannelState.isAvailable(tab)) {
-            playPingSound(minecraft, tab);
+        // does a whisper to a character neither played nor spoken as by a
+        // copy: it waits, counted, for that identity.
+        if (lineChimes(page, mentioned, isLocalAccount(packet.getSenderId()),
+                replayed) && ClientChatChannelState.isAvailable(page)) {
+            playPingSound(minecraft, page);
         }
         if (!replayed) {
-            askToJoinSharedQuests(minecraft, packet, tab);
+            askToJoinSharedQuests(minecraft, packet, page);
         }
     }
 
@@ -366,7 +367,7 @@ public final class LostTalesChatPresentation {
      */
     private static void askToJoinSharedQuests(Minecraft minecraft,
                                               LostTalesChatMessagePacket packet,
-                                              ConversationPage tab) {
+                                              ConversationPage page) {
         if (packet.getChannel() != ChatChannel.FELLOWSHIP
                 || isLocalAccount(packet.getSenderId())
                 || LostTalesChatMessagePacket.isSystemSender(packet.getSenderId())
@@ -386,15 +387,15 @@ public final class LostTalesChatPresentation {
                             showcase.getQuestCard()),
                     packet.getMessageId(), showcase.getTokenIndex());
             boolean addressed = LostTalesConfig.enableChatPings;
-            int chatLineId = printServerLine(minecraft, tab, line, addressed,
+            int chatLineId = printServerLine(minecraft, page, line, addressed,
                     packet.getTimestampMillis(), ChatReplyReference.NONE,
                     ChatMessageIds.NONE);
             if (addressed) {
                 markPinged(chatLineId);
             }
-            if (lineChimes(tab, addressed, false, false)
-                    && ClientChatChannelState.isAvailable(tab)) {
-                playPingSound(minecraft, tab);
+            if (lineChimes(page, addressed, false, false)
+                    && ClientChatChannelState.isAvailable(page)) {
+                playPingSound(minecraft, page);
             }
         }
     }
@@ -423,9 +424,9 @@ public final class LostTalesChatPresentation {
      * Notifications allows for a line {@code addressed} to the player or
      * not.
      */
-    static boolean lineChimes(ConversationPage tab, boolean addressed, boolean own,
+    static boolean lineChimes(ConversationPage page, boolean addressed, boolean own,
                               boolean replayed) {
-        return !own && !replayed && ChatLayout.chimes(tab, addressed);
+        return !own && !replayed && ChatLayout.chimes(page, addressed);
     }
 
     /**
@@ -588,9 +589,9 @@ public final class LostTalesChatPresentation {
                                           LostTalesChatMessagePacket packet,
                                           boolean edited) {
         boolean grouped = groupable(packet);
-        IChatComponent full = build(packet, held.tab, held.showcaseIds, false,
+        IChatComponent full = build(packet, held.page, held.showcaseIds, false,
                 held.kind, held.body == null ? null : held.body.createCopy());
-        IChatComponent groupedLine = build(packet, held.tab,
+        IChatComponent groupedLine = build(packet, held.page,
                 held.showcaseIds, grouped, held.kind,
                 held.body == null ? null : held.body.createCopy());
         if (edited) {
@@ -645,8 +646,8 @@ public final class LostTalesChatPresentation {
         if (unnamed.length() > 0) {
             return unnamed;
         }
-        ConversationPage tab = ClientChatChannelViews.tabOf(chatLineId);
-        if (tab != null && tab.getChannel() == ChatChannel.SERVER_CONSOLE) {
+        ConversationPage page = ClientChatChannelViews.pageOf(chatLineId);
+        if (page != null && page.getChannel() == ChatChannel.SERVER_LOG) {
             return StatCollector.translateToLocal(
                     "gui.losttales.chat.message.console_stays");
         }
@@ -671,7 +672,7 @@ public final class LostTalesChatPresentation {
                 && LostTalesChatMessagePacket.isSystemSender(entry.senderId);
     }
 
-    /** Why a line cannot be answered, or empty where it can: a tab this player cannot talk in. */
+    /** Why a line cannot be answered, or empty where it can: a page this player cannot talk in. */
     static String whyNotRepliable(int chatLineId) {
         return isRepliable(chatLineId) ? "" : StatCollector.translateToLocal(
                 "gui.losttales.chat.input.hint.read_only");
@@ -730,10 +731,10 @@ public final class LostTalesChatPresentation {
             } catch (RuntimeException refused) {
                 continue;
             }
-            IChatComponent full = build(updated, entry.tab,
+            IChatComponent full = build(updated, entry.page,
                     entry.showcaseIds, false);
             // A reply never groups, so its grouped form is the full one.
-            IChatComponent groupedLine = build(updated, entry.tab,
+            IChatComponent groupedLine = build(updated, entry.page,
                     entry.showcaseIds, false);
             if (entry.edited) {
                 full = markEdited(full);
@@ -796,17 +797,17 @@ public final class LostTalesChatPresentation {
      * same line.
      */
     private static int print(Minecraft minecraft,
-                             LostTalesChatMessagePacket packet, ConversationPage tab,
+                             LostTalesChatMessagePacket packet, ConversationPage page,
                              boolean mentioned) {
-        return print(minecraft, packet, tab, mentioned,
+        return print(minecraft, packet, page, mentioned,
                 ChatBodyKind.MESSAGE);
     }
 
     /** As above, with the body presented as {@code kind} says. */
     private static int print(Minecraft minecraft,
-                             LostTalesChatMessagePacket packet, ConversationPage tab,
+                             LostTalesChatMessagePacket packet, ConversationPage page,
                              boolean mentioned, ChatBodyKind kind) {
-        return print(minecraft, packet, tab, mentioned, kind, null);
+        return print(minecraft, packet, page, mentioned, kind, null);
     }
 
     /**
@@ -817,7 +818,7 @@ public final class LostTalesChatPresentation {
      * whose parent is whichever root came last.
      */
     private static int print(Minecraft minecraft,
-                             LostTalesChatMessagePacket packet, ConversationPage tab,
+                             LostTalesChatMessagePacket packet, ConversationPage page,
                              boolean mentioned, ChatBodyKind kind,
                              IChatComponent body) {
         int chatLineId = allocateChatLineId();
@@ -825,12 +826,12 @@ public final class LostTalesChatPresentation {
         // Decoded once: both forms of the line show the same showcases.
         int[] showcaseIds = decodeShowcases(packet);
         chat.printChatMessageWithOptionalDeletion(
-                build(packet, tab, showcaseIds, false, kind, body),
+                build(packet, page, showcaseIds, false, kind, body),
                 chatLineId);
         if (receivingBeforeArrival) {
             ageOutOfFeed(minecraft, chat, chatLineId);
         }
-        rememberPrinted(chatLineId, packet, tab, showcaseIds, kind,
+        rememberPrinted(chatLineId, packet, page, showcaseIds, kind,
                 body == null ? null : body.createCopy(), mentioned);
         return chatLineId;
     }
@@ -848,7 +849,7 @@ public final class LostTalesChatPresentation {
      * reached or have no room.
      */
     private static void printOlder(Minecraft minecraft,
-                                   LostTalesChatMessagePacket packet, ConversationPage tab,
+                                   LostTalesChatMessagePacket packet, ConversationPage page,
                                    int aboveChatLineId, IChatComponent body) {
         ChatBodyKind kind = body == null ? ChatBodyKind.MESSAGE
                 : ChatBodyKind.ANSWER;
@@ -888,7 +889,7 @@ public final class LostTalesChatPresentation {
         int[] showcaseIds = decodeShowcases(packet);
         int messagesBefore = messages.size();
         chat.printChatMessageWithOptionalDeletion(
-                build(packet, tab, showcaseIds, false, kind, body),
+                build(packet, page, showcaseIds, false, kind, body),
                 chatLineId);
         if (messages.size() != messagesBefore + 1 || messages.get(0) == null
                 || messages.get(0).getChatLineID() != chatLineId) {
@@ -915,39 +916,39 @@ public final class LostTalesChatPresentation {
                     rows.get(index).func_151461_a(), chatLineId));
         }
         ChatWindowLines.noteMutated();
-        rememberRun(chatLineId, tab, packet,
-                build(packet, tab, showcaseIds, groupable(packet),
+        rememberRun(chatLineId, page, packet,
+                build(packet, page, showcaseIds, groupable(packet),
                         kind, body == null ? null : body.createCopy()));
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
-        ClientChatMessages.remember(packet, tab, showcaseIds, kind,
+        ClientChatMessages.remember(packet, page, showcaseIds, kind,
                 body == null ? null : body.createCopy());
-        ClientChatChannelViews.recordBackfilled(chatLineId, tab);
+        ClientChatChannelViews.recordBackfilled(chatLineId, page);
         ClientChatChannelViews.recordTime(chatLineId, packet.getTimestampMillis());
     }
 
     /**
      * Everything a printed line is remembered by: its grouped form for
-     * the runs, its ids, its packet for a later rebuild, and its tab.
+     * the runs, its ids, its packet for a later rebuild, and its page.
      * {@code groupedBody} is a copy of the body of its own, for the
      * grouped form.
      */
     private static void rememberPrinted(int chatLineId,
                                         LostTalesChatMessagePacket packet,
-                                        ConversationPage tab, int[] showcaseIds,
+                                        ConversationPage page, int[] showcaseIds,
                                         ChatBodyKind kind,
                                         IChatComponent groupedBody,
                                         boolean mentioned) {
         // Taken before the grouped form claims the body as its own.
         IChatComponent keptBody = groupedBody == null ? null
                 : groupedBody.createCopy();
-        rememberRun(chatLineId, tab, packet,
-                build(packet, tab, showcaseIds, groupable(packet), kind,
+        rememberRun(chatLineId, page, packet,
+                build(packet, page, showcaseIds, groupable(packet), kind,
                         groupedBody));
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
         // Kept so the same line can be built again if it is edited or
         // its reactions change.
-        ClientChatMessages.remember(packet, tab, showcaseIds, kind, keptBody);
-        noteLinePrinted(chatLineId, tab, mentioned,
+        ClientChatMessages.remember(packet, page, showcaseIds, kind, keptBody);
+        noteLinePrinted(chatLineId, page, mentioned,
                 packet.getTimestampMillis());
     }
 
@@ -971,11 +972,11 @@ public final class LostTalesChatPresentation {
      * voice whoever lends it: its own lines and every action run on under
      * one Narrator header.
      */
-    private static void rememberRun(int chatLineId, ConversationPage tab,
+    private static void rememberRun(int chatLineId, ConversationPage page,
                                     LostTalesChatMessagePacket packet,
                                     IChatComponent groupedLine) {
         boolean narrated = narrated(packet);
-        ChatGroupRuns.remember(chatLineId, tab,
+        ChatGroupRuns.remember(chatLineId, page,
                 narrated ? ChatGroupRuns.NARRATOR_VOICE : packet.getSenderId(),
                 narrated ? ChatNarrator.NAME : packet.getIdentityName(),
                 !narrated && packet.isAccountLine(),
@@ -984,7 +985,7 @@ public final class LostTalesChatPresentation {
 
     /**
      * A line this client signs itself, the way the server would sign
-     * it: the identity the tab speaks as, its roles and its colour, the
+     * it: the identity the page speaks as, its roles and its colour, the
      * account's skin remembered for the head. The LOTR title is the
      * server's to resolve, so a locally signed line carries none. Every
      * line built here — the pending echo of a message, the player's
@@ -992,23 +993,23 @@ public final class LostTalesChatPresentation {
      * through this one factory.
      */
     private static LostTalesChatMessagePacket signedPacket(
-            Minecraft minecraft, ConversationPage tab, String message,
+            Minecraft minecraft, ConversationPage page, String message,
             List<ChatShowcase> showcases, ChatReplyReference reply,
             long messageId, long timestampMillis) {
-        ClientChatSignature.Signature signature = ClientChatSignature.of(tab);
-        // The character the tab speaks as, as the server names it on its
+        ClientChatSignature.Signature signature = ClientChatSignature.of(page);
+        // The character the page speaks as, as the server names it on its
         // own copy: whose presence the line's head wears.
         LostTalesChatMessagePacket packet = new LostTalesChatMessagePacket(
-                tab.getChannel(), minecraft.thePlayer.getUniqueID(),
+                page.getChannel(), minecraft.thePlayer.getUniqueID(),
                 signature.identityName, signature.accountName, "",
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
                 signature.nameColor,
                 message, timestampMillis, signature.skinId,
-                showcases, "", tab.isWhisper() ? tab.getPartner() : "",
+                showcases, "", page.isWhisper() ? page.getPartner() : "",
                 signature.roles, signature.accountLine, messageId, reply,
-                tab.isWhisper() && !tab.isNpc()
-                        ? tab.getPartnerIdentity() : "", 0L,
-                ClientChatPresence.speakerOf(tab).getCharacterId());
+                page.isWhisper() && !page.isNpc()
+                        ? page.getPartnerIdentity() : "", 0L,
+                ClientChatPresence.speakerOf(page).getCharacterId());
         if (signature.accountLine) {
             LostTalesCharacterHeadIconRenderer.rememberAccountSkin(
                     minecraft, packet.getSenderId(),
@@ -1020,46 +1021,46 @@ public final class LostTalesChatPresentation {
     /**
      * The player's own line in an NPC conversation: nobody is on the
      * other end, so nothing is sent; the line is signed the way the
-     * server signs a whisper of theirs — the identity the tab speaks
-     * as, its roles and its colour — and filed under the NPC's tab. The
+     * server signs a whisper of theirs — the identity the page speaks
+     * as, its roles and its colour — and filed under the NPC's page. The
      * things the player shared were resolved by the client from its
      * own inventory and marker cache, since no server ever sees them,
      * and the quote of a reply is the client's own too: the author and
      * the text off the line it was answering, which is the only record
      * either of them has.
      */
-    public static boolean echoToNpc(ConversationPage tab, String message,
+    public static boolean echoToNpc(ConversationPage page, String message,
                                     List<ChatShowcase> showcases,
                                     ChatReplyReference reply) {
-        return echoToNpc(tab, message, showcases, reply, false);
+        return echoToNpc(page, message, showcases, reply, false);
     }
 
     /** As above; {@code action} shows the words as an action. */
-    public static boolean echoToNpc(ConversationPage tab, String message,
+    public static boolean echoToNpc(ConversationPage page, String message,
                                     List<ChatShowcase> showcases,
                                     ChatReplyReference reply,
                                     boolean action) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (tab == null || !tab.isNpc() || message == null
+        if (page == null || !page.isNpc() || message == null
                 || !ChatMessageValidator.isValid(message)
                 || minecraft == null || minecraft.ingameGUI == null
                 || minecraft.thePlayer == null) {
             return false;
         }
-        LostTalesChatMessagePacket packet = signedPacket(minecraft, tab,
+        LostTalesChatMessagePacket packet = signedPacket(minecraft, page,
                 message, showcases, reply, ClientChatMessageIds.nextLocal(),
                 System.currentTimeMillis()).withAction(action);
-        if (ChatLayout.openTab(tab, windowIdOfSelection()) == null) {
+        if (ChatLayout.openTab(page, windowIdOfSelection()) == null) {
             return false;
         }
         // An NPC conversation never passes through the server, so the
         // mention check the served channels get on receipt runs here:
-        // naming yourself highlights the line in this tab exactly as
+        // naming yourself highlights the line in this page exactly as
         // anywhere else. The line is the player's own, so it never
         // chimes.
         boolean mentioned = LostTalesConfig.enableChatPings
                 && ChatMentions.mentionsAny(message, localMentionNames(minecraft));
-        int chatLineId = print(minecraft, packet, tab, mentioned);
+        int chatLineId = print(minecraft, packet, page, mentioned);
         if (mentioned) {
             markPinged(chatLineId);
         }
@@ -1080,12 +1081,12 @@ public final class LostTalesChatPresentation {
      * is shown early unless the history can actually be reached, since
      * the promise is only kept by rewriting the line where it stands.</p>
      */
-    public static long echoPending(ConversationPage tab, String message,
+    public static long echoPending(ConversationPage page, String message,
                                    List<ChatShowcase> showcases,
                                    ChatReplyReference reply,
                                    boolean action) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (tab == null || tab.isNpc() || message == null
+        if (page == null || page.isNpc() || message == null
                 || !ChatMessageValidator.isValid(message)
                 || minecraft == null || minecraft.ingameGUI == null
                 || minecraft.thePlayer == null
@@ -1097,15 +1098,16 @@ public final class LostTalesChatPresentation {
         // the echo runs on from the server's lines before it as its own
         // copy will, rather than sorting behind them or falling out of
         // the grouping window by however far the clocks disagree.
-        LostTalesChatMessagePacket packet = signedPacket(minecraft, tab,
+        LostTalesChatMessagePacket packet = signedPacket(minecraft, page,
                 message, showcases, reply, ClientChatMessageIds.nextLocal(),
-                serverNow()).withAction(action);
+                serverNow()).withAction(action)
+                .withSpeechRange(ChatSpeechRanges.of(page));
         long nonce = ClientChatPendingEchoes.nextNonce();
         // Never pinged: naming yourself in your own message is answered
         // for by the copy that comes back, which highlights it. Neither
         // sounds, the player's own line never does.
-        int chatLineId = print(minecraft, packet, tab, false);
-        ClientChatPendingEchoes.remember(nonce, chatLineId, packet, tab,
+        int chatLineId = print(minecraft, packet, page, false);
+        ClientChatPendingEchoes.remember(nonce, chatLineId, packet, page,
                 decodeShowcases(packet), System.currentTimeMillis());
         return nonce;
     }
@@ -1123,7 +1125,7 @@ public final class LostTalesChatPresentation {
      */
     private static int confirmPendingEcho(Minecraft minecraft,
                                           LostTalesChatMessagePacket packet,
-                                          ConversationPage tab) {
+                                          ConversationPage page) {
         if (packet.getEchoNonce() == 0L || minecraft.thePlayer == null
                 || !minecraft.thePlayer.getUniqueID().equals(
                         packet.getSenderId())) {
@@ -1138,7 +1140,7 @@ public final class LostTalesChatPresentation {
         int chatLineId = pending.chatLineId;
         int[] showcaseIds = decodeShowcases(packet);
         if (!ChatWindowLines.replaceMessage(chat, chatLineId,
-                build(packet, tab, showcaseIds, false))) {
+                build(packet, page, showcaseIds, false))) {
             // The promised line is no longer in the history to rewrite.
             // Take it out if it is anywhere at all and print the real
             // message afresh, rather than leaving the two side by side.
@@ -1147,15 +1149,15 @@ public final class LostTalesChatPresentation {
             LostTalesChatHistoryHooks.refresh(chat);
             return 0;
         }
-        rememberRun(chatLineId, tab, packet,
-                build(packet, tab, showcaseIds, groupable(packet)));
+        rememberRun(chatLineId, page, packet,
+                build(packet, page, showcaseIds, groupable(packet)));
         ClientChatMessageIds.remember(chatLineId, packet.getMessageId());
-        ClientChatMessages.remember(packet, tab, showcaseIds);
+        ClientChatMessages.remember(packet, page, showcaseIds);
         // The line's time is the server's from here on, for the day
         // rules as for everything else.
         ClientChatChannelViews.recordTime(chatLineId,
                 packet.getTimestampMillis());
-        ClientChatChannelViews.noteOwnLine(tab, chatLineId,
+        ClientChatChannelViews.noteOwnLine(page, chatLineId,
                 packet.getMessageId());
         LostTalesChatHistoryHooks.refresh(chat);
         return chatLineId;
@@ -1182,11 +1184,11 @@ public final class LostTalesChatPresentation {
         boolean changed = false;
         for (ClientChatPendingEchoes.Pending pending : gone) {
             IChatComponent line = markUndelivered(build(pending.packet,
-                    pending.tab, pending.showcaseIds, false));
+                    pending.page, pending.showcaseIds, false));
             if (ChatWindowLines.replaceMessage(chat, pending.chatLineId,
                     line)) {
                 ChatGroupRuns.replaceGroupedLine(pending.chatLineId,
-                        markUndelivered(build(pending.packet, pending.tab,
+                        markUndelivered(build(pending.packet, pending.page,
                                 pending.showcaseIds, true)));
                 changed = true;
             }
@@ -1208,8 +1210,8 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * The window the selected tab is in, or null with nothing selected:
-     * where a reopening tab lands first, like any other reopening
+     * The window the selected page is in, or null with nothing selected:
+     * where a reopening page lands first, like any other reopening
      * channel.
      */
     static String windowIdOfSelection() {
@@ -1219,16 +1221,15 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * The mention cue, only on this client and only because this client's
-     * own names matched: the server never triggers it and no other client
-     * can hear it. Played as a UI sound so the player's position, the
+     * The chime, on this client alone: the server never plays it and no
+     * other client hears it. Played as a UI sound so the player's position, the
      * dimension, or a respawn in progress cannot swallow or duplicate it.
      */
-    private static void playPingSound(Minecraft minecraft, ConversationPage tab) {
-        // Do Not Disturb, chosen for the identity the tab speaks as,
+    private static void playPingSound(Minecraft minecraft, ConversationPage page) {
+        // Do Not Disturb, chosen for the identity the page speaks as,
         // holds the cue: the mention still counts and tints, and nothing
         // sounds.
-        if (ClientChatPresence.holdsCues(tab)) {
+        if (ClientChatPresence.holdsCues(page)) {
             return;
         }
         String sound = LostTalesConfig.chatPingSound == null
@@ -1264,7 +1265,7 @@ public final class LostTalesChatPresentation {
      * the print by {@link #receive(LostTalesChatMessagePacket, boolean,
      * boolean)} and {@link #receiveConsoleEvent(ChatConsoleEvent,
      * boolean, boolean)}; the print stamps such a line as already gone
-     * from the closed feed, and it does not enter as the newest message.
+     * from the feed, and it does not enter as the newest message.
      */
     private static boolean receivingBeforeArrival;
 
@@ -1311,8 +1312,8 @@ public final class LostTalesChatPresentation {
         }
     }
 
-    /** Records animation timing and the line's tab for the tab views. */
-    private static void noteLinePrinted(int chatLineId, ConversationPage tab,
+    /** Records animation timing and the line's page for the page views. */
+    private static void noteLinePrinted(int chatLineId, ConversationPage page,
                                         boolean mentioned,
                                         long timestampMillis) {
         // A line from before this player arrived was never news here:
@@ -1321,15 +1322,15 @@ public final class LostTalesChatPresentation {
             lastMessageChatLineId = chatLineId;
             hasLastMessage = true;
             lastMessageNanos = System.nanoTime();
-            lastMessageTab = tab;
+            lastMessagePage = page;
         }
         // What the view's read mark moves to once the line is seen.
         long serverId = ClientChatMessageIds.messageIdOf(chatLineId);
-        // The tab typed in is in front only while no page stands before
+        // The page typed in is in front only while no page stands before
         // it. Pinned to the screen while playing, its lines stay unread
         // until the conversation is opened.
         ConversationPage typedIn = ClientChatChannelState.getSelected();
-        ClientChatChannelViews.record(chatLineId, tab,
+        ClientChatChannelViews.record(chatLineId, page,
                 WindowLayout.showsPage(WindowLayout.windowOf(typedIn))
                         || PinnedWindows.shows(typedIn)
                         ? null : typedIn, mentioned,
@@ -1456,25 +1457,15 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * Whether a line the server sent names this player: the server says
-     * whom its mentions reach ({@link LostTalesChatMessagePacket#getNamedPlayers}),
-     * and one of them is this player as the line's channel knows them
-     * ({@link #isLocalIdentity}); or which roles it calls
-     * ({@link LostTalesChatMessagePacket#getMentionedRoles}), and this
-     * player holds one — in every channel, since an operator is worth
-     * calling wherever the call is made. Which roles the player holds is
-     * the server's word too, sent with the chat access.
-     */
-    private static boolean pingsLocalPlayer(LostTalesChatMessagePacket packet) {
-        return !pingedVoices(packet).isEmpty();
-    }
-
-    /**
-     * The voices of this player's a line names, as {@link #pingsLocalPlayer}
-     * finds them: in character each character of theirs it names that they
-     * play or a copy speaks as; {@link #EVERY_VOICE} for the account out of
-     * character and for a role they hold. Empty for a line that names none
-     * of them, and for a forward.
+     * The voices of this player's a line names. The server says whom its
+     * mentions reach ({@link LostTalesChatMessagePacket#getNamedPlayers})
+     * and which roles it calls ({@link LostTalesChatMessagePacket#getMentionedRoles}).
+     * In character each character of theirs it names that they play or a
+     * copy speaks as ({@link #isLocalIdentity}); {@link #EVERY_VOICE} for
+     * the account out of character, and for a role they hold, in every
+     * channel. Which roles the player holds is the server's word too, sent
+     * with the chat access. Empty for a line that names none of them, and
+     * for a forward.
      */
     static Set<String> pingedVoices(LostTalesChatMessagePacket packet) {
         // A forward pings nobody: its words were said elsewhere, before.
@@ -1548,7 +1539,7 @@ public final class LostTalesChatPresentation {
 
     /**
      * Whether the line can be answered: it is a line at all — a blank
-     * row and a day's rule are nobody's — and the tab it lives in takes
+     * row and a day's rule are nobody's — and the page it lives in takes
      * messages. A message the server named is answered by its id; an
      * announcement, a death message, a console notice, a command's echo
      * or an NPC's speech is answered by quoting its words, since nothing
@@ -1557,7 +1548,7 @@ public final class LostTalesChatPresentation {
     static boolean isRepliable(int chatLineId) {
         return chatLineId != 0
                 && ClientChatChannelState.canSend(
-                        ClientChatChannelViews.tabOf(chatLineId));
+                        ClientChatChannelViews.pageOf(chatLineId));
     }
 
     /**
@@ -1916,15 +1907,15 @@ public final class LostTalesChatPresentation {
         return hasLastMessage && chatLineId == lastMessageChatLineId;
     }
 
-    static ConversationPage getLastMessageTab() {
-        return lastMessageTab;
+    static ConversationPage getLastMessagePage() {
+        return lastMessagePage;
     }
 
     /**
      * The game has cleared its own message list — it does so whenever
      * the main menu opens, so every trip through it, leaving a world or
      * a server, empties the chat — and everything said about those lines
-     * goes with them; the tabs, the layout, the identities and what the
+     * goes with them; the pages, the layout, the identities and what the
      * session knows of the server stay, and the read marks say where
      * the replay's unread run begins. The line ids go on counting, so
      * nothing still holding one can mistake a new line for an old.
@@ -1933,7 +1924,7 @@ public final class LostTalesChatPresentation {
         ClientChatChannelViews.forgetLines();
         lastMessageChatLineId = 0;
         hasLastMessage = false;
-        lastMessageTab = null;
+        lastMessagePage = null;
         pingedChatLineIds.clear();
         forwardedChatLineIds.clear();
         flashedChatLineId = 0;
@@ -1944,7 +1935,7 @@ public final class LostTalesChatPresentation {
         hoveredSenderRow = null;
         hoveredIndex = -1;
         pendingJumpChatLineId = 0;
-        lastCommandEchoTab = null;
+        lastCommandEchoPage = null;
         lastCommandEchoLineId = 0;
         lastCommandEcho = null;
         HOVER_FADES.clear();
@@ -1958,7 +1949,7 @@ public final class LostTalesChatPresentation {
         lastMessageNanos = 0L;
         lastMessageChatLineId = 0;
         hasLastMessage = false;
-        lastMessageTab = null;
+        lastMessagePage = null;
         nextChatLineId = Integer.MIN_VALUE;
         pingedChatLineIds.clear();
         forwardedChatLineIds.clear();
@@ -1971,7 +1962,7 @@ public final class LostTalesChatPresentation {
         hoveredSenderRow = null;
         hoveredIndex = -1;
         pendingJumpChatLineId = 0;
-        lastCommandEchoTab = null;
+        lastCommandEchoPage = null;
         lastCommandEchoLineId = 0;
         lastCommandEcho = null;
         commandAnswered = false;
@@ -1980,7 +1971,7 @@ public final class LostTalesChatPresentation {
         CHIP_FADES.clear();
         ChatLineHover.clear();
         frameNanos = 0L;
-        commandTab = null;
+        commandPage = null;
         commandUntilMillis = 0L;
         ChatSpoilerMarker.clear();
         ChatFoldMarker.clear();
@@ -1994,24 +1985,24 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * The tab a packet would be filed under: a whisper's conversation
+     * The page a packet would be filed under: a whisper's conversation
      * with the partner's identity, held as the character this copy says
      * it is held as; a scoped channel's line under the identity of this
      * player's that is in the conversation it was said in.
      */
-    private static ConversationPage tabOf(LostTalesChatMessagePacket packet) {
+    private static ConversationPage pageOf(LostTalesChatMessagePacket packet) {
         ConversationPage filed = fileUnder(packet);
         ClientChatContextHistory.remember(filed, packet.getMessageId());
         return filed;
     }
 
     static ConversationPage fileUnder(LostTalesChatMessagePacket packet) {
-        // A command's answer of the server's own names the tab the
+        // A command's answer of the server's own names the page the
         // command was typed in, which is this client's own word, and
         // is filed there wherever its channel would have put it.
         if (LostTalesChatMessagePacket.isSystemSender(packet.getSenderId())
-                && packet.getTabId().length() > 0) {
-            ConversationPage stated = ConversationPage.fromId(packet.getTabId());
+                && packet.getPageId().length() > 0) {
+            ConversationPage stated = ConversationPage.fromId(packet.getPageId());
             if (stated != null) {
                 return stated;
             }
@@ -2029,23 +2020,23 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * The line as it is shown, filed under {@code tab}. The tab is the
+     * The line as it is shown, filed under {@code page}. The page is the
      * caller's, not the packet's: an NPC conversation and a whisper with
-     * a player of the same name are two different tabs, and only the
+     * a player of the same name are two different pages, and only the
      * caller knows which one this line belongs to. A <em>grouped</em>
      * line continues its sender's run and
      * drops the repeated header — the channel prefix, tags, brackets,
      * head, name and title — keeping only the body, which starts
      * behind the same chevron the run's first body row
      * does, so a run reads as one voice speaking in paragraphs.
-     * The prefix goes with the rest: in the closed feed the run's
+     * The prefix goes with the rest: in the feed the run's
      * header line already named the channel, so its continuations do
      * not say it again.
      */
     static IChatComponent build(LostTalesChatMessagePacket packet,
-                                ConversationPage tab, int[] showcaseIds,
+                                ConversationPage page, int[] showcaseIds,
                                 boolean grouped) {
-        return build(packet, tab, showcaseIds, grouped,
+        return build(packet, page, showcaseIds, grouped,
                 ChatBodyKind.MESSAGE);
     }
 
@@ -2056,9 +2047,9 @@ public final class LostTalesChatPresentation {
      * exactly as it is.
      */
     static IChatComponent build(LostTalesChatMessagePacket packet,
-                                ConversationPage tab, int[] showcaseIds,
+                                ConversationPage page, int[] showcaseIds,
                                 boolean grouped, ChatBodyKind kind) {
-        return build(packet, tab, showcaseIds, grouped, kind, null);
+        return build(packet, page, showcaseIds, grouped, kind, null);
     }
 
     /**
@@ -2067,10 +2058,10 @@ public final class LostTalesChatPresentation {
      * for every other kind, whose body is read off the packet.
      */
     static IChatComponent build(LostTalesChatMessagePacket packet,
-                                ConversationPage tab, int[] showcaseIds,
+                                ConversationPage page, int[] showcaseIds,
                                 boolean grouped, ChatBodyKind kind,
                                 IChatComponent body) {
-        IChatComponent line = buildLine(packet, tab, showcaseIds, grouped,
+        IChatComponent line = buildLine(packet, page, showcaseIds, grouped,
                 kind, body);
         appendReactions(line, packet);
         return line;
@@ -2114,12 +2105,12 @@ public final class LostTalesChatPresentation {
     }
 
     private static IChatComponent buildLine(LostTalesChatMessagePacket packet,
-                                            ConversationPage tab, int[] showcaseIds,
+                                            ConversationPage page, int[] showcaseIds,
                                             boolean grouped, ChatBodyKind kind,
                                             IChatComponent body) {
         ChatChannel channel = packet.getChannel();
         ChatComponentText root = new ChatComponentText("");
-        ConversationPage named = tab == null ? tabOf(packet) : tab;
+        ConversationPage named = page == null ? pageOf(packet) : page;
         // An action is a sentence its speaker's name opens, told by the
         // Narrator in character and under the account out of it (CHAT-37);
         // a forwarded one keeps the forward's own layout and names its
@@ -2141,10 +2132,10 @@ public final class LostTalesChatPresentation {
             appendReplyQuote(root, packet.getReply());
             root.appendSibling(ChatLayoutMarker.lineBreak());
         }
-        // The prefix names the tab, so it is the colour the tab is drawn
+        // The prefix names the page, so it is the colour the page is drawn
         // in: a conversation speaks in the other party's colour, every
         // other channel in its own. Nothing in the feed may name a
-        // channel in a colour its tab does not use. Faction takes the
+        // channel in a colour its page does not use. Faction takes the
         // sender's own faction colour, which the server put on the line
         // and which is the receiver's too — the server routes faction
         // chat to members only.
@@ -2257,13 +2248,17 @@ public final class LostTalesChatPresentation {
         // forward names them by, in its colour, opens the words.
         boolean forwardedAction = kind.parsesBody() && packet.isAction()
                 && packet.getReply().isForward();
+        // A line heard nearby reads a size larger or smaller by how far
+        // its speaker stood from this reader (CHAT-37).
         if (forwardedAction) {
             root.appendSibling(ChatLayoutMarker.bodyBreak(
-                    ChatNarrator.color(), ChatLineMark.ACTION));
+                    ChatNarrator.color(), ChatLineMark.ACTION,
+                    packet.getDistanceStep()));
         } else {
             root.appendSibling(ChatLayoutMarker.bodyBreak(
                     packet.getNameColor(), kind == ChatBodyKind.COMMAND
-                            ? ChatLineMark.COMMAND : ChatLineMark.SAID));
+                            ? ChatLineMark.COMMAND : ChatLineMark.SAID,
+                    packet.getDistanceStep()));
         }
         int bodyStart = root.getSiblings().size();
         if (kind.parsesBody()) {
@@ -2284,10 +2279,16 @@ public final class LostTalesChatPresentation {
             }
             ChatSpoilerMarker.mark(root.getSiblings(), wordsStart,
                     packet.getMessageId());
-            if (packet.isNarrator() || forwardedAction) {
+            if (packet.isNarrator() || forwardedAction
+                    || packet.getSpeechRange() == ChatSpeechRange.WHISPER) {
                 // The Narrator's words are told, not said, and an action
                 // is what was done: in italics, as a storybook sets them.
+                // A whisper heard nearby is in italics too (CHAT-37).
                 italicise(root.getSiblings(), bodyStart);
+            }
+            if (packet.getSpeechRange() == ChatSpeechRange.SHOUT) {
+                // A shout heard nearby is in bold (CHAT-37).
+                embolden(root.getSiblings(), wordsStart);
             }
         } else if (kind == ChatBodyKind.ANSWER) {
             // The server's own component, exactly as it came: its
@@ -2345,7 +2346,7 @@ public final class LostTalesChatPresentation {
                                          int[] showcaseIds,
                                          ChatChannel channel) {
         root.appendSibling(ChatLayoutMarker.bodyBreak(ChatNarrator.color(),
-                ChatLineMark.ACTION));
+                ChatLineMark.ACTION, packet.getDistanceStep()));
         root.appendSibling(ChatHeadMarker.asAvatar(voicedHead(packet)));
         String whisper = senderSuggestion(packet);
         int sentenceStart = root.getSiblings().size();
@@ -2363,6 +2364,10 @@ public final class LostTalesChatPresentation {
         ChatSpoilerMarker.mark(root.getSiblings(), wordsStart,
                 packet.getMessageId());
         italicise(root.getSiblings(), sentenceStart);
+        if (packet.getSpeechRange() == ChatSpeechRange.SHOUT) {
+            // A shouted action's words are in bold too (CHAT-37).
+            embolden(root.getSiblings(), wordsStart);
+        }
     }
 
     /** The speaker's head worn in the Narrator's voice ({@link ChatHeadMarker#encodeVoiced}). */
@@ -2422,6 +2427,14 @@ public final class LostTalesChatPresentation {
         for (int index = from; index < parts.size(); index++) {
             IChatComponent part = parts.get(index);
             part.setChatStyle(part.getChatStyle().setItalic(Boolean.TRUE));
+        }
+    }
+
+    /** Sets every run from {@code from} on in bold, the marks it carries kept. */
+    private static void embolden(List<IChatComponent> parts, int from) {
+        for (int index = from; index < parts.size(); index++) {
+            IChatComponent part = parts.get(index);
+            part.setChatStyle(part.getChatStyle().setBold(Boolean.TRUE));
         }
     }
 
@@ -2644,7 +2657,7 @@ public final class LostTalesChatPresentation {
      * into a channel — an achievement, a death message, command output,
      * a fast-travel countdown — with the channel prefix every other
      * line carries and a tracked line id, so the feed names
-     * its channel and the tabs can file it. The component itself is the
+     * its channel and the pages can file it. The component itself is the
      * server's, untouched; no head, no mention check.
      *
      * <p>{@code audibleMentionCue} says whether a mention of this player
@@ -2821,9 +2834,8 @@ public final class LostTalesChatPresentation {
         for (FellowshipInvitationSnapshot invitation : fellowship.getIncomingInvitations()) {
             if (invitationId.equals(invitation.getInvitationId())) {
                 return ClientChatIgnores.isIgnored(invitation.getInvitingOwnerId())
-                        || ClientChatIgnores.isIgnoredIdentity(
-                                invitation.getInvitingOwnerId(),
-                                invitation.getInvitingCharacterName());
+                        || ClientChatIgnores.isIgnoredCharacter(
+                                invitation.getInvitingIdentityId());
             }
         }
         return false;
@@ -2853,23 +2865,23 @@ public final class LostTalesChatPresentation {
         // A system line reopens its closed channel exactly as a player
         // message does — an achievement brings Global back, a command's
         // answer the console — unless the channel is hidden.
-        ConversationPage tab = ConversationPage.of(channel);
+        ConversationPage page = ConversationPage.of(channel);
         // A console line arriving while a command's answer is expected
         // is that answer: a line of the Server's own, shown where the
         // command was typed and nowhere else. An operators' notice of
         // somebody's command never is.
         boolean adminNotice = ChatSystemLineClassifier.isAdminNotice(message);
-        ConversationPage asked = channel == ChatChannel.CLIENT_CONSOLE && !adminNotice
-                ? commandOutputTab() : null;
+        ConversationPage asked = channel == ChatChannel.CONSOLE && !adminNotice
+                ? commandOutputPage() : null;
         // A line addressed to this player, a fellowship invitation, stands in
         // the conversation they are looking at, where it is read and
         // answered, rather than in a console that may be closed.
         ConversationPage addressed = asked == null
                 && FellowshipInvitationNotice.isNotice(message)
                 ? ClientChatChannelState.getSelected() : null;
-        if (asked == null && addressed == null && !ChatLayout.isOpen(tab)
-                && ChatLayout.opensByItself(tab)) {
-            ChatLayout.openTab(tab, windowIdOfSelection());
+        if (asked == null && addressed == null && !ChatLayout.isOpen(page)
+                && ChatLayout.opensByItself(page)) {
+            ChatLayout.openTab(page, windowIdOfSelection());
         }
         // A system line naming a player — an achievement, a death, a
         // join — names them the way a typed mention does: @Name in the
@@ -2900,16 +2912,16 @@ public final class LostTalesChatPresentation {
         // behind it join its run.
         ChatReplyReference reply = ChatReplyReference.NONE;
         if (addressed != null) {
-            tab = addressed;
+            page = addressed;
         } else if (asked != null) {
-            tab = asked;
+            page = asked;
             reply = commandEchoQuote();
             // The answer quotes this player's command: a reply to them,
             // which pings them as any reply to them does.
             mentioned |= LostTalesConfig.enableChatPings
                     && repliesToLocalPlayer(minecraft, reply);
         }
-        int chatLineId = printServerLine(minecraft, tab, shown, mentioned,
+        int chatLineId = printServerLine(minecraft, page, shown, mentioned,
                 now, reply, messageId);
         if (asked != null && lastCommandEcho != null) {
             rememberAnswer(chatLineId, lastCommandEcho.getMessage());
@@ -2919,8 +2931,8 @@ public final class LostTalesChatPresentation {
         }
         // A mention the cue may not sound for counts as none: an
         // announcement names its player without addressing them.
-        if (ChatLayout.chimes(tab, mentioned && audibleMentionCue)) {
-            playPingSound(minecraft, tab);
+        if (ChatLayout.chimes(page, mentioned && audibleMentionCue)) {
+            playPingSound(minecraft, page);
         }
         return true;
     }
@@ -2928,11 +2940,11 @@ public final class LostTalesChatPresentation {
     /**
      * Shows one entry of the Server Log, once. A command is a line
      * of the Server's own — {@code @Player used /command in #Channel.},
-     * the channel a link to the tab the command was typed in, landing
+     * the channel a link to the page the command was typed in, landing
      * on the command itself when this client is the one that typed it.
      * Every other kind says plainly who did it and what, as a sentence
      * with its full stop ({@link #asSentence}). Filed in the Server
-     * Console tab, stamped with when it happened, and a cue as the
+     * Console page, stamped with when it happened, and a cue as the
      * Server Log's Notifications allows, never for this player's own
      * doing. The server sent it only because this player may read it;
      * nothing here decides that.
@@ -2944,7 +2956,7 @@ public final class LostTalesChatPresentation {
      * nothing more, and the first they had not stands under the unread
      * divider. One that happened {@code beforeArrival}, before this
      * player arrived, is history: it stands in the Server Log, never
-     * in the closed feed.</p>
+     * in the feed.</p>
      */
     public static void receiveConsoleEvent(ChatConsoleEvent event,
                                            boolean replayed,
@@ -2956,7 +2968,7 @@ public final class LostTalesChatPresentation {
         if (minecraft == null || minecraft.ingameGUI == null) {
             return;
         }
-        ConversationPage console = ConversationPage.of(ChatChannel.SERVER_CONSOLE);
+        ConversationPage console = ConversationPage.of(ChatChannel.SERVER_LOG);
         boolean[] mentioned = new boolean[1];
         IChatComponent body;
         if (event.getKind() == ChatConsoleEvent.Kind.COMMAND) {
@@ -3091,7 +3103,7 @@ public final class LostTalesChatPresentation {
             return text(ChatNames.server(LostTalesWords.LANG), null, false);
         }
         IChatComponent placed = asMentionName(account,
-                ChatChannel.SERVER_CONSOLE, localNames, mentioned,
+                ChatChannel.SERVER_LOG, localNames, mentioned,
                 recorded == null ? Collections.<ChatNamedPlayer>emptyList()
                         : Collections.singletonList(recorded));
         if (placed != null) {
@@ -3123,9 +3135,9 @@ public final class LostTalesChatPresentation {
      * The words of a command entry: who, the command, and where — the
      * actor as a mention when the client can place the account, this
      * player's own name a ping like any other mention, the command as
-     * it was described, shown as inline code ({@link #codeRun}), the tab
+     * it was described, shown as inline code ({@link #codeRun}), the page
      * as a link in its own colour, and the translation's full stop. A
-     * command run from the server's own console names no tab.
+     * command run from the server's own console names no page.
      */
     private static IChatComponent commandNotice(Minecraft minecraft,
                                                 ChatConsoleEvent event,
@@ -3184,7 +3196,7 @@ public final class LostTalesChatPresentation {
      * margin is for a server under load.
      */
     private static final long COMMAND_ECHO_LINK_WINDOW_MILLIS = 10000L;
-    private static ConversationPage lastCommandEchoTab;
+    private static ConversationPage lastCommandEchoPage;
     private static int lastCommandEchoLineId;
     private static long lastCommandEchoMillis;
     /** The echo as it was signed, for the quote its first answer opens with. */
@@ -3193,14 +3205,14 @@ public final class LostTalesChatPresentation {
     /**
      * The line this client echoed the command of a console entry on,
      * for the entry's link to land on: the entry names this player and
-     * the tab the last command was echoed in, and follows it closely.
+     * the page the last command was echoed in, and follows it closely.
      * Zero for anyone else's command, or one echoed too long ago.
      */
     private static int commandEchoLineFor(Minecraft minecraft,
                                           ChatConsoleEvent event,
                                           ConversationPage typedIn) {
-        if (minecraft.thePlayer == null || lastCommandEchoTab == null
-                || !lastCommandEchoTab.equals(typedIn)
+        if (minecraft.thePlayer == null || lastCommandEchoPage == null
+                || !lastCommandEchoPage.equals(typedIn)
                 || !event.getActor().equalsIgnoreCase(
                         minecraft.thePlayer.getCommandSenderName())
                 || System.currentTimeMillis() - lastCommandEchoMillis
@@ -3212,23 +3224,23 @@ public final class LostTalesChatPresentation {
 
     /**
      * Prints a line of the Server's own — a command's answer, the
-     * console's word on who ran what — into one tab, signed the way a
+     * console's word on who ran what — into one page, signed the way a
      * message is: the Server identity with the console mark for a head,
      * and the component exactly as it came for a body. This client's
      * own work under a local id, so it can be answered and jumped to
-     * and never edited or sent. The tab reopens for it unless it is
+     * and never edited or sent. The page reopens for it unless it is
      * hidden.
      */
-    private static int printServerLine(Minecraft minecraft, ConversationPage tab,
+    private static int printServerLine(Minecraft minecraft, ConversationPage page,
                                        IChatComponent body, boolean mentioned,
                                        long timestampMillis,
                                        ChatReplyReference reply,
                                        long messageId) {
-        if (!ChatLayout.isOpen(tab) && ChatLayout.opensByItself(tab)) {
-            ChatLayout.openTab(tab, windowIdOfSelection());
+        if (!ChatLayout.isOpen(page) && ChatLayout.opensByItself(page)) {
+            ChatLayout.openTab(page, windowIdOfSelection());
         }
-        return print(minecraft, serverPacket(tab, body, timestampMillis, reply,
-                messageId), tab, mentioned, ChatBodyKind.ANSWER, body);
+        return print(minecraft, serverPacket(page, body, timestampMillis, reply,
+                messageId), page, mentioned, ChatBodyKind.ANSWER, body);
     }
 
     /**
@@ -3239,10 +3251,10 @@ public final class LostTalesChatPresentation {
      * the component.
      */
     private static LostTalesChatMessagePacket serverPacket(
-            ConversationPage tab, IChatComponent body, long timestampMillis,
+            ConversationPage page, IChatComponent body, long timestampMillis,
             ChatReplyReference reply, long messageId) {
         return systemPacket(LostTalesChatMessagePacket.SERVER_SENDER_ID,
-                ChatNames.server(LostTalesWords.LANG), tab, body, timestampMillis,
+                ChatNames.server(LostTalesWords.LANG), page, body, timestampMillis,
                 reply, messageId);
     }
 
@@ -3252,29 +3264,29 @@ public final class LostTalesChatPresentation {
      * Server's lines are.
      */
     static LostTalesChatMessagePacket clientPacket(
-            ConversationPage tab, IChatComponent body, long timestampMillis,
+            ConversationPage page, IChatComponent body, long timestampMillis,
             ChatReplyReference reply) {
         return systemPacket(LostTalesChatMessagePacket.CLIENT_SENDER_ID,
-                ChatNames.client(LostTalesWords.LANG), tab, body, timestampMillis,
+                ChatNames.client(LostTalesWords.LANG), page, body, timestampMillis,
                 reply, ChatMessageIds.NONE);
     }
 
     private static LostTalesChatMessagePacket systemPacket(
-            UUID senderId, String name, ConversationPage tab, IChatComponent body,
+            UUID senderId, String name, ConversationPage page, IChatComponent body,
             long timestampMillis, ChatReplyReference reply, long messageId) {
-        return new LostTalesChatMessagePacket(tab.getChannel(),
+        return new LostTalesChatMessagePacket(page.getChannel(),
                 senderId, name, name, "",
                 LostTalesColors.rgb(LostTalesColors.HUD_LABEL),
                 LostTalesChatVisualStyle.asideRgb(),
                 copyTextOf(body), timestampMillis, "", null, "",
-                tab.isWhisper() ? tab.getPartner() : "", 0, true,
+                page.isWhisper() ? page.getPartner() : "", 0, true,
                 // The server's own id when it named the line, so every
                 // client answers the same message; this client's else.
                 ChatMessageIds.isServerId(messageId) ? messageId
                         : ClientChatMessageIds.nextLocal(),
                 reply == null ? ChatReplyReference.NONE : reply,
-                tab.isWhisper() && !tab.isNpc()
-                        ? tab.getPartnerIdentity() : "");
+                page.isWhisper() && !page.isNpc()
+                        ? page.getPartnerIdentity() : "");
     }
 
     /**
@@ -3393,8 +3405,8 @@ public final class LostTalesChatPresentation {
     }
 
     /**
-     * How long a jump waits for the tab it moved to to be drawn before
-     * it is given up: a tab is drawn on the very next frame, and a
+     * How long a jump waits for the page it moved to to be drawn before
+     * it is given up: a page is drawn on the very next frame, and a
      * jump that has not landed by then never will.
      */
     private static final long PENDING_JUMP_NANOS = 2000L * 1000000L;
@@ -3403,7 +3415,7 @@ public final class LostTalesChatPresentation {
 
     /**
      * Asks the next draw to land on a line: what a jump to a message in
-     * another tab does after bringing that tab forward, since the tab's
+     * another page does after bringing that page forward, since the page's
      * rows exist only once it has been drawn.
      */
     static void requestJump(int chatLineId) {
@@ -3431,16 +3443,16 @@ public final class LostTalesChatPresentation {
      * notice is rarely mistaken for an answer.
      */
     private static final long COMMAND_OUTPUT_WINDOW_MILLIS = 3000L;
-    private static ConversationPage commandTab;
+    private static ConversationPage commandPage;
     private static long commandUntilMillis;
 
     /**
-     * Says a server command has just gone out from {@code tab}: console
+     * Says a server command has just gone out from {@code page}: console
      * lines arriving within the window are its answer, shown there as
      * lines of the Server's own.
      */
-    public static void expectCommandOutput(ConversationPage tab) {
-        commandTab = tab;
+    public static void expectCommandOutput(ConversationPage page) {
+        commandPage = page;
         commandUntilMillis = System.currentTimeMillis() + COMMAND_OUTPUT_WINDOW_MILLIS;
         commandAnswered = false;
     }
@@ -3493,17 +3505,17 @@ public final class LostTalesChatPresentation {
                         lastCommandEcho.getSkinId());
     }
 
-    private static ConversationPage commandOutputTab() {
-        if (commandTab == null || System.currentTimeMillis() > commandUntilMillis) {
-            commandTab = null;
+    private static ConversationPage commandOutputPage() {
+        if (commandPage == null || System.currentTimeMillis() > commandUntilMillis) {
+            commandPage = null;
             return null;
         }
-        return commandTab;
+        return commandPage;
     }
 
     /**
      * Shows the command itself where it was typed, as a line of the
-     * player's own — signed by the identity the tab speaks as, exactly
+     * player's own — signed by the identity the page speaks as, exactly
      * as a message typed there would be — whose body is the command as
      * the chat's inline code, behind the command mark. It reads as the
      * Server Log writes it ({@link ChatCommandText}): a secret it
@@ -3515,27 +3527,27 @@ public final class LostTalesChatPresentation {
      * quote it, nothing can edit or delete it — and it is never
      * pending. It joins the identity's run like any other line of
      * theirs, and is remembered so the console's entry about it can
-     * link back to it. The tab reopens for it unless it is hidden.
+     * link back to it. The page reopens for it unless it is hidden.
      */
-    public static void echoCommand(ConversationPage tab, String command) {
+    public static void echoCommand(ConversationPage page, String command) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (tab == null || command == null || command.length() == 0
+        if (page == null || command == null || command.length() == 0
                 || minecraft == null || minecraft.ingameGUI == null
                 || minecraft.thePlayer == null) {
             return;
         }
-        if (!ChatLayout.isOpen(tab) && ChatLayout.opensByItself(tab)) {
-            ChatLayout.openTab(tab, windowIdOfSelection());
+        if (!ChatLayout.isOpen(page) && ChatLayout.opensByItself(page)) {
+            ChatLayout.openTab(page, windowIdOfSelection());
         }
         long now = System.currentTimeMillis();
-        LostTalesChatMessagePacket packet = signedPacket(minecraft, tab,
+        LostTalesChatMessagePacket packet = signedPacket(minecraft, page,
                 ChatCommandText.describeTyped(command,
                         ClientChatChannelState.getPrivateCommands()), null,
                 ChatReplyReference.NONE, ClientChatMessageIds.nextLocal(), now);
-        lastCommandEchoLineId = print(minecraft, packet, tab, false,
+        lastCommandEchoLineId = print(minecraft, packet, page, false,
                 ChatBodyKind.COMMAND);
         lastCommandEcho = packet;
-        lastCommandEchoTab = tab;
+        lastCommandEchoPage = page;
         lastCommandEchoMillis = now;
     }
 
@@ -3565,10 +3577,10 @@ public final class LostTalesChatPresentation {
         // mode change, say — it is that answer, and stands where the
         // command was typed quoting it; otherwise it is filed in the
         // Console. Rebuilt in place, so it keeps its turn in the history.
-        ConversationPage asked = commandOutputTab();
-        ConversationPage tab = asked != null ? asked : ConversationPage.of(ChatChannel.CLIENT_CONSOLE);
+        ConversationPage asked = commandOutputPage();
+        ConversationPage page = asked != null ? asked : ConversationPage.of(ChatChannel.CONSOLE);
         IChatComponent body = line.func_151461_a();
-        LostTalesChatMessagePacket packet = clientPacket(tab, body, now,
+        LostTalesChatMessagePacket packet = clientPacket(page, body, now,
                 asked != null ? commandEchoQuote() : ChatReplyReference.NONE);
         // An answer quoting this player's command replies to them, and
         // pings them as any reply to them does.
@@ -3576,21 +3588,21 @@ public final class LostTalesChatPresentation {
         boolean repliedTo = LostTalesConfig.enableChatPings
                 && repliesToLocalPlayer(minecraft, packet.getReply());
         messages.set(index, new ChatLine(line.getUpdatedCounter(),
-                build(packet, tab, NO_SHOWCASES, false, ChatBodyKind.ANSWER,
+                build(packet, page, NO_SHOWCASES, false, ChatBodyKind.ANSWER,
                         body), chatLineId));
-        rememberPrinted(chatLineId, packet, tab, NO_SHOWCASES,
+        rememberPrinted(chatLineId, packet, page, NO_SHOWCASES,
                 ChatBodyKind.ANSWER, body.createCopy(), repliedTo);
         if (asked != null && lastCommandEcho != null) {
             rememberAnswer(chatLineId, lastCommandEcho.getMessage());
         }
-        if (!ChatLayout.isOpen(tab) && ChatLayout.opensByItself(tab)) {
-            ChatLayout.openTab(tab, windowIdOfSelection());
+        if (!ChatLayout.isOpen(page) && ChatLayout.opensByItself(page)) {
+            ChatLayout.openTab(page, windowIdOfSelection());
         }
         if (repliedTo) {
             markPinged(chatLineId);
         }
-        if (ChatLayout.chimes(tab, repliedTo)) {
-            playPingSound(minecraft, tab);
+        if (ChatLayout.chimes(page, repliedTo)) {
+            playPingSound(minecraft, page);
         }
         return true;
     }
@@ -3938,16 +3950,16 @@ public final class LostTalesChatPresentation {
     /**
      * Prints an LOTR NPC speech line styled like a player message, the
      * name in the colour the caller resolved — the NPC's faction colour,
-     * like a role-playing character's — so the line, the tab and the
+     * like a role-playing character's — so the line, the page and the
      * conversation read as one; the body stays the plain ivory.
      */
-    public static boolean receiveNpcSpeech(ConversationPage tab, UUID npcId,
+    public static boolean receiveNpcSpeech(ConversationPage page, UUID npcId,
                                            String npcName,
                                            String texturePath,
                                            String message,
                                            int nameColor,
                                            String factionName) {
-        return receiveNpcSpeech(tab, npcId, npcName, texturePath, message,
+        return receiveNpcSpeech(page, npcId, npcName, texturePath, message,
                 nameColor, factionName, null);
     }
 
@@ -3956,7 +3968,7 @@ public final class LostTalesChatPresentation {
      * click to answer the speaker (a quest giver's *Accept* and
      * *Decline*); null for none.
      */
-    public static boolean receiveNpcSpeech(ConversationPage tab, UUID npcId,
+    public static boolean receiveNpcSpeech(ConversationPage page, UUID npcId,
                                            String npcName,
                                            String texturePath,
                                            String message,
@@ -3964,7 +3976,7 @@ public final class LostTalesChatPresentation {
                                            String factionName,
                                            IChatComponent answers) {
         Minecraft minecraft = Minecraft.getMinecraft();
-        if (tab == null || npcId == null || npcName == null
+        if (page == null || npcId == null || npcName == null
                 || npcName.length() == 0 || message == null
                 || message.length() == 0 || minecraft == null
                 || minecraft.ingameGUI == null) {
@@ -3973,23 +3985,23 @@ public final class LostTalesChatPresentation {
         // The tab wears the same portrait the line is drawn with, and
         // is named in the same colour the NPC's own name is; the
         // faction is kept for the NPC's card.
-        ChatChannelIcons.rememberNpc(tab, npcId, texturePath);
+        ChatChannelIcons.rememberNpc(page, npcId, texturePath);
         ChatChannelIcons.rememberNpcFaction(npcId, factionName);
-        ClientChatChannelState.rememberPartnerColor(tab,
+        ClientChatChannelState.rememberPartnerColor(page,
                 nameColor & 0xFFFFFF);
-        ChatLayout.noteNpcSpoke(tab);
-        if (tab.isWhisper() && !ChatLayout.isOpen(tab)) {
+        ChatLayout.noteNpcSpoke(page);
+        if (page.isWhisper() && !ChatLayout.isOpen(page)) {
             // The NPC's conversation is a whisper like a player's: it
             // opens for the speech, and one closed by hand opens again
             // when the NPC speaks. Where no window can take it, the
             // speech is filed under it all the same — counted unread,
-            // in the closed feed, there once the tab is opened — and
+            // in the feed, there once the page is opened — and
             // never left as a line of its own in the Console.
-            ChatLayout.reopenConversation(tab, windowIdOfSelection());
+            ChatLayout.reopenConversation(page, windowIdOfSelection());
             // Only the last few NPC conversations stay open by
             // themselves; the ones quiet longest wait in the +.
-            if (ChatLayout.isOpen(tab)) {
-                ChatLayout.closeQuietNpcConversations(tab,
+            if (ChatLayout.isOpen(page)) {
+                ChatLayout.closeQuietNpcConversations(page,
                         LostTalesConfig.npcConversationsOpen);
             }
         }
@@ -4006,22 +4018,22 @@ public final class LostTalesChatPresentation {
         long now = System.currentTimeMillis();
         GuiNewChat chat = minecraft.ingameGUI.getChatGUI();
         chat.printChatMessageWithOptionalDeletion(
-                withAnswers(buildNpcSpeech(tab, npcId, npcName,
+                withAnswers(buildNpcSpeech(page, npcId, npcName,
                         texturePath, message, nameColor, false), answers),
                 chatLineId);
-        ChatGroupRuns.remember(chatLineId, tab, npcId, npcName, false, now,
-                true, withAnswers(buildNpcSpeech(tab, npcId, npcName,
+        ChatGroupRuns.remember(chatLineId, page, npcId, npcName, false, now,
+                true, withAnswers(buildNpcSpeech(page, npcId, npcName,
                         texturePath, message, nameColor, true), answers));
         // An NPC's speech is this client's own line too: nobody else
         // sees it, so it is named locally like the player's replies.
         ClientChatMessageIds.remember(chatLineId,
                 ClientChatMessageIds.nextLocal());
-        noteLinePrinted(chatLineId, tab, mentioned, now);
+        noteLinePrinted(chatLineId, page, mentioned, now);
         if (mentioned) {
             markPinged(chatLineId);
         }
-        if (ChatLayout.chimes(tab, mentioned)) {
-            playPingSound(minecraft, tab);
+        if (ChatLayout.chimes(page, mentioned)) {
+            playPingSound(minecraft, page);
         }
         return true;
     }
@@ -4040,7 +4052,7 @@ public final class LostTalesChatPresentation {
      * drops the repeated header, exactly as a player's grouped line
      * does.
      */
-    static IChatComponent buildNpcSpeech(ConversationPage tab, UUID npcId,
+    static IChatComponent buildNpcSpeech(ConversationPage page, UUID npcId,
                                          String npcName,
                                          String texturePath,
                                          String message,
@@ -4056,8 +4068,8 @@ public final class LostTalesChatPresentation {
                     NO_SHOWCASES, ChatChannel.WHISPER);
             return root;
         }
-        appendChannelPrefix(root, tab,
-                ClientChatChannelState.displayColor(tab));
+        appendChannelPrefix(root, page,
+                ClientChatChannelState.displayColor(page));
         root.appendSibling(ChatLayoutMarker.anchor());
         nameColor &= 0xFFFFFF;
         int bodyColor = LostTalesColors.rgb(LostTalesColors.HUD_LABEL);
@@ -4090,7 +4102,7 @@ public final class LostTalesChatPresentation {
     /**
      * Channel label as the receiving client names it, carried on prefix
      * markers so the renderer can drop it while the chat screen is open
-     * (the tabs separate channels there) and show it in the closed HUD's
+     * (the pages separate channels there) and show it in the closed HUD's
      * combined feed. Faction shows the local active character's faction
      * name, which is the sender's faction too because the server only
      * routes faction chat to members. A conversation names its
@@ -4099,11 +4111,11 @@ public final class LostTalesChatPresentation {
      * instead of saying the name twice.
      */
     private static void appendChannelPrefix(ChatComponentText root,
-                                            ConversationPage tab,
+                                            ConversationPage page,
                                             int channelColor) {
-        String label = tab != null && tab.isWhisper()
+        String label = page != null && page.isWhisper()
                 ? ChatNames.channel(LostTalesWords.LANG, ChatChannel.WHISPER)
-                : ClientChatChannelState.displayName(tab);
+                : ClientChatChannelState.displayName(page);
         root.appendSibling(ChatPrefixMarker.channel(
                 text(label, nearestFormatting(channelColor), false),
                 channelColor));
@@ -4397,7 +4409,7 @@ public final class LostTalesChatPresentation {
      * The channel pass over one run of body text: a word behind a
      * {@code #} that names a conversation — {@code #ooc},
      * {@code #gondor} — is drawn as {@code #Name} in its colour and
-     * links to its tab; every other word goes on to the mention pass.
+     * links to its page; every other word goes on to the mention pass.
      */
     private static void appendChannelsAndMentions(ChatComponentText root,
                                                   String text,
@@ -4435,7 +4447,7 @@ public final class LostTalesChatPresentation {
 
     /**
      * A channel as a link, in its colour: {@code #Name} alone for the
-     * tab, and for a link to one of its messages — by this client's
+     * page, and for a link to one of its messages — by this client's
      * own line id, or the server's message id — {@code #Name >} and a
      * speech bubble after it, the way a messenger draws a link to a
      * message. The pieces carry one marker, so they light together and
@@ -4444,41 +4456,41 @@ public final class LostTalesChatPresentation {
     static void appendChannelLink(ChatComponentText root, ChatChannel named,
                                   String scope, int chatLineId,
                                   long messageId) {
-        ConversationPage tab = ConversationPage.of(named, scope);
-        // A whisper link names no tab: only its two people hold the
+        ConversationPage page = ConversationPage.of(named, scope);
+        // A whisper link names no page: only its two people hold the
         // message, and the click finds it by its id.
         appendChannelLink(root, "#" + ClientChatChannelState.displayName(
                 named, scope), ClientChatChannelState.displayColor(named, scope),
-                tab == null ? ChatTabIds.WHISPER_PREFIX : tab.id(),
+                page == null ? ChatPageIds.WHISPER_PREFIX : page.id(),
                 chatLineId, messageId);
     }
 
     static void appendChannelLink(ChatComponentText root, String label,
-                                  int color, String tabId, int chatLineId,
+                                  int color, String pageId, int chatLineId,
                                   long messageId) {
         boolean toMessage = chatLineId != 0
                 || ChatMessageIds.isServerId(messageId);
         root.appendSibling(link(text(label, nearestFormatting(color), false),
-                color, tabId, chatLineId, messageId));
+                color, pageId, chatLineId, messageId));
         if (!toMessage) {
             return;
         }
         root.appendSibling(link(text(ChatChannelLinkMarker.MESSAGE_SEPARATOR,
-                nearestFormatting(color), false), color, tabId, chatLineId,
+                nearestFormatting(color), false), color, pageId, chatLineId,
                 messageId));
         ChatComponentText slot = text(ChatChannelLinkMarker.ICON_SLOT,
                 nearestFormatting(color), false);
         slot.getChatStyle().setBold(Boolean.TRUE);
-        root.appendSibling(link(slot, color, tabId, chatLineId, messageId));
+        root.appendSibling(link(slot, color, pageId, chatLineId, messageId));
     }
 
     private static ChatComponentText link(ChatComponentText run, int color,
-                                          String tabId, int chatLineId,
+                                          String pageId, int chatLineId,
                                           long messageId) {
         return ChatMessageIds.isServerId(messageId)
-                ? ChatChannelLinkMarker.applyMessage(run, color, tabId,
+                ? ChatChannelLinkMarker.applyMessage(run, color, pageId,
                         messageId)
-                : ChatChannelLinkMarker.apply(run, color, tabId, chatLineId);
+                : ChatChannelLinkMarker.apply(run, color, pageId, chatLineId);
     }
 
     /**

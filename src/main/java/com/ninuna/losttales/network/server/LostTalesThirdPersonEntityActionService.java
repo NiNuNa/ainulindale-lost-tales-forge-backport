@@ -16,7 +16,11 @@ import cpw.mods.fml.common.eventhandler.Event;
 
 import java.util.List;
 
-/** Server-thread authority boundary for offset-camera entity actions. */
+/**
+ * Attacks and uses of the entity a player aims at over the shoulder,
+ * checked again on the server thread: reach, a clear line to it, and no
+ * other entity in front of it.
+ */
 public final class LostTalesThirdPersonEntityActionService {
     private static final double SURVIVAL_ENTITY_REACH = 3.0D;
     private static final double CREATIVE_ENTITY_REACH = 6.0D;

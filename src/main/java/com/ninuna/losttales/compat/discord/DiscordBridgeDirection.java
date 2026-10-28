@@ -2,7 +2,7 @@ package com.ninuna.losttales.compat.discord;
 
 import java.util.Locale;
 
-/** Which way lines cross a Discord binding. */
+/** Which way lines cross a Discord link. */
 public enum DiscordBridgeDirection {
     DISABLED(false, false),
     GAME_TO_DISCORD(true, false),
@@ -17,12 +17,12 @@ public enum DiscordBridgeDirection {
         this.reads = reads;
     }
 
-    /** Whether game lines of the bound channel are posted to Discord. */
+    /** Whether game lines of the linked channel are posted to Discord. */
     public boolean sendsToDiscord() {
         return this.sends;
     }
 
-    /** Whether Discord messages are delivered into the bound channel. */
+    /** Whether Discord messages are delivered into the linked channel. */
     public boolean readsFromDiscord() {
         return this.reads;
     }

@@ -19,8 +19,8 @@ import java.util.Locale;
 
 /** A request about one quest, from the journal or a quest conversation. */
 public class LostTalesQuestActionPacket implements IMessage {
-    public static final String ACTION_PIN = "pin";
-    public static final String ACTION_UNPIN = "unpin";
+    public static final String ACTION_TRACK = "track";
+    public static final String ACTION_UNTRACK = "untrack";
     /**
      * Giving a quest up. The client names the quest; the server decides
      * whether it is one this player is on and one that may be given up
@@ -136,7 +136,7 @@ public class LostTalesQuestActionPacket implements IMessage {
     }
 
     private static boolean isKnownAction(String action) {
-        return ACTION_PIN.equals(action) || ACTION_UNPIN.equals(action)
+        return ACTION_TRACK.equals(action) || ACTION_UNTRACK.equals(action)
                 || ACTION_ABANDON.equals(action)
                 || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
@@ -146,7 +146,7 @@ public class LostTalesQuestActionPacket implements IMessage {
     }
 
     private static boolean hasValidIdentifierUsage(String action, String identifier) {
-        if (ACTION_PIN.equals(action) || ACTION_ABANDON.equals(action)
+        if (ACTION_TRACK.equals(action) || ACTION_ABANDON.equals(action)
                 || ACTION_CLEAR.equals(action)
                 || ACTION_ACCEPT.equals(action)
                 || ACTION_HAND_IN.equals(action)
@@ -159,13 +159,13 @@ public class LostTalesQuestActionPacket implements IMessage {
 
     private static void execute(EntityPlayerMP player, String action, String questId,
                                 int choice) {
-        if (ACTION_PIN.equals(action)) {
-            LostTalesQuestManager.pinQuest(player, questId);
-        } else if (ACTION_UNPIN.equals(action)) {
+        if (ACTION_TRACK.equals(action)) {
+            LostTalesQuestManager.trackQuest(player, questId);
+        } else if (ACTION_UNTRACK.equals(action)) {
             if (questId.length() > 0) {
-                LostTalesQuestManager.unpinQuest(player, questId);
+                LostTalesQuestManager.untrackQuest(player, questId);
             } else {
-                LostTalesQuestManager.unpinQuest(player);
+                LostTalesQuestManager.untrackQuest(player);
             }
         } else if (ACTION_ABANDON.equals(action)) {
             LostTalesQuestManager.abandonOwnQuest(player, questId);

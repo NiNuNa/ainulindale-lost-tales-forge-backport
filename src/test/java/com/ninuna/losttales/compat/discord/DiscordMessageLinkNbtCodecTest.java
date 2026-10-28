@@ -42,7 +42,7 @@ public final class DiscordMessageLinkNbtCodecTest {
     @Test
     public void linksRoundTripWithoutTheirWebhooks() {
         DiscordMessageLinks links = new DiscordMessageLinks();
-        // A game line posted through two bindings into two channels.
+        // A game line posted through two links into two channels.
         links.link(1000L, "111", "-# ↩ header\n", "channel:5", WEBHOOK, "ooc");
         links.link(1000L, "222", "", "channel:6", OTHER_WEBHOOK, "ooc#2");
         // A Discord member's line, read from a channel.
@@ -67,13 +67,13 @@ public final class DiscordMessageLinkNbtCodecTest {
         List<DiscordMessageLinks.Copy> copies = restored.copiesOf(1000L);
         assertEquals(2, copies.size());
         assertEquals("-# ↩ header\n", copies.get(0).header);
-        assertEquals("ooc", copies.get(0).bindingId);
+        assertEquals("ooc", copies.get(0).channelLinkId);
         assertEquals("", copies.get(0).webhookUrl);
         // Each copy comes back under the channel it is in.
         assertEquals("channel:6", copies.get(1).destination);
-        assertEquals("ooc#2", copies.get(1).bindingId);
+        assertEquals("ooc#2", copies.get(1).channelLinkId);
         assertEquals("", copies.get(1).webhookUrl);
-        assertEquals("", restored.copiesOf(2000L).get(0).bindingId);
+        assertEquals("", restored.copiesOf(2000L).get(0).channelLinkId);
         // Written again, the save says exactly the same.
         assertEquals(written, write(restored));
     }
@@ -88,7 +88,7 @@ public final class DiscordMessageLinkNbtCodecTest {
         // A post known by its webhook alone is left out.
         links.link(2000L, "222", "", WEBHOOK, WEBHOOK, "ooc");
         links.link(3000L, "333", "", OTHER_WEBHOOK, OTHER_WEBHOOK, "");
-        // A binding id that could pass for a URL is not written.
+        // A link id that could pass for a URL is not written.
         links.link(4000L, "444", "", "channel:6", OTHER_WEBHOOK,
                 "https://evil.example/x");
 
@@ -175,10 +175,10 @@ public final class DiscordMessageLinkNbtCodecTest {
         NBTTagCompound urlDestination = entryLike(second, 4000L, "400");
         firstCopyOf(urlDestination).setString("Destination", WEBHOOK);
         NBTTagCompound badDiscordId = entryLike(second, 5000L, "not-a-snowflake");
-        // Kept under a binding rather than its channel.
-        NBTTagCompound underBinding = entryLike(second, 6000L, "600");
-        firstCopyOf(underBinding).setString("Destination", "binding:ooc");
-        firstCopyOf(underBinding).setString("Binding", "ooc");
+        // Kept under a link rather than its channel.
+        NBTTagCompound underChannelLink = entryLike(second, 6000L, "600");
+        firstCopyOf(underChannelLink).setString("Destination", "link:ooc");
+        firstCopyOf(underChannelLink).setString("ChannelLink", "ooc");
         NBTTagCompound noCopies = entryLike(second, 7000L, "700");
         noCopies.setTag("Copies", new NBTTagList());
         // Another message under a Discord id the second already names.
@@ -191,7 +191,7 @@ public final class DiscordMessageLinkNbtCodecTest {
         rewritten.appendTag(noId);
         rewritten.appendTag(urlDestination);
         rewritten.appendTag(badDiscordId);
-        rewritten.appendTag(underBinding);
+        rewritten.appendTag(underChannelLink);
         rewritten.appendTag(noCopies);
         rewritten.appendTag(takenDiscordId);
         rewritten.appendTag(sameMessage);
@@ -320,7 +320,7 @@ public final class DiscordMessageLinkNbtCodecTest {
     /** A copy without a field the writer always writes is quarantined with its message. */
     @Test
     public void aCopyMissingAFieldIsQuarantined() {
-        for (String field : new String[] {"Binding", "Header"}) {
+        for (String field : new String[] {"ChannelLink", "Header"}) {
             DiscordMessageLinks links = new DiscordMessageLinks();
             links.link(1000L, "111", "", "channel:5", "");
             NBTTagCompound written = write(links);

@@ -30,7 +30,7 @@ import static org.junit.Assert.assertTrue;
 public final class LostTalesQuestRulesTest {
     private static final String GIVER_QUEST = "{\"id\":\"losttales:test/back\","
             + "\"startMode\":\"interaction\",\"interaction\":{\"entity\":\"losttales.Nia\"},"
-            + "\"dialogue\":{\"offer\":\"Help?\",\"handIn\":\"You came back!\"},"
+            + "\"conversation\":{\"offer\":\"Help?\",\"handIn\":\"You came back!\"},"
             + "\"returnTo\":\"giver\",\"timeLimit\":\"2.5\",\"failOn\":\"death,giverKilled\","
             + "\"stages\":[{\"id\":\"10\",\"timeLimit\":\"1\",\"objectives\":[{\"id\":\"a\","
             + "\"type\":\"gather\",\"params\":{\"item\":\"minecraft:log\"}}]}]}";
@@ -75,7 +75,7 @@ public final class LostTalesQuestRulesTest {
 
     private static final String BRANCHING = "{\"id\":\"losttales:test/mill\","
             + "\"startMode\":\"interaction\",\"interaction\":{\"entity\":\"losttales.Nia\"},"
-            + "\"dialogue\":{\"offer\":\"Thieves at the mill.\"},"
+            + "\"conversation\":{\"offer\":\"Thieves at the mill.\"},"
             + "\"stages\":[{\"id\":\"look\",\"ask\":\"Will you warn him?\","
             + "\"choices\":[{\"say\":\"I'll warn the miller.\",\"next\":\"miller\"},"
             + "{\"say\":\"Let him learn.\",\"next\":\"thieves\"}],"
@@ -152,7 +152,7 @@ public final class LostTalesQuestRulesTest {
     @Test
     public void aMissiveIsHandedInAtABoard() {
         LostTalesMissiveData letter = LostTalesMissiveData.builder(
-                "losttales:missive/generated/test", "kill")
+                "losttales:missive/test", "kill")
                 .titleId("clear_the_paths")
                 .objective(new LostTalesMissiveObjectiveData("kill_wolves", "kill",
                         false, Collections.singletonMap("count", "3")))

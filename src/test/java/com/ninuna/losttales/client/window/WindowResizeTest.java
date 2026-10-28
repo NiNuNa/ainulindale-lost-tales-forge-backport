@@ -71,7 +71,7 @@ public final class WindowResizeTest {
         assertFalse(window.getActiveTab().isMemberListOut());
         assertTrue(WindowLayout.resetWindow(window.getId()));
         for (WindowPage tab : window.getTabs()) {
-            tab.resetView();
+            tab.resetPanels();
         }
         assertFalse(window.isPinnedToHud());
         assertFalse(window.isPinnedToGui());
@@ -146,7 +146,7 @@ public final class WindowResizeTest {
 
     /**
      * A width belongs to one window: bounded, written down beside its
-     * height, and read back for that window alone. The closed-chat feed
+     * height, and read back for that window alone. The feed
      * and any window without one keep the game's own chat width.
      */
     @Test

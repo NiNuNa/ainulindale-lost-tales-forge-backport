@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  */
 final class DiscordMessageLinkRewriter {
     /** A Discord id in a link: as many digits as a Discord id has at most. */
-    private static final String ID = "(\\d{1," + DiscordChannelBindings.MAX_SNOWFLAKE_DIGITS + "})";
+    private static final String ID = "(\\d{1," + DiscordChannelLinks.MAX_SNOWFLAKE_DIGITS + "})";
     /**
      * A Discord jump URL: the guild, the channel and the message, on
      * any of Discord's hosts.
@@ -42,7 +42,7 @@ final class DiscordMessageLinkRewriter {
         /**
          * The game's {@code #<code name>/<id>} for the Discord message, or
          * empty when the bridge never carried it, or the channel is not
-         * bound to any of the game's.
+         * linked to any of the game's.
          */
         String gameLink(String guildId, String channelId, String discordMessageId);
     }

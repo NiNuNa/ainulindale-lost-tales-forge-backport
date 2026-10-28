@@ -184,6 +184,6 @@ public final class QuestLogSyncTest {
                 .getActiveQuest("a:hunt").getObjectiveProgress().get("wolves"));
         assertFalse(LostTalesClientQuestProgressStore.isQuestActive("a:unknown"));
         assertTrue("the rest of the log stays",
-                LostTalesClientQuestProgressStore.isQuestPinned("a:hunt"));
+                LostTalesClientQuestProgressStore.isQuestTracked("a:hunt"));
     }
 }

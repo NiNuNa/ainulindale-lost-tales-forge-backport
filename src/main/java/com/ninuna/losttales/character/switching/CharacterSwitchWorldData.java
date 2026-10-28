@@ -17,7 +17,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/** Versioned persistent account manifests and switch transaction journals. */
+/** The switch store: each account's cooldown, freeze, unsettled death and switch journal. */
 public final class CharacterSwitchWorldData extends WorldSavedData {
 
     public static final String DATA_NAME = "losttales_character_switches";

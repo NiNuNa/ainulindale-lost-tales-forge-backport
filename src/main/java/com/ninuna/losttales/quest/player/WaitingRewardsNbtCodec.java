@@ -23,7 +23,7 @@ import net.minecraftforge.common.util.Constants;
  * whole log read-only, kept as it was. A quest's entry that cannot be
  * read (an id past its bound or said twice, a reward without its parts,
  * a count out of bounds, a kind said twice) is set aside whole in the
- * quarantine, never dropped. An item the game no longer has is no fault:
+ * quarantine, never dropped. An item the game lacks is no fault:
  * it waits until the game has it again.</p>
  */
 public final class WaitingRewardsNbtCodec {

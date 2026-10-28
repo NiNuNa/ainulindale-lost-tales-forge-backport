@@ -16,7 +16,7 @@ public final class LostTalesClientQuestProgressStoreTest {
     }
 
     @Test
-    public void syncedDiscoveryAndPinUseLogicalLotrIdentity() {
+    public void syncedDiscoveryAndTrackUseLogicalLotrIdentity() {
         LostTalesClientQuestProgressStore.update(
                 Collections.emptyList(), Collections.emptySet(),
                 Collections.emptySet(),
@@ -28,9 +28,9 @@ public final class LostTalesClientQuestProgressStoreTest {
         assertTrue(LostTalesClientQuestProgressStore
                 .isMarkerDiscovered("lotr:waypoint:hobbiton"));
         assertTrue(LostTalesClientQuestProgressStore
-                .isMapMarkerPinned("LOTR:WAYPOINT:hobbiton"));
+                .isMapMarkerTracked("LOTR:WAYPOINT:hobbiton"));
         assertTrue(LostTalesClientQuestProgressStore
-                .isMapMarkerPinned("lotr:waypoint:HOBBITON"));
+                .isMapMarkerTracked("lotr:waypoint:HOBBITON"));
     }
 
     @Test
@@ -46,9 +46,9 @@ public final class LostTalesClientQuestProgressStoreTest {
         assertTrue(LostTalesClientQuestProgressStore
                 .isMarkerDiscovered("losttales:town"));
         assertTrue(LostTalesClientQuestProgressStore
-                .isMapMarkerPinned("losttales:Town"));
+                .isMapMarkerTracked("losttales:Town"));
         assertFalse(LostTalesClientQuestProgressStore
-                .isMapMarkerPinned("losttales:town"));
+                .isMapMarkerTracked("losttales:town"));
     }
 
     @Test

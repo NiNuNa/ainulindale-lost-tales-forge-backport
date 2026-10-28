@@ -126,7 +126,7 @@ public final class ChatInputBarTest {
     /**
      * The bar's spacing: two clear rows between the rule and what stands
      * on the bar and two between it and the bar's foot, the window's
-     * frame running just below; seven clear pixels before the tab button
+     * frame running just below; seven clear pixels before the page button
      * and after the identity button, and five between the two framed
      * buttons.
      */
@@ -204,9 +204,9 @@ public final class ChatInputBarTest {
                 ChatInputBar.NOTICE_LIFETIME_MILLIS - 1.0F) < 0.01F);
     }
 
-    /** The tab button names the channel as its tab does. */
+    /** The page button names the channel as its page does. */
     @Test
-    public void theTabButtonNamesTheChannelAsItsTabDoes() {
+    public void thePageButtonNamesTheChannelAsItsTabDoes() {
         ClientChatChannelState.clear();
         ConversationPage ooc = ConversationPage.of(ChatChannel.OOC);
         assertEquals(ClientChatChannelState.displayName(ooc),
@@ -219,12 +219,12 @@ public final class ChatInputBarTest {
     }
 
     /**
-     * The tab and identity buttons give the field what it lacks of its
+     * The page and identity buttons give the field what it lacks of its
      * comfortable width, the name first, down to the icon alone: each
      * pixel the field lacks moves the divider by one.
      */
     @Test
-    public void theTabButtonGivesItsNameUpForTheField() {
+    public void thePageButtonGivesItsNameUpForTheField() {
         int whole = 80;
         int comfortable = ChatInputBar.COMFORTABLE_FIELD_WIDTH;
         assertEquals(whole, ChatInputBar.leadWidth(whole, comfortable));

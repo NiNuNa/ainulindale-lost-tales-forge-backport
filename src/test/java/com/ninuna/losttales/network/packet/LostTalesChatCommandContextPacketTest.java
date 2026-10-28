@@ -9,13 +9,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * The tab a command was typed in crosses whole, and anything that is
- * not a tab id is refused rather than kept.
+ * The page a command was typed in crosses whole, and anything that is
+ * not a page id is refused rather than kept.
  */
 public final class LostTalesChatCommandContextPacketTest {
 
     @Test
-    public void aTabIdRoundTrips() {
+    public void aPageIdRoundTrips() {
         LostTalesChatCommandContextPacket packet =
                 new LostTalesChatCommandContextPacket("faction|scope:gondor");
         ByteBuf buffer = Unpooled.buffer();
@@ -24,7 +24,7 @@ public final class LostTalesChatCommandContextPacketTest {
                 new LostTalesChatCommandContextPacket();
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
-        assertEquals("faction|scope:gondor", decoded.getTabId());
+        assertEquals("faction|scope:gondor", decoded.getPageId());
         assertEquals(0, buffer.readableBytes());
     }
 
@@ -40,11 +40,11 @@ public final class LostTalesChatCommandContextPacketTest {
             new LostTalesChatCommandContextPacket("all\nwhisper:Steve");
             assertTrue(false);
         } catch (IllegalArgumentException expected) {
-            // a line break is not part of any tab id
+            // a line break is not part of any page id
         }
         StringBuilder long_ = new StringBuilder();
         for (int index = 0;
-             index <= LostTalesChatCommandContextPacket.MAX_TAB_ID_CHARACTERS;
+             index <= LostTalesChatCommandContextPacket.MAX_PAGE_ID_CHARACTERS;
              index++) {
             long_.append('x');
         }
@@ -52,7 +52,7 @@ public final class LostTalesChatCommandContextPacketTest {
             new LostTalesChatCommandContextPacket(long_.toString());
             assertTrue(false);
         } catch (IllegalArgumentException expected) {
-            // longer than any tab id
+            // longer than any page id
         }
     }
 
@@ -66,7 +66,7 @@ public final class LostTalesChatCommandContextPacketTest {
                 new LostTalesChatCommandContextPacket();
         decoded.fromBytes(trailing);
         assertTrue(decoded.isMalformed());
-        assertEquals("", decoded.getTabId());
+        assertEquals("", decoded.getPageId());
         assertEquals(0, trailing.readableBytes());
 
         // A control character inside the id.

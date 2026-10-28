@@ -9,7 +9,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Which lines a choice lets through: the lines that chime under
- * Notification Settings, and the lines that reach the closed feed under
+ * Notification Settings, and the lines that reach the feed under
  * Chat Feed Settings, one set of three words for both. A line is addressed to the
  * player when it mentions them or replies to them.
  */
@@ -71,8 +71,8 @@ public final class ChatLineChoiceTest {
         for (ChatLineChoice choice : ChatLineChoice.values()) {
             assertTrue(choice.labelKey(), keys.contains(choice.labelKey()));
         }
-        assertTrue(keys.contains("gui.losttales.chat.tab.notify"));
-        assertTrue(keys.contains("gui.losttales.chat.tab.feed"));
+        assertTrue(keys.contains("gui.losttales.chat.page.notify"));
+        assertTrue(keys.contains("gui.losttales.chat.page.feed"));
     }
 
     /**

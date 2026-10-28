@@ -43,7 +43,7 @@ public final class ClientChatPendingEchoesTest {
     @Test
     public void aPromisedLineIsPendingUntilItIsTaken() {
         long nonce = ClientChatPendingEchoes.nextNonce();
-        ClientChatPendingEchoes.remember(nonce, 41, packet(), tab(), null,
+        ClientChatPendingEchoes.remember(nonce, 41, packet(), page(), null,
                 1000L);
         assertTrue(ClientChatPendingEchoes.isPending(41));
 
@@ -68,8 +68,8 @@ public final class ClientChatPendingEchoesTest {
     public void onlyPromisesPastTheTimeoutAreGivenUpOn() {
         long old = ClientChatPendingEchoes.nextNonce();
         long recent = ClientChatPendingEchoes.nextNonce();
-        ClientChatPendingEchoes.remember(old, 1, packet(), tab(), null, 0L);
-        ClientChatPendingEchoes.remember(recent, 2, packet(), tab(), null,
+        ClientChatPendingEchoes.remember(old, 1, packet(), page(), null, 0L);
+        ClientChatPendingEchoes.remember(recent, 2, packet(), page(), null,
                 ClientChatPendingEchoes.TIMEOUT_MILLIS);
 
         List<ClientChatPendingEchoes.Pending> gone =
@@ -88,7 +88,7 @@ public final class ClientChatPendingEchoesTest {
     @Test
     public void clearingForgetsEverything() {
         long nonce = ClientChatPendingEchoes.nextNonce();
-        ClientChatPendingEchoes.remember(nonce, 3, packet(), tab(), null, 0L);
+        ClientChatPendingEchoes.remember(nonce, 3, packet(), page(), null, 0L);
         assertTrue(ClientChatPendingEchoes.isPending(3));
         ClientChatPendingEchoes.clear();
         assertFalse(ClientChatPendingEchoes.isPending(3));
@@ -98,7 +98,7 @@ public final class ClientChatPendingEchoesTest {
                 ClientChatPendingEchoes.TIMEOUT_MILLIS + 1L).isEmpty());
     }
 
-    private static ConversationPage tab() {
+    private static ConversationPage page() {
         return ConversationPage.of(ChatChannel.OOC);
     }
 

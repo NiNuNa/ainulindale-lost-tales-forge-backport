@@ -1,6 +1,6 @@
 package com.ninuna.losttales.client.chat;
 
-import com.ninuna.losttales.client.mapmarker.LostTalesMapCursor;
+import com.ninuna.losttales.client.mapmarker.LostTalesPointer;
 import com.ninuna.losttales.client.window.WindowHover;
 import org.junit.Test;
 
@@ -26,7 +26,7 @@ public final class ChatHoverTest {
                 ChatHover.Kind.PICKER_BUTTON, ChatHover.Kind.JUMP_PILL,
                 ChatHover.Kind.REPLY_CHIP, ChatHover.Kind.MESSAGE_TOOLBAR,
                 ChatHover.Kind.SCROLLBAR}) {
-            assertEquals(kind.name(), LostTalesMapCursor.Pose.HAND,
+            assertEquals(kind.name(), LostTalesPointer.Pose.HAND,
                     new ChatHover(kind).pose());
         }
     }
@@ -35,7 +35,7 @@ public final class ChatHoverTest {
     public void theArrowIsWhereAPressOnlyLands() {
         for (ChatHover.Kind kind : new ChatHover.Kind[] {
                 ChatHover.Kind.SUGGESTIONS, ChatHover.Kind.PICKER}) {
-            assertEquals(kind.name(), LostTalesMapCursor.Pose.ARROW,
+            assertEquals(kind.name(), LostTalesPointer.Pose.ARROW,
                     new ChatHover(kind).pose());
         }
     }
@@ -43,18 +43,18 @@ public final class ChatHoverTest {
     @Test
     public void aLineOrAWindowActsOnlyWhenAPressWouldDoSomething() {
         ChatHover line = new ChatHover(ChatHover.Kind.LINE);
-        assertEquals(LostTalesMapCursor.Pose.ARROW, line.pose());
+        assertEquals(LostTalesPointer.Pose.ARROW, line.pose());
         line.acts = true;
-        assertEquals(LostTalesMapCursor.Pose.HAND, line.pose());
+        assertEquals(LostTalesPointer.Pose.HAND, line.pose());
         ChatHover window = new ChatHover(ChatHover.Kind.WINDOW);
-        assertEquals(LostTalesMapCursor.Pose.ARROW, window.pose());
+        assertEquals(LostTalesPointer.Pose.ARROW, window.pose());
         window.acts = true;
-        assertEquals(LostTalesMapCursor.Pose.HAND, window.pose());
+        assertEquals(LostTalesPointer.Pose.HAND, window.pose());
     }
 
     @Test
     public void aMemberListsEdgeResizesSideways() {
-        assertEquals(LostTalesMapCursor.Pose.RESIZE_HORIZONTAL,
+        assertEquals(LostTalesPointer.Pose.RESIZE_HORIZONTAL,
                 new ChatHover(ChatHover.Kind.MEMBER_LIST_EDGE).pose());
     }
 

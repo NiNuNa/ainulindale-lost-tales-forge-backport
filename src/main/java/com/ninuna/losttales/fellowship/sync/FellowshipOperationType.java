@@ -1,6 +1,6 @@
 package com.ninuna.losttales.fellowship.sync;
 
-/** Stable network identifiers for fellowship requests and operation feedback. */
+/** The fellowship requests, each with the number it goes by on the wire. */
 public enum FellowshipOperationType {
     REQUEST_STATE(0, "request_state"),
     CREATE(1, "create"),
@@ -13,8 +13,8 @@ public enum FellowshipOperationType {
     ACCEPT_INVITATION(8, "accept_invitation"),
     DECLINE_INVITATION(9, "decline_invitation"),
     CANCEL_INVITATION(10, "cancel_invitation"),
-    SET_GO_HERE_MARKER(11, "set_go_here_marker"),
-    REMOVE_GO_HERE_MARKER(12, "remove_go_here_marker"),
+    SET_GO_HERE_MARK(11, "set_go_here_mark"),
+    REMOVE_GO_HERE_MARK(12, "remove_go_here_mark"),
     RENAME(13, "rename"),
     SET_GUIDE(14, "set_guide"),
     SET_ICON(15, "set_icon"),
@@ -73,7 +73,7 @@ public enum FellowshipOperationType {
 
     /** Whether the request carries a place on the map: a go-here mark set, a fellowship's mark placed or moved. */
     public boolean requiresMapPosition() {
-        return this == SET_GO_HERE_MARKER || this == PLACE_MARK
+        return this == SET_GO_HERE_MARK || this == PLACE_MARK
                 || this == MOVE_MARK;
     }
 

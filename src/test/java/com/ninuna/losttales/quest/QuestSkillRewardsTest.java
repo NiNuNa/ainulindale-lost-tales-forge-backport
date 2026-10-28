@@ -36,7 +36,8 @@ public final class QuestSkillRewardsTest {
                 + " \"type\": \"goto\", \"params\": {\"x\": \"0\", \"y\": \"64\", \"z\": \"0\"}}]}],"
                 + " \"rewards\": {\"skills\": \"" + skills + "\"}}";
         LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser.parseQuest(
-                new java.io.StringReader(file), "quests/test/skill_reward.json");
+                new java.io.StringReader(file), "quests/test/skill_reward.json",
+                new java.util.ArrayList<String>());
         List<String> warnings = LostTalesQuestDefinitionValidator.warningsOf(quest,
                 new java.util.ArrayList<String>());
         StringBuilder all = new StringBuilder();

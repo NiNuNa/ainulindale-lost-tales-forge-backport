@@ -1,5 +1,7 @@
 package com.ninuna.losttales.quest.missive;
 
+import com.ninuna.losttales.storage.NbtQuarantine;
+import java.util.List;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import org.junit.Test;
@@ -14,8 +16,8 @@ import static org.junit.Assert.assertTrue;
  * longer stand on a board, and fails closed on data it cannot read.
  */
 public final class MissivesTakenWorldDataTest {
-    private static final String A = "losttales:missive/generated/a";
-    private static final String B = "losttales:missive/generated/b";
+    private static final String A = "losttales:missive/a";
+    private static final String B = "losttales:missive/b";
 
     private static MissivesTakenWorldData data() {
         return new MissivesTakenWorldData(MissivesTakenWorldData.DATA_NAME);
@@ -47,7 +49,7 @@ public final class MissivesTakenWorldDataTest {
         data.take(A, 100L, 100L, 1000L);
         data.take(B, 900L, 1000L, 1000L);
         assertTrue("posted at 100, still on boards at 1000", data.wasTaken(A));
-        assertTrue(data.take("losttales:missive/generated/c", 1500L, 1500L, 1000L));
+        assertTrue(data.take("losttales:missive/c", 1500L, 1500L, 1000L));
         assertFalse("gone from boards by 1100", data.wasTaken(A));
         assertTrue(data.wasTaken(B));
     }
@@ -57,15 +59,15 @@ public final class MissivesTakenWorldDataTest {
     public void theRecordRefusesPastItsBound() {
         MissivesTakenWorldData data = data();
         for (int index = 0; index < MissivesTakenWorldData.MAX_ENTRIES; index++) {
-            assertTrue(data.take("losttales:missive/generated/" + index, index,
+            assertTrue(data.take("losttales:missive/" + index, index,
                     index, 0L));
         }
         assertFalse("a full record takes no more", data.take(
-                "losttales:missive/generated/full", 1L, 1L, 0L));
+                "losttales:missive/full", 1L, 1L, 0L));
         assertEquals(MissivesTakenWorldData.MAX_ENTRIES, data.size());
         assertTrue("the oldest is still remembered",
-                data.wasTaken("losttales:missive/generated/0"));
-        assertFalse(data.wasTaken("losttales:missive/generated/full"));
+                data.wasTaken("losttales:missive/0"));
+        assertFalse(data.wasTaken("losttales:missive/full"));
     }
 
     /**
@@ -84,7 +86,7 @@ public final class MissivesTakenWorldDataTest {
         data.take(A, 100L, 100L, keep);
         data.take(B, keep, keep, keep);
         assertTrue("posted at 100, a copy could still stand", data.wasTaken(A));
-        data.take("losttales:missive/generated/c", keep + 100L, keep + 100L, keep);
+        data.take("losttales:missive/c", keep + 100L, keep + 100L, keep);
         assertFalse("past the longest days a notice may stand", data.wasTaken(A));
         assertTrue(data.wasTaken(B));
 
@@ -99,7 +101,8 @@ public final class MissivesTakenWorldDataTest {
     @Test
     public void unreadableDataFailsClosedAndIsKeptVerbatim() {
         NBTTagCompound newer = new NBTTagCompound();
-        newer.setInteger(MissivesTakenWorldData.TAG_VERSION, 2);
+        newer.setInteger(MissivesTakenWorldData.TAG_VERSION,
+                MissivesTakenWorldData.DATA_VERSION + 1);
         newer.setString("Future", "kept");
         MissivesTakenWorldData data = data();
         data.readFromNBT(newer);
@@ -110,7 +113,11 @@ public final class MissivesTakenWorldDataTest {
         assertEquals(newer, written);
     }
 
-    /** An entry that cannot be read is kept aside, untouched, and the rest still read. */
+    /**
+     * An entry that cannot be read is set aside in the shared quarantine
+     * with its reason and place, kept whole, and the rest still read
+     * (DATA-10).
+     */
     @Test
     public void aBrokenEntryIsQuarantined() {
         MissivesTakenWorldData data = data();
@@ -127,8 +134,81 @@ public final class MissivesTakenWorldDataTest {
         assertFalse(read.wasTaken(B));
         NBTTagCompound again = new NBTTagCompound();
         read.writeToNBT(again);
-        NBTTagList aside = again.getTagList(MissivesTakenWorldData.TAG_QUARANTINED, 10);
-        assertEquals(1, aside.tagCount());
-        assertEquals(broken, aside.getCompoundTagAt(0));
+        List<NBTTagCompound> aside = NbtQuarantine.read(again).getEntries();
+        assertEquals(1, aside.size());
+        assertEquals("unreadable_posting_time", aside.get(0).getString("Reason"));
+        assertEquals(1, aside.get(0).getInteger(MissivesTakenWorldData.TAG_TAKEN_INDEX));
+        assertEquals(broken, aside.get(0).getCompoundTag("OriginalData"));
+
+        MissivesTakenWorldData kept = data();
+        kept.readFromNBT(again);
+        assertTrue("what was set aside stays aside", kept.isUsable());
+        NBTTagCompound third = new NBTTagCompound();
+        kept.writeToNBT(third);
+        assertEquals(1, NbtQuarantine.read(third).getEntries().size());
+    }
+
+    /** The later of two entries for one missive is set aside, never dropped. */
+    @Test
+    public void aSecondEntryForOneMissiveIsQuarantined() {
+        MissivesTakenWorldData data = data();
+        data.take(A, 5L, 5L, 0L);
+        NBTTagCompound tag = new NBTTagCompound();
+        data.writeToNBT(tag);
+        NBTTagCompound twice = new NBTTagCompound();
+        twice.setString(MissivesTakenWorldData.TAG_QUEST_ID, A);
+        twice.setLong(MissivesTakenWorldData.TAG_POSTED_AT, 9L);
+        tag.getTagList(MissivesTakenWorldData.TAG_TAKEN, 10).appendTag(twice);
+        MissivesTakenWorldData read = data();
+        read.readFromNBT(tag);
+        assertTrue(read.wasTaken(A));
+        NBTTagCompound again = new NBTTagCompound();
+        read.writeToNBT(again);
+        assertEquals(1, again.getTagList(MissivesTakenWorldData.TAG_TAKEN, 10).tagCount());
+        List<NBTTagCompound> aside = NbtQuarantine.read(again).getEntries();
+        assertEquals(1, aside.size());
+        assertEquals("duplicate_missive", aside.get(0).getString("Reason"));
+    }
+
+    /**
+     * A quarantine past its bound keeps the whole store as it was,
+     * read-only, and so does one this build cannot read.
+     */
+    @Test
+    public void aQuarantinePastItsBoundKeepsTheStoreAsItWas() {
+        NBTTagCompound tag = new NBTTagCompound();
+        data().writeToNBT(tag);
+        NBTTagList taken = tag.getTagList(MissivesTakenWorldData.TAG_TAKEN, 10);
+        for (int index = 0; index <= NbtQuarantine.MAX_ENTRIES; index++) {
+            taken.appendTag(new NBTTagCompound());
+        }
+        MissivesTakenWorldData data = data();
+        data.readFromNBT(tag);
+        assertFalse(data.isUsable());
+        assertFalse(data.take(A, 1L, 1L, 0L));
+        NBTTagCompound written = new NBTTagCompound();
+        data.writeToNBT(written);
+        assertEquals(tag, written);
+
+        NBTTagCompound noQuarantine = new NBTTagCompound();
+        data().writeToNBT(noQuarantine);
+        noQuarantine.removeTag("Quarantine");
+        MissivesTakenWorldData unreadable = data();
+        unreadable.readFromNBT(noQuarantine);
+        assertFalse(unreadable.isUsable());
+    }
+
+    /**
+     * A letter with no posting time stands on a board for good, so the
+     * record keeps its missive for good too (one rule for a notice's
+     * days, {@link MissiveNotice#isPast}).
+     */
+    @Test
+    public void aMissivePostedAtNoTimeIsRememberedForGood() {
+        long keep = MissivesTaken.keepTicks(true);
+        MissivesTakenWorldData data = data();
+        data.take(A, 0L, 10L, keep);
+        data.take(B, keep * 10L, keep * 10L, keep);
+        assertTrue(data.wasTaken(A));
     }
 }

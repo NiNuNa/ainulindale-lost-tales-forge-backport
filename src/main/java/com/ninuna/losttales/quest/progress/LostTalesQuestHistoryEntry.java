@@ -20,10 +20,11 @@ public final class LostTalesQuestHistoryEntry {
         FAILED,
         ABANDONED;
 
+        /** The outcome named exactly as {@link #name} writes it; null for any other word. */
         public static Outcome fromName(String value) {
             if (value != null) {
                 for (Outcome outcome : values()) {
-                    if (outcome.name().equalsIgnoreCase(value)) {
+                    if (outcome.name().equals(value)) {
                         return outcome;
                     }
                 }

@@ -10,11 +10,12 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
- * The safety boundary for the character-management C2S packets: every
+ * The safety boundary for the character requests clients send: every
  * request that carries a request id and waits on a
- * {@link CharacterOperationType} answer. A profile read
- * ({@code CharacterProfileRequestPacket}) is answered with a profile packet
- * either way and goes through {@link LostTalesServerPacketDispatcher}.
+ * {@link CharacterOperationType} answer. A profile read and a gear read
+ * ({@code CharacterProfileRequestPacket}, {@code CharacterGearRequestPacket})
+ * carry no request id and go through
+ * {@link LostTalesServerPacketDispatcher}, which drops a refused one.
  *
  * <p>The gate itself — the per-player request window, the throttled
  * diagnostics — is every family's and is
@@ -25,7 +26,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
  * throttled, or a flood of requests would be a flood of answers.</p>
  *
  * <p>Also this family's own is the lifecycle epoch: a request is stamped
- * when it arrives and dropped if the player has switched character, died
+ * when it arrives and refused if the player has switched character, died
  * or changed dimension before the server thread reaches it.</p>
  */
 public final class CharacterServerPacketDispatcher {
@@ -44,6 +45,31 @@ public final class CharacterServerPacketDispatcher {
     private static boolean isLoreTransfer(CharacterOperationType operationType) {
         return operationType == CharacterOperationType.LORE_CLAIM
                 || operationType == CharacterOperationType.LORE_RELEASE;
+    }
+
+    /**
+     * A roster read goes through in a session that is not ready: a player
+     * held while the server cannot read characters, whose game asks every
+     * 30 seconds so the store is tried again (CHAR-01), and one held while
+     * their last switch waits for an administrator, whose Characters page
+     * still shows their roster (CHAR-45). Nothing is changed by it.
+     */
+    private static boolean readsInUnreadySession(EntityPlayerMP player,
+                                                 long epoch,
+                                                 CharacterOperationType operationType) {
+        return operationType == CharacterOperationType.REQUEST_ROSTER
+                && CharacterLifecycleStateTracker.isRequestInSession(player, epoch);
+    }
+
+    /** What a request refused for its session answers: a held journal says so (CHAR-45). */
+    private static CharacterErrorId sessionRefusal(EntityPlayerMP player,
+                                                   CharacterOperationType operationType) {
+        if (CharacterJoin.isHeldForJournal(player)) {
+            return CharacterErrorId.SWITCH_JOURNAL_HELD;
+        }
+        return operationType == CharacterOperationType.SELECT
+                ? CharacterErrorId.SWITCH_SESSION_CHANGED
+                : CharacterErrorId.INVALID_PLAYER;
     }
 
     public static EntityPlayerMP getPlayer(MessageContext context) {
@@ -96,14 +122,14 @@ public final class CharacterServerPacketDispatcher {
                     @Override
                     public void run(EntityPlayerMP livePlayer) {
                         if (!CharacterLifecycleStateTracker.isRequestEpochCurrent(
-                                livePlayer, requestEpoch)) {
+                                livePlayer, requestEpoch)
+                                && !readsInUnreadySession(livePlayer,
+                                        requestEpoch, guardedOperationType)) {
                             CharacterSyncManager.sendFailure(
                                     livePlayer,
                                     guardedRequestId,
                                     guardedOperationType,
-                                    guardedOperationType == CharacterOperationType.SELECT
-                                            ? CharacterErrorId.SWITCH_SESSION_CHANGED
-                                            : CharacterErrorId.INVALID_PLAYER);
+                                    sessionRefusal(livePlayer, guardedOperationType));
                             return;
                         }
                         guardedTask.run(livePlayer);

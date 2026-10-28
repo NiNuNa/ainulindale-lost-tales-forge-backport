@@ -3,13 +3,8 @@ package com.ninuna.losttales.compat.lotr;
 import com.mojang.authlib.GameProfile;
 import com.ninuna.losttales.accessory.effect.AccessoryEffectService;
 import com.ninuna.losttales.util.LostTalesLog;
-import lotr.common.LOTRLevelData;
 import lotr.common.network.LOTRPacketUpdatePlayerLocations;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.world.World;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -43,26 +38,6 @@ public final class LotrAccessoryMapHooks {
             logOnce(incompatible);
         }
         return false;
-    }
-
-    /** Sends every player in the world LOTR's map locations again. */
-    public static void refreshPlayerLocations(World world) {
-        if (world == null || world.isRemote || world.playerEntities == null) {
-            return;
-        }
-        try {
-            List<?> recipients = new ArrayList<Object>(world.playerEntities);
-            for (Object value : recipients) {
-                if (value instanceof EntityPlayer) {
-                    LOTRLevelData.sendPlayerLocationsToPlayer(
-                            (EntityPlayer)value, world);
-                }
-            }
-        } catch (RuntimeException failure) {
-            logOnce(failure);
-        } catch (LinkageError incompatible) {
-            logOnce(incompatible);
-        }
     }
 
     private static void logOnce(Throwable failure) {

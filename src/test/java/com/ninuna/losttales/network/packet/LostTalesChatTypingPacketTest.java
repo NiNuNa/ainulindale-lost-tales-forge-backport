@@ -185,8 +185,10 @@ public final class LostTalesChatTypingPacketTest {
             decoded.fromBytes(wire.copy(0, length));
             assertTrue(decoded.isMalformed());
         }
+        // The character's presence flag, before its 16 bytes and the range
+        // byte, takes no value but 0 or 1.
         decoded = new LostTalesChatTypingPacket();
-        decoded.fromBytes(wire.copy().setByte(wire.readableBytes() - 17, 2));
+        decoded.fromBytes(wire.copy().setByte(wire.readableBytes() - 18, 2));
         assertTrue(decoded.isMalformed());
     }
 }

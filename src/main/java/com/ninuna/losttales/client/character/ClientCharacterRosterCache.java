@@ -10,7 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Client-only synchronized view model. It is never authoritative.
+ * Your roster as the server last sent it, for the pages to show.
  *
  * <p>Each request is answered on its own, as the fellowship's are: the answer
  * waits under its request id until whoever sent it reads it, so a second

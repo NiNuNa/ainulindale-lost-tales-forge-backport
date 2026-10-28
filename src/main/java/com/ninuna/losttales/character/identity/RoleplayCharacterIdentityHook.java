@@ -42,17 +42,16 @@ public final class RoleplayCharacterIdentityHook {
                 character == null ? null : character.getCharacterId(), accountId);
     }
 
-    /** Returns the active character name for roleplay dialogue only. */
+    /** Returns the active character name for roleplay conversation only. */
     public static String resolveRoleplayName(EntityPlayer player) {
         return PlayableIdentity.displayName(resolveActive(player),
                 player == null ? "" : player.getCommandSenderName());
     }
 
     /**
-     * Resolves either a roleplay-character UUID or a normal account UUID.
-     * LOTR's bounty target records call this in place of their own name
-     * lookup, after their identity key has been changed to a character
-     * UUID. It never throws into LOTR's code: a failure is logged once and
+     * The name for a character's id or an account's. LOTR's bounty
+     * records, which hold a character's id, call this in place of their
+     * own name lookup. It never throws into LOTR's code: a failure is logged once and
      * answers with the account name Forge last saw for the id, as LOTR's
      * own lookup would.
      */

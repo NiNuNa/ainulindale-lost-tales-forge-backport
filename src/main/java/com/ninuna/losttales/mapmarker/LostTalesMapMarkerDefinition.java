@@ -47,7 +47,7 @@ public final class LostTalesMapMarkerDefinition {
         this(id, name, iconName, colorName, "", "", false,
                 dimensionId, x, y, z, 128.0D, 8.0D,
                 hiddenUntilDiscovered, hiddenUntilDiscovered, false,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0);
+                LostTalesMapMarkerSource.QUEST_GIVER, false, "", 0);
     }
 
     public LostTalesMapMarkerDefinition(String id, String name,
@@ -111,7 +111,7 @@ public final class LostTalesMapMarkerDefinition {
         this.discoverable = discoverable;
         this.requiresRegionUnlock = requiresRegionUnlock;
         this.source = source == null
-                ? LostTalesMapMarkerSource.QUEST_DYNAMIC : source;
+                ? LostTalesMapMarkerSource.QUEST_GIVER : source;
         this.hasWaystone = hasWaystone;
         this.waystoneStructureType = waystoneStructureType == null
                 ? "" : waystoneStructureType.trim().toLowerCase();

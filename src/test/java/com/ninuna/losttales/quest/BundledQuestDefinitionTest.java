@@ -147,7 +147,8 @@ public final class BundledQuestDefinitionTest {
         assertNotNull(file + " is named by the index but is not in the jar",
                 reader);
         try {
-            return LostTalesQuestDefinitionJsonParser.parseQuest(reader, file);
+            return LostTalesQuestDefinitionJsonParser.parseQuest(reader, file,
+                    new java.util.ArrayList<String>());
         } finally {
             close(reader);
         }

@@ -20,7 +20,7 @@ public final class LostTalesClientMapMarkerIndexTest {
                 LostTalesMapMarkerSource.LOTR_ADAPTER);
         LostTalesMapMarkerData quest = marker(
                 "lotr:waypoint:hobbiton", "Quest", 20.0D,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC);
+                LostTalesMapMarkerSource.QUEST_GIVER);
 
         index.replaceWorldMarkers(Collections.singleton(world));
         index.replaceQuestMarkers(Collections.singleton(quest));
@@ -43,7 +43,7 @@ public final class LostTalesClientMapMarkerIndexTest {
                 LostTalesMapMarkerSource.LOTR_ADAPTER);
         LostTalesMapMarkerData quest = marker(
                 "LOTR:WAYPOINT:hobbiton", "Quest", 20.0D,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC);
+                LostTalesMapMarkerSource.QUEST_GIVER);
 
         index.replaceWorldMarkers(Collections.singleton(world));
         index.replaceQuestMarkers(Collections.singleton(quest));
@@ -63,10 +63,10 @@ public final class LostTalesClientMapMarkerIndexTest {
                 LostTalesMapMarkerSource.CUSTOM_PRESET);
         LostTalesMapMarkerData collidingFellowship = marker(
                 "fellowship_mark:shared", "Fellowship Collision", 20.0D,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC);
+                LostTalesMapMarkerSource.QUEST_GIVER);
         LostTalesMapMarkerData fellowship = marker(
                 "fellowship_mark:member", "Fellowship", 30.0D,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC);
+                LostTalesMapMarkerSource.QUEST_GIVER);
 
         index.replaceWorldMarkers(Collections.singleton(world));
         LostTalesClientMapMarkerIndex.Snapshot map = index.getMapSnapshot(
@@ -93,7 +93,7 @@ public final class LostTalesClientMapMarkerIndexTest {
                 LostTalesMapMarkerSource.CUSTOM_PRESET);
         LostTalesMapMarkerData fellowship = marker(
                 "fellowship_mark:member", "Fellowship", 30.0D,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC);
+                LostTalesMapMarkerSource.QUEST_GIVER);
 
         index.replaceWorldMarkers(Collections.singleton(first));
         assertEquals(2, index.getMapSnapshot(

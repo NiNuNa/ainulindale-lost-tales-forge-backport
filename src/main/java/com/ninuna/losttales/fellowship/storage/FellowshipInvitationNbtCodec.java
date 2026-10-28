@@ -241,7 +241,8 @@ public final class FellowshipInvitationNbtCodec {
         }
     }
 
-    private static final Comparator<FellowshipInvitation> INVITATION_ORDER =
+    /** The invitations' one order, saved and listed: oldest first, then by id. */
+    static final Comparator<FellowshipInvitation> INVITATION_ORDER =
             new Comparator<FellowshipInvitation>() {
                 @Override
                 public int compare(FellowshipInvitation left,

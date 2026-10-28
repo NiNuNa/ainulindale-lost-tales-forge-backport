@@ -8,7 +8,7 @@ package com.ninuna.losttales.chat;
  * they have one. Role requirements are not listed here: they are the
  * config's ({@link ChatChannelGates}), the Operator channel's included.
  * The server checks the real thing on every send; the client mirrors
- * the same answer to decide which tabs to show.
+ * the same answer to decide which pages to show.
  */
 public enum ChatChannelAccess {
     /** Open to everyone online. */

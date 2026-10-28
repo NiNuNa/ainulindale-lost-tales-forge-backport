@@ -94,7 +94,7 @@ public final class Window {
         public static final ScreenFill RIGHT_QUARTER =
                 named("right_quarter", 9, 0, 3, 2);
         /**
-         * The window's own box for its page alone ({@link ContentView}):
+         * The window's own box for its page alone ({@link Borderless}):
          * the window's row, strip and bar lie past the box's edges. Never
          * a window's own fill, never snapped to and never saved, so it is
          * none of the named parts the layout file reads; its edges are

@@ -378,7 +378,7 @@ public final class MissiveWordsTest {
         Map<String, String> params = new java.util.LinkedHashMap<String, String>();
         params.put("entity", "Zombie");
         params.put("count", "4");
-        return LostTalesMissiveData.builder("losttales:missive/generated/b/1_0", "kill")
+        return LostTalesMissiveData.builder("losttales:missive/b/1_0", "kill")
                 .written(true).titleId(title).issuerId(issuer).flavorId(flavor)
                 .descriptionId("kill").target("Zombie")
                 .objective(new LostTalesMissiveObjectiveData("kill_zombie", "kill",
@@ -391,7 +391,7 @@ public final class MissiveWordsTest {
         Map<String, String> params = new java.util.LinkedHashMap<String, String>();
         params.put(param, target);
         params.put("count", String.valueOf(count));
-        return LostTalesMissiveData.builder("losttales:missive/generated/b/1_0", type)
+        return LostTalesMissiveData.builder("losttales:missive/b/1_0", type)
                 .titleId("dangerous_work").descriptionId(type).target(target)
                 .objective(new LostTalesMissiveObjectiveData(type + "_target",
                         type, false, params))
@@ -406,7 +406,7 @@ public final class MissiveWordsTest {
                 type, false, Collections.singletonMap(
                         "kill".equals(type) ? "entity" : "item", target)));
         LostTalesMissiveData.Builder builder = LostTalesMissiveData.builder(
-                "losttales:missive/generated/b/1_0", type)
+                "losttales:missive/b/1_0", type)
                 .titleId(title).issuerId(issuer).descriptionId(type)
                 .flavorId(flavor).target(target);
         for (LostTalesMissiveObjectiveData objective : objectives) {

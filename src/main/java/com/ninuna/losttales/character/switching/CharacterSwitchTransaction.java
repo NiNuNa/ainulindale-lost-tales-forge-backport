@@ -3,8 +3,9 @@ package com.ninuna.losttales.character.switching;
 import java.util.UUID;
 
 /**
- * Persistent intent/commit record used to reconcile an interrupted switch.
- * A null source is the ghost a player is until their first character is
+ * The journal of one switch: its two sides, the saved-life generation each
+ * comes back from, the cooldown before and after, and how far it got. A
+ * null source is the ghost a player is until their first character is
  * played; the target is always a character.
  */
 public final class CharacterSwitchTransaction {

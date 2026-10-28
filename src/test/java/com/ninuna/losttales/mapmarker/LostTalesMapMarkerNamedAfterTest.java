@@ -261,15 +261,15 @@ public final class LostTalesMapMarkerNamedAfterTest {
         decoded.fromBytes(buffer);
         assertFalse(decoded.isMalformed());
         assertEquals("entity:losttales.Nia",
-                decoded.getDynamicMapMarkers().get(0).getNamedAfter());
-        assertEquals("", decoded.getDynamicMapMarkers().get(0).getName());
+                decoded.getGiverMarkers().get(0).getNamedAfter());
+        assertEquals("", decoded.getGiverMarkers().get(0).getName());
     }
 
     private static LostTalesMapMarkerDefinition definition(String namedAfter) {
         return new LostTalesMapMarkerDefinition("losttales:quest_giver_nia",
                 "", "quest", "blue", "", "", false, 0, 1.0D, 64.0D, 1.0D,
                 128.0D, 8.0D, true, true, false,
-                LostTalesMapMarkerSource.QUEST_DYNAMIC, false, "", 0,
+                LostTalesMapMarkerSource.QUEST_GIVER, false, "", 0,
                 namedAfter);
     }
 

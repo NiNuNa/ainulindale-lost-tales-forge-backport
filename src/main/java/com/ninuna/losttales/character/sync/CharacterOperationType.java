@@ -1,6 +1,6 @@
 package com.ninuna.losttales.character.sync;
 
-/** Stable network identifiers for character-management operations. */
+/** The character requests, each with the number it goes by on the wire. */
 public enum CharacterOperationType {
     REQUEST_ROSTER(0, "request_roster"),
     CREATE(1, "create"),

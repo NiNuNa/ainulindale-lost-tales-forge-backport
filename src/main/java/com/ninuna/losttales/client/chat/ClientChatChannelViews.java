@@ -15,17 +15,17 @@ import java.util.Map;
 import net.minecraft.client.gui.ChatLine;
 
 /**
- * Per-tab views over vanilla's single chat history. Lines stay in
- * {@code GuiNewChat}; this class only remembers which tab each Lost Tales
- * chat-line id belongs to and derives a tab's visible subset, scroll
- * offset, and unread counts from that. Lines without a recorded tab
+ * Per-page views over vanilla's single chat history. Lines stay in
+ * {@code GuiNewChat}; this class only remembers which page each Lost Tales
+ * chat-line id belongs to and derives a page's visible subset, scroll
+ * offset, and unread counts from that. Lines without a recorded page
  * (printed on the client without passing through the chat event) belong
  * to the console view. Messages are never copied.
  *
- * <p>A view is described by a {@link ChatLineFilter}: one tab while the
- * chat screen is open, a window's tabs minus the muted ones for the
- * closed-chat feed. The last few filters' results are cached so every
- * window pays one comparison per frame. Scroll offsets are per tab and
+ * <p>A view is described by a {@link ChatLineFilter}: one page while the
+ * chat screen is open, a window's pages minus the muted ones for the
+ * feed. The last few filters' results are cached so every
+ * window pays one comparison per frame. Scroll offsets are per page and
  * survive closing the screen.</p>
  *
  * <p>A scroll offset is measured in message lines and fractions of one.
@@ -38,24 +38,24 @@ import net.minecraft.client.gui.ChatLine;
 public final class ClientChatChannelViews {
     /**
      * Tracked line ids never fall below the history's capacity, so every
-     * shown line has its tab; a little more covers ids allocated while
+     * shown line has its page; a little more covers ids allocated while
      * the history trims.
      */
     private static final int TRACKED_LINES_MARGIN = 64;
     /** Unread counts stop climbing here; the jump button and the {@code +}'s tip say "99+". */
     public static final int MAX_UNREAD = 99;
     /**
-     * The channel whose tab shows lines Lost Tales did not route: they
+     * The channel whose page shows lines Lost Tales did not route: they
      * are what only this player sees anyway, so they live in the console
-     * tab and keep the conversation tabs clean.
+     * page and keep the conversation pages clean.
      */
-    public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CLIENT_CONSOLE;
-    private static final LinkedHashMap<Integer, ConversationPage> TAB_BY_LINE_ID =
+    public static final ChatChannel SYSTEM_LINE_VIEW = ChatChannel.CONSOLE;
+    private static final LinkedHashMap<Integer, ConversationPage> PAGE_BY_LINE_ID =
             new LinkedHashMap<Integer, ConversationPage>();
     /**
      * When each Lost Tales line was said, by chat line id: what a
      * window reads to stand a dated rule over each day's first message.
-     * Bounded like the tab index and cleared with it.
+     * Bounded like the page index and cleared with it.
      */
     private static final LinkedHashMap<Integer, Long> TIME_BY_LINE_ID =
             new LinkedHashMap<Integer, Long>();
@@ -105,8 +105,8 @@ public final class ClientChatChannelViews {
     /**
      * Where each conversation's latest unread run begins: the divider its
      * copies draw above that line — "new since you last looked". Set when the
-     * first unread line of a run arrives, kept while the tab is being
-     * read (so the divider does not vanish the moment the tab opens),
+     * first unread line of a run arrives, kept while the page is being
+     * read (so the divider does not vanish the moment the page opens),
      * and replaced by the next run once this one has been seen.
      */
     private static final Map<ConversationPage, UnreadDivider> UNREAD_DIVIDERS =
@@ -138,14 +138,14 @@ public final class ClientChatChannelViews {
      * conversation's copies share is kept under {@link #sharedKey}.
      *
      * <p>Everything here belongs to a conversation, not to a row. A scoped
-     * channel has a row entry and a conversation tab for every
+     * channel has a row entry and a conversation page for every
      * conversation in it, and the two are never the same value: a line
      * arrives under its own conversation while the window and the
      * renderer both ask about the row. Every access goes through here so
      * that one side cannot write what the other never reads.</p>
      */
-    private static ConversationPage viewKey(ConversationPage tab) {
-        return ConversationPage.viewed(tab);
+    private static ConversationPage viewKey(ConversationPage page) {
+        return ConversationPage.viewed(page);
     }
 
     /**
@@ -153,12 +153,12 @@ public final class ClientChatChannelViews {
      * its unread lines, its divider, its waiting count and its newest
      * line, one for every copy of it however many stand open.
      */
-    private static ConversationPage sharedKey(ConversationPage tab) {
-        return ConversationPage.viewedConversation(tab);
+    private static ConversationPage sharedKey(ConversationPage page) {
+        return ConversationPage.viewedConversation(page);
     }
 
     /**
-     * Remembers a new Lost Tales line's tab and counts it unread in its
+     * Remembers a new Lost Tales line's page and counts it unread in its
      * conversation, unless a copy of it is in front at its newest line; a
      * line the server named was said at
      * {@code timestampMillis}. {@code serverId} is where the view's read
@@ -170,26 +170,26 @@ public final class ClientChatChannelViews {
      * arrival, were never news to them and are filed as read; one they
      * were shown before — no newer than the view's read mark — is filed
      * and nothing else; and the first one they were not stands under the
-     * unread divider, in the tab in front as in any other, the way a
+     * unread divider, in the page in front as in any other, the way a
      * messenger marks where its reader left off.
      */
-    public static synchronized void record(int chatLineId, ConversationPage tab,
+    public static synchronized void record(int chatLineId, ConversationPage page,
                                            ConversationPage selected,
                                            boolean mentionsLocalPlayer,
                                            long serverId,
                                            long timestampMillis,
                                            boolean replayed) {
-        if (tab == null) {
+        if (page == null) {
             return;
         }
-        TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), tab.conversation());
-        while (TAB_BY_LINE_ID.size() > maxTrackedLines()) {
-            Iterator<Integer> iterator = TAB_BY_LINE_ID.keySet().iterator();
+        PAGE_BY_LINE_ID.put(Integer.valueOf(chatLineId), page.conversation());
+        while (PAGE_BY_LINE_ID.size() > maxTrackedLines()) {
+            Iterator<Integer> iterator = PAGE_BY_LINE_ID.keySet().iterator();
             iterator.next();
             iterator.remove();
         }
         invalidateCache();
-        recordIn(tab.conversation(), chatLineId, selected, mentionsLocalPlayer,
+        recordIn(page.conversation(), chatLineId, selected, mentionsLocalPlayer,
                 serverId, timestampMillis, replayed);
     }
 
@@ -226,9 +226,9 @@ public final class ClientChatChannelViews {
         // and for a scoped channel those are never the same value.
         if (view.equals(sharedKey(selected))) {
             if (replayed) {
-                // Said while this player was away, in the tab in front:
+                // Said while this player was away, in the page in front:
                 // the divider stands over the first of them and the run
-                // is read from there, marked as seen once the tab is
+                // is read from there, marked as seen once the page is
                 // looked at like any other.
                 UnreadDivider divider = UNREAD_DIVIDERS.get(view);
                 if (divider == null || divider.seen) {
@@ -237,11 +237,11 @@ public final class ClientChatChannelViews {
                 }
                 return;
             }
-            // The tab is open in front of the player — but if they have
+            // The page is open in front of the player — but if they have
             // scrolled back to read, a message arriving is one they have
             // not seen. It is counted on the jump-to-present button, and
             // the first of a run opens the same crimson divider an unread
-            // run in another tab opens, so where they were reading is
+            // run in another page opens, so where they were reading is
             // marked as plainly there as anywhere else.
             if (target(viewKey(selected)) > 0.0D) {
                 int waiting = count(WAITING_BELOW, view);
@@ -291,13 +291,13 @@ public final class ClientChatChannelViews {
      * history — and nothing more: it was said before anything on screen,
      * so it is neither unread nor the newest, and moves no mark.
      */
-    public static synchronized void recordBackfilled(int chatLineId, ConversationPage tab) {
-        if (tab == null) {
+    public static synchronized void recordBackfilled(int chatLineId, ConversationPage page) {
+        if (page == null) {
             return;
         }
-        TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), tab.conversation());
-        while (TAB_BY_LINE_ID.size() > maxTrackedLines()) {
-            Iterator<Integer> iterator = TAB_BY_LINE_ID.keySet().iterator();
+        PAGE_BY_LINE_ID.put(Integer.valueOf(chatLineId), page.conversation());
+        while (PAGE_BY_LINE_ID.size() > maxTrackedLines()) {
+            Iterator<Integer> iterator = PAGE_BY_LINE_ID.keySet().iterator();
             iterator.next();
             iterator.remove();
         }
@@ -339,9 +339,9 @@ public final class ClientChatChannelViews {
      * the foot of the stack, and there the arriving messages should push
      * it, which is what jumping to the present goes back to.</p>
      */
-    static synchronized void holdPosition(ConversationPage tab,
+    static synchronized void holdPosition(ConversationPage page,
                                           ChatFrame frame) {
-        ConversationPage view = viewKey(tab);
+        ConversationPage view = viewKey(page);
         if (view == null || frame == null) {
             return;
         }
@@ -356,7 +356,7 @@ public final class ClientChatChannelViews {
             ANCHORS.remove(view);
             // Back at the newest message: nothing is waiting below any
             // more, whether the player scrolled down or jumped.
-            WAITING_BELOW.remove(sharedKey(tab));
+            WAITING_BELOW.remove(sharedKey(page));
             return;
         }
         int divider = frame.dividerLineIndex;
@@ -422,9 +422,9 @@ public final class ClientChatChannelViews {
      * under the pointer. Taken from the layout drawn now, and put back
      * once on the next.
      */
-    static synchronized void keepInPlace(ConversationPage tab, ChatFrame frame,
+    static synchronized void keepInPlace(ConversationPage page, ChatFrame frame,
                                          int chatLineId, boolean top) {
-        ConversationPage view = viewKey(tab);
+        ConversationPage view = viewKey(page);
         int index = view == null || frame == null || frame.lines == null
                 ? -1 : rowOf(frame.lines, chatLineId, top);
         if (index < 0) {
@@ -590,21 +590,21 @@ public final class ClientChatChannelViews {
      * moves the view's read mark to its newest line, so the next join
      * knows these were seen.
      */
-    public static synchronized void markViewed(ConversationPage tab) {
-        tab = sharedKey(tab);
-        if (tab != null) {
-            UNREAD_PINGS.remove(tab);
-            UNREAD_OTHER.remove(tab);
-            UnreadDivider divider = UNREAD_DIVIDERS.get(tab);
+    public static synchronized void markViewed(ConversationPage page) {
+        page = sharedKey(page);
+        if (page != null) {
+            UNREAD_PINGS.remove(page);
+            UNREAD_OTHER.remove(page);
+            UnreadDivider divider = UNREAD_DIVIDERS.get(page);
             if (divider != null) {
-                // The divider stays while the tab is read; the next
+                // The divider stays while the page is read; the next
                 // unread run replaces it.
                 divider.seen = true;
             }
-            Long newest = NEWEST_MESSAGE_BY_VIEW.get(tab);
+            Long newest = NEWEST_MESSAGE_BY_VIEW.get(page);
             if (newest != null) {
                 ClientChatReadMarks.markRead(ClientChatSession.currentKey(),
-                        tab, newest.longValue());
+                        page, newest.longValue());
             }
         }
     }
@@ -616,13 +616,13 @@ public final class ClientChatChannelViews {
      * count: it is theirs, read in its conversation, whose read mark moves
      * up to it so the next join's replay does not count it as new.
      */
-    public static synchronized void noteOwnLine(ConversationPage tab, int chatLineId,
+    public static synchronized void noteOwnLine(ConversationPage page, int chatLineId,
                                                 long serverId) {
-        if (tab == null || !ChatMessageIds.isServerId(serverId)) {
+        if (page == null || !ChatMessageIds.isServerId(serverId)) {
             return;
         }
-        ConversationPage conversation = tab.conversation();
-        TAB_BY_LINE_ID.put(Integer.valueOf(chatLineId), conversation);
+        ConversationPage conversation = page.conversation();
+        PAGE_BY_LINE_ID.put(Integer.valueOf(chatLineId), conversation);
         Long newest = NEWEST_MESSAGE_BY_VIEW.get(conversation);
         if (newest == null || serverId > newest.longValue()) {
             NEWEST_MESSAGE_BY_VIEW.put(conversation, Long.valueOf(serverId));
@@ -654,34 +654,34 @@ public final class ClientChatChannelViews {
     }
 
     /**
-     * The line the tab's unread divider stands above, or null: the first
+     * The line the page's unread divider stands above, or null: the first
      * line of the latest unread run.
      */
-    public static synchronized Integer unreadDividerLine(ConversationPage tab) {
-        UnreadDivider divider = tab == null ? null
-                : UNREAD_DIVIDERS.get(sharedKey(tab));
+    public static synchronized Integer unreadDividerLine(ConversationPage page) {
+        UnreadDivider divider = page == null ? null
+                : UNREAD_DIVIDERS.get(sharedKey(page));
         return divider == null ? null : Integer.valueOf(divider.lineId);
     }
 
     /**
-     * When the tab's unread run began: the time its first line was
+     * When the page's unread run began: the time its first line was
      * said, or zero without a divider. What the divider's label dates
      * itself by when that was not today.
      */
-    public static synchronized long unreadDividerTimestamp(ConversationPage tab) {
-        UnreadDivider divider = tab == null ? null
-                : UNREAD_DIVIDERS.get(sharedKey(tab));
+    public static synchronized long unreadDividerTimestamp(ConversationPage page) {
+        UnreadDivider divider = page == null ? null
+                : UNREAD_DIVIDERS.get(sharedKey(page));
         return divider == null ? 0L : divider.timestampMillis;
     }
 
     /**
-     * Removes the tab's divider once its run has been seen: called when
-     * the player moves on — the tab is deselected, or the screen closes
+     * Removes the page's divider once its run has been seen: called when
+     * the player moves on — the page is deselected, or the screen closes
      * — so the divider shows while the new messages are being read and
-     * is gone the next time the tab opens, the way Discord's is.
+     * is gone the next time the page opens, the way Discord's is.
      */
-    public static synchronized void dismissSeenDivider(ConversationPage tab) {
-        ConversationPage view = sharedKey(tab);
+    public static synchronized void dismissSeenDivider(ConversationPage page) {
+        ConversationPage view = sharedKey(page);
         UnreadDivider divider = view == null ? null
                 : UNREAD_DIVIDERS.get(view);
         if (divider != null && divider.seen) {
@@ -690,17 +690,17 @@ public final class ClientChatChannelViews {
     }
 
     /**
-     * Removes the tab's divider outright, seen or not: sending a
+     * Removes the page's divider outright, seen or not: sending a
      * message there says the conversation has moved on, the way it does
      * on Discord.
      */
-    public static synchronized void dismissDivider(ConversationPage tab) {
-        if (tab != null) {
-            UNREAD_DIVIDERS.remove(sharedKey(tab));
+    public static synchronized void dismissDivider(ConversationPage page) {
+        if (page != null) {
+            UNREAD_DIVIDERS.remove(sharedKey(page));
         }
     }
 
-    /** As above for every tab at once; what closing the screen calls. */
+    /** As above for every page at once; what closing the screen calls. */
     public static synchronized void dismissSeenDividers() {
         Iterator<Map.Entry<ConversationPage, UnreadDivider>> iterator =
                 UNREAD_DIVIDERS.entrySet().iterator();
@@ -712,12 +712,12 @@ public final class ClientChatChannelViews {
     }
 
     /** Sends the view back to the newest line; it glides there. */
-    public static synchronized void scrollHome(ConversationPage tab) {
-        ConversationPage view = viewKey(tab);
+    public static synchronized void scrollHome(ConversationPage page) {
+        ConversationPage view = viewKey(page);
         if (view != null) {
             SCROLL.remove(view);
             ANCHORS.remove(view);
-            WAITING_BELOW.remove(sharedKey(tab));
+            WAITING_BELOW.remove(sharedKey(page));
             noteScrolled(view);
         }
     }
@@ -731,7 +731,7 @@ public final class ClientChatChannelViews {
         return count(WAITING_BELOW, sharedKey(view));
     }
 
-    /** One tab's divider: where the latest unread run starts. */
+    /** One page's divider: where the latest unread run starts. */
     private static final class UnreadDivider {
         final int lineId;
         /**
@@ -750,25 +750,25 @@ public final class ClientChatChannelViews {
     }
 
     /** Unread messages that mentioned the player, capped at MAX_UNREAD + 1. */
-    public static synchronized int unreadPingCount(ConversationPage tab) {
-        tab = sharedKey(tab);
-        return count(UNREAD_PINGS, tab);
+    public static synchronized int unreadPingCount(ConversationPage page) {
+        page = sharedKey(page);
+        return count(UNREAD_PINGS, page);
     }
 
     /** Unread messages other than pings, capped at MAX_UNREAD + 1. */
-    public static synchronized int unreadOtherCount(ConversationPage tab) {
-        tab = sharedKey(tab);
-        return count(UNREAD_OTHER, tab);
+    public static synchronized int unreadOtherCount(ConversationPage page) {
+        page = sharedKey(page);
+        return count(UNREAD_OTHER, page);
     }
 
     /** Every unread message, pings included, capped at MAX_UNREAD + 1. */
-    public static synchronized int unreadCount(ConversationPage tab) {
+    public static synchronized int unreadCount(ConversationPage page) {
         return Math.min(MAX_UNREAD + 1,
-                unreadPingCount(tab) + unreadOtherCount(tab));
+                unreadPingCount(page) + unreadOtherCount(page));
     }
 
-    public static synchronized boolean hasUnread(ConversationPage tab) {
-        return unreadPingCount(tab) + unreadOtherCount(tab) > 0;
+    public static synchronized boolean hasUnread(ConversationPage page) {
+        return unreadPingCount(page) + unreadOtherCount(page) > 0;
     }
 
     /**
@@ -776,18 +776,18 @@ public final class ClientChatChannelViews {
      * run that reaches back to it.
      */
     static synchronized boolean isUnread(int chatLineId) {
-        ConversationPage tab = TAB_BY_LINE_ID.get(Integer.valueOf(chatLineId));
-        if (tab == null) {
+        ConversationPage page = PAGE_BY_LINE_ID.get(Integer.valueOf(chatLineId));
+        if (page == null) {
             return false;
         }
-        UnreadDivider divider = UNREAD_DIVIDERS.get(tab);
+        UnreadDivider divider = UNREAD_DIVIDERS.get(page);
         return divider != null && !divider.seen && chatLineId >= divider.lineId
-                && count(UNREAD_PINGS, tab) + count(UNREAD_OTHER, tab) > 0;
+                && count(UNREAD_PINGS, page) + count(UNREAD_OTHER, page) > 0;
     }
 
-    /** The recorded tab, or null for vanilla and untracked lines. */
-    public static synchronized ConversationPage tabOf(int chatLineId) {
-        return TAB_BY_LINE_ID.get(Integer.valueOf(chatLineId));
+    /** The recorded page, or null for vanilla and untracked lines. */
+    public static synchronized ConversationPage pageOf(int chatLineId) {
+        return PAGE_BY_LINE_ID.get(Integer.valueOf(chatLineId));
     }
 
     /**
@@ -812,10 +812,10 @@ public final class ClientChatChannelViews {
             if (line == null) {
                 continue;
             }
-            // Untracked lines belong to the console wherever its tab lives;
+            // Untracked lines belong to the console wherever its page lives;
             // a line addressed to the player passes where only such lines
             // of its conversation do.
-            if (filter.accepts(TAB_BY_LINE_ID.get(
+            if (filter.accepts(PAGE_BY_LINE_ID.get(
                     Integer.valueOf(line.getChatLineID())),
                     LostTalesChatPresentation.isPingedLine(
                             line.getChatLineID()))) {
@@ -840,9 +840,9 @@ public final class ClientChatChannelViews {
      * fractions of a line included, so a window dragged to an odd height
      * still comes to rest on a whole message at both ends.
      */
-    public static synchronized double getScroll(ConversationPage tab, int totalLines,
+    public static synchronized double getScroll(ConversationPage page, int totalLines,
                                                 double roomLines) {
-        ConversationPage view = viewKey(tab);
+        ConversationPage view = viewKey(page);
         if (view == null) {
             return 0.0D;
         }
@@ -875,9 +875,9 @@ public final class ClientChatChannelViews {
      * once per window draw; with chat animation switched off, or while
      * a resize holds the clamp in motion, it is the target itself.
      */
-    public static synchronized double renderedScroll(ConversationPage tab,
+    public static synchronized double renderedScroll(ConversationPage page,
                                                      double target) {
-        ConversationPage view = viewKey(tab);
+        ConversationPage view = viewKey(page);
         if (view == null) {
             return 0.0D;
         }
@@ -914,10 +914,10 @@ public final class ClientChatChannelViews {
      * what a jump to a quoted message asks for. The offset is a target
      * like any other, so the view glides to it rather than snapping.
      */
-    public static synchronized void scrollTo(ConversationPage tab, double lines,
+    public static synchronized void scrollTo(ConversationPage page, double lines,
                                              int totalLines,
                                              double roomLines) {
-        ConversationPage view = viewKey(tab);
+        ConversationPage view = viewKey(page);
         if (view != null) {
             SCROLL.put(view, Double.valueOf(Math.max(0.0D, lines)));
             noteScrolled(view);
@@ -960,7 +960,7 @@ public final class ClientChatChannelViews {
     public static synchronized void clear() {
         ClientChatContextHistory.clear();
         ClientChatOlderHistory.clear();
-        TAB_BY_LINE_ID.clear();
+        PAGE_BY_LINE_ID.clear();
         TIME_BY_LINE_ID.clear();
         SCROLL.clear();
         RENDERED.clear();
@@ -990,13 +990,14 @@ public final class ClientChatChannelViews {
         // with the place's conversations first.
         ChatLayout.closeConversations();
         ClientChatIdentities.clear();
+        ChatSpeechRanges.clear();
         ClientChatChannelState.forgetConversationHistory();
         ChatChannelIcons.forgetPortraits();
         ChatChannelIcons.forgetChannelIcons();
     }
 
     /**
-     * Forgets everything said about the lines themselves — their tabs,
+     * Forgets everything said about the lines themselves — their pages,
      * times, ids, runs, scroll and unread state — while keeping what the
      * session knows about the server: its channels, roles, identities,
      * conversations and layout. What the game clearing its own message
@@ -1008,7 +1009,7 @@ public final class ClientChatChannelViews {
     public static synchronized void forgetLines() {
         ClientChatContextHistory.clear();
         ClientChatOlderHistory.clear();
-        TAB_BY_LINE_ID.clear();
+        PAGE_BY_LINE_ID.clear();
         TIME_BY_LINE_ID.clear();
         SCROLL.clear();
         RENDERED.clear();
@@ -1038,8 +1039,8 @@ public final class ClientChatChannelViews {
         return LostTalesChatHistoryHooks.capacity() + TRACKED_LINES_MARGIN;
     }
 
-    private static int count(Map<ConversationPage, Integer> counter, ConversationPage tab) {
-        Integer value = tab == null ? null : counter.get(tab);
+    private static int count(Map<ConversationPage, Integer> counter, ConversationPage page) {
+        Integer value = page == null ? null : counter.get(page);
         return value == null ? 0 : value.intValue();
     }
 

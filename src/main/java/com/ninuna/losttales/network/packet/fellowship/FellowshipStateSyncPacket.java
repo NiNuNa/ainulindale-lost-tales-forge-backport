@@ -60,6 +60,9 @@ public final class FellowshipStateSyncPacket implements IMessage {
                             buffer, FellowshipPacketCodec.MAX_ERROR_ID_BYTES));
             int memberLimit = buffer.readUnsignedByte();
 
+            if (stateErrorId == null) {
+                throw new FellowshipPacketCodec.DecodeException("unknown error id");
+            }
             if (synchronizationSequence <= 0L) {
                 throw new FellowshipPacketCodec.DecodeException(
                         "invalid synchronization sequence");
@@ -80,7 +83,8 @@ public final class FellowshipStateSyncPacket implements IMessage {
             FellowshipErrorId createRefusal = FellowshipErrorId.fromId(
                     LostTalesPacketCodec.readUtf8String(
                             buffer, FellowshipPacketCodec.MAX_ERROR_ID_BYTES));
-            if (!FellowshipStateSnapshot.isCreateRefusal(createRefusal)) {
+            if (createRefusal == null
+                    || !FellowshipStateSnapshot.isCreateRefusal(createRefusal)) {
                 throw new FellowshipPacketCodec.DecodeException("invalid create refusal");
             }
             int fellowshipCount = buffer.readUnsignedByte();

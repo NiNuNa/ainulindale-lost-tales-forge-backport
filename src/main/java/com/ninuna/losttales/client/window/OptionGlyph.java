@@ -17,7 +17,6 @@ import net.minecraft.client.Minecraft;
 public abstract class OptionGlyph {
     /** Ink of a struck option's stroke. */
     private static final int STRIKE_RGB = LostTalesColors.rgb(LostTalesColors.CRIMSON);
-    /** Ink a pattern lights to. */
 
     public abstract int width();
 

@@ -67,14 +67,25 @@ public final class QuestStartGate {
         START_NOT_ALLOWED,
         /** What the start came with proves nothing: no giver in sight, no seal, no card. */
         UNPROVEN,
-        REQUIREMENTS_NOT_MET
+        REQUIREMENTS_NOT_MET,
+        /**
+         * The world could not record the letter's missive as taken
+         * (QUEST-34), so it did not start; the gate said nothing of it.
+         */
+        NOT_RECORDED,
+        /**
+         * The starter was used already, or the world could not judge or
+         * record it as used (QUEST-34); the gate said which.
+         */
+        STARTER_REFUSED
     }
 
     /**
      * Starts {@code questId} for the player, if what {@code proof} brings
-     * holds and every rule lets it. Each refusal but a missing proof is
-     * said to the player; a card that proves nothing says the card is no
-     * longer there to join.
+     * holds and every rule lets it. Each refusal but a missing proof and
+     * a missive the world could not record ({@link StartResult#NOT_RECORDED})
+     * is said to the player; a card that proves nothing says it cannot be
+     * joined.
      */
     public static StartResult start(EntityPlayerMP player, String questId,
                                     QuestStartProof proof) {
@@ -101,6 +112,17 @@ public final class QuestStartGate {
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
         Entity giver = quest == null ? null : giverFor(player, quest, proof);
         boolean proven = quest != null && proves(player, quest, proof, giver);
+        if (proven && way == QuestStartProof.Way.ITEM) {
+            // A copy of a starter used already starts nothing (QUEST-34).
+            StartersUsed.Standing standing = StartersUsed.standing(player.worldObj,
+                    proof.getStack());
+            if (standing != StartersUsed.Standing.UNUSED) {
+                say(player, standing == StartersUsed.Standing.USED
+                        ? "chat.losttales.quest.starter.used"
+                        : "chat.losttales.quest.starter.not_now");
+                return StartResult.STARTER_REFUSED;
+            }
+        }
         QuestStartRules.Verdict verdict = QuestStartRules.judge(quest, data,
                 way, proven, LostTalesConfig.allowQuestItemStarts,
                 LostTalesConfig.allowQuestInteractionStarts,
@@ -150,8 +172,8 @@ public final class QuestStartGate {
      * quest is offered in conversation, the first that starts, is offered
      * or is already under way ending the search. Nothing is offered while
      * this creature waits for a hand-in the player's client talks about,
-     * nor by a LOTR NPC touched again within {@link QuestOfferPause}'s
-     * pause after it offered (QUEST-11). Answers whether any quest
+     * nor by a creature touched again within {@link QuestOfferPause}'s
+     * pause after it offered or told a rumour (QUEST-11). Answers whether any quest
      * answered the touch, a hand-in waiting on this creature among them:
      * then the creature's own interaction waits.
      */
@@ -175,7 +197,7 @@ public final class QuestStartGate {
             if (!quest.canStartFromInteraction() || quest.isWorldQuest()
                     || !isGiver(quest, target, player)
                     || awaitsHandIn
-                            && LostTalesQuestDialogue.of(quest).isOffered()) {
+                            && LostTalesQuestConversation.of(quest).isOffered()) {
                 continue;
             }
             StartResult result = start(player, quest.getId(),
@@ -258,7 +280,7 @@ public final class QuestStartGate {
             if (!quest.canStartFromInteraction() || quest.isWorldQuest()
                     || LostTalesQuestParams.value(quest.getInteraction(),
                             "block").length() == 0
-                    || LostTalesQuestDialogue.of(quest).isOffered()
+                    || LostTalesQuestConversation.of(quest).isOffered()
                     || !isBlockGiver(quest, player, x, y, z)) {
                 continue;
             }
@@ -278,7 +300,7 @@ public final class QuestStartGate {
     public static boolean mayOffer(EntityPlayerMP player,
                                    LostTalesQuestDefinition quest) {
         if (player == null || quest == null
-                || !LostTalesQuestDialogue.of(quest).isOffered()) {
+                || !LostTalesQuestConversation.of(quest).isOffered()) {
             return false;
         }
         LostTalesQuestPlayerData data = LostTalesQuestPlayerData.get(player);
@@ -369,7 +391,7 @@ public final class QuestStartGate {
             LostTalesQuestDefinition quest =
                     LostTalesQuestRegistry.getQuest(progress.getQuestId());
             if (quest == null || !progress.isChoosing()
-                    && !LostTalesQuestDialogue.of(quest).isHandedIn()) {
+                    && !LostTalesQuestConversation.of(quest).isHandedIn()) {
                 continue;
             }
             if (progress.isReturning() || progress.isChoosing()) {
@@ -493,8 +515,13 @@ public final class QuestStartGate {
         if (missive != null) {
             return beginMissive(player, quest, data, missive);
         }
+        boolean starter = proof.getWay() == QuestStartProof.Way.ITEM;
+        if (starter && !StartersUsed.record(player.worldObj, proof.getStack())) {
+            say(player, "chat.losttales.quest.starter.not_now");
+            return StartResult.STARTER_REFUSED;
+        }
         LostTalesQuestManager.begin(player, quest, 0L, giverFor(player, quest, proof));
-        if (proof.getWay() == QuestStartProof.Way.ITEM) {
+        if (starter) {
             useUp(player, proof.getStack());
         }
         return StartResult.STARTED;
@@ -511,14 +538,14 @@ public final class QuestStartGate {
                                             LostTalesQuestPlayerData data,
                                             LostTalesMissiveData missive) {
         StartResult result;
-        if (!LostTalesQuestRegistry.registerRuntimeQuest(quest)) {
+        if (!LostTalesQuestRegistry.registerMissive(quest)) {
             say(player, "chat.losttales.quest.unknown", quest.getId());
             result = StartResult.UNKNOWN_QUEST;
-        } else if (!data.rememberDynamicQuestDefinition(quest)) {
+        } else if (!data.rememberMissiveDefinition(quest)) {
             say(player, "chat.losttales.quest.missives_full");
             result = StartResult.START_NOT_ALLOWED;
         } else if (!MissivesTaken.record(player.worldObj, missive)) {
-            result = StartResult.START_NOT_ALLOWED;
+            result = StartResult.NOT_RECORDED;
         } else {
             LostTalesQuestManager.begin(player, quest,
                     Math.max(0L, missive.getTimeLimitTicks()), null);
@@ -576,7 +603,10 @@ public final class QuestStartGate {
         return false;
     }
 
-    /** A starter item is used up as its quest starts, in every game mode (QUEST-34). */
+    /**
+     * A starter item is used up as its quest starts, in every game mode,
+     * the world having recorded it as used (QUEST-34).
+     */
     private static void useUp(EntityPlayerMP player, ItemStack held) {
         if (held == null) {
             return;
@@ -686,15 +716,15 @@ public final class QuestStartGate {
         if (xText.length() == 0 && yText.length() == 0 && zText.length() == 0) {
             return true;
         }
-        double targetX = LostTalesQuestParams.parseDouble(xText, blockX) + 0.5D;
-        double targetY = LostTalesQuestParams.parseDouble(yText, blockY) + 0.5D;
-        double targetZ = LostTalesQuestParams.parseDouble(zText, blockZ) + 0.5D;
+        int here = player.worldObj.provider.dimensionId;
+        LostTalesQuestParams.Location place = new LostTalesQuestParams.Location(here,
+                LostTalesQuestParams.parseDouble(xText, blockX) + 0.5D,
+                LostTalesQuestParams.parseDouble(yText, blockY) + 0.5D,
+                LostTalesQuestParams.parseDouble(zText, blockZ) + 0.5D);
         double radius = Math.max(0.5D, LostTalesQuestParams.parseDouble(
                 LostTalesQuestParams.value(interaction, "radius"), 1.5D));
-        double dx = player.posX - targetX;
-        double dy = player.posY - targetY;
-        double dz = player.posZ - targetZ;
-        return dx * dx + dy * dy + dz * dz <= radius * radius;
+        return LostTalesQuestParams.isWithin(place, here, player.posX,
+                player.posY, player.posZ, radius);
     }
 
     private static void say(EntityPlayerMP player, String key, Object... args) {

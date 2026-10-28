@@ -20,7 +20,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Versioned, fail-closed recovery journal for deleted characters. */
+/**
+ * The deleted characters, kept until their purge. Data of another version
+ * makes the store read-only; an entry it cannot read is quarantined.
+ */
 public final class CharacterDeletionWorldData extends WorldSavedData {
 
     public static final String DATA_NAME = "losttales_character_deletions";

@@ -12,11 +12,11 @@ public final class ChatChannelTest {
     public void presentationOrderIsGlobalProximityFactionOocFellowship() {
         assertEquals(Arrays.asList(ChatChannel.GLOBAL, ChatChannel.PROXIMITY,
                 ChatChannel.FACTION, ChatChannel.OOC, ChatChannel.FELLOWSHIP,
-                ChatChannel.OPERATOR, ChatChannel.CLIENT_CONSOLE,
-                ChatChannel.SERVER_CONSOLE),
+                ChatChannel.OPERATOR, ChatChannel.CONSOLE,
+                ChatChannel.SERVER_LOG),
                 ChatChannel.presentationOrder());
         // Every channel but Whisper is presented exactly once (whispers
-        // are tabs per conversation, never a channel tab).
+        // are pages per conversation, never a channel page).
         HashSet<ChatChannel> presented = new HashSet<ChatChannel>(
                 Arrays.asList(ChatChannel.values()));
         presented.remove(ChatChannel.WHISPER);
@@ -36,8 +36,8 @@ public final class ChatChannelTest {
     @Test
     public void idsAreTheChannelsNames() {
         for (ChatChannel channel : ChatChannel.values()) {
-            if (channel == ChatChannel.CLIENT_CONSOLE
-                    || channel == ChatChannel.SERVER_CONSOLE) {
+            if (channel == ChatChannel.CONSOLE
+                    || channel == ChatChannel.SERVER_LOG) {
                 continue;
             }
             assertEquals(channel.getDisplayName().replaceFirst(" Chat$", "")
@@ -52,11 +52,10 @@ public final class ChatChannelTest {
         assertEquals("faction", ChatChannel.FACTION.getId());
         assertEquals("ooc", ChatChannel.OOC.getId());
         assertEquals("operator", ChatChannel.OPERATOR.getId());
-        assertEquals("client_console", ChatChannel.CLIENT_CONSOLE.getId());
-        assertEquals("server_console", ChatChannel.SERVER_CONSOLE.getId());
+        assertEquals("console", ChatChannel.CONSOLE.getId());
+        assertEquals("server_log", ChatChannel.SERVER_LOG.getId());
         assertEquals(null, ChatChannel.fromId("all"));
         assertEquals(null, ChatChannel.fromId("admin"));
-        assertEquals(null, ChatChannel.fromId("console"));
         assertEquals(ChatChannel.FELLOWSHIP, ChatChannel.fromId(" Fellowship "));
         // Every id resolves back to its own channel, so no two collide.
         for (ChatChannel channel : ChatChannel.values()) {
@@ -74,19 +73,19 @@ public final class ChatChannelTest {
         assertEquals("ooc", ChatChannel.OOC.getId());
         assertEquals("OOC Chat", ChatChannel.OOC.getDisplayName());
         assertEquals(ChatRecipientRule.SELF,
-                ChatChannel.CLIENT_CONSOLE.getRecipientRule());
+                ChatChannel.CONSOLE.getRecipientRule());
         assertEquals(ChatRecipientRule.CONSOLE_READERS,
-                ChatChannel.SERVER_CONSOLE.getRecipientRule());
+                ChatChannel.SERVER_LOG.getRecipientRule());
         // The player reads the consoles as the Console and the Server Log;
-        // their code names stay client_console and server_console.
-        assertEquals("Console", ChatChannel.CLIENT_CONSOLE.getDisplayName());
+        // their code names stay console and server_log.
+        assertEquals("Console", ChatChannel.CONSOLE.getDisplayName());
         assertEquals("Server Log",
-                ChatChannel.SERVER_CONSOLE.getDisplayName());
-        assertEquals("client_console", ChatChannel.CLIENT_CONSOLE.getId());
-        assertEquals("server_console", ChatChannel.SERVER_CONSOLE.getId());
+                ChatChannel.SERVER_LOG.getDisplayName());
+        assertEquals("console", ChatChannel.CONSOLE.getId());
+        assertEquals("server_log", ChatChannel.SERVER_LOG.getId());
         // Neither console ever leaves the game.
-        assertEquals(false, ChatChannel.CLIENT_CONSOLE.isBridgeable());
-        assertEquals(false, ChatChannel.SERVER_CONSOLE.isBridgeable());
+        assertEquals(false, ChatChannel.CONSOLE.isBridgeable());
+        assertEquals(false, ChatChannel.SERVER_LOG.isBridgeable());
         assertEquals(ChatRecipientRule.OPERATORS,
                 ChatChannel.OPERATOR.getRecipientRule());
         assertEquals(ChatPresentationMode.OUT_OF_CHARACTER,
@@ -100,7 +99,7 @@ public final class ChatChannelTest {
                 ChatChannel.PROXIMITY.getAccess());
         assertEquals(ChatChannelAccess.NONE, ChatChannel.OOC.getAccess());
         assertEquals(ChatChannelAccess.NONE,
-                ChatChannel.CLIENT_CONSOLE.getAccess());
+                ChatChannel.CONSOLE.getAccess());
         assertEquals(ChatChannelAccess.NONE,
                 ChatChannel.WHISPER.getAccess());
         assertEquals(ChatChannelAccess.CHARACTER_FACTION,
@@ -126,7 +125,7 @@ public final class ChatChannelTest {
         assertEquals(true, ChatChannel.OOC.isBridgeable());
         assertEquals(true, ChatChannel.OPERATOR.isBridgeable());
         assertEquals(false, ChatChannel.FELLOWSHIP.isBridgeable());
-        assertEquals(false, ChatChannel.CLIENT_CONSOLE.isBridgeable());
+        assertEquals(false, ChatChannel.CONSOLE.isBridgeable());
         assertEquals(false, ChatChannel.WHISPER.isBridgeable());
     }
 

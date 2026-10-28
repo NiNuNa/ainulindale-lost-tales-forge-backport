@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * The chat's layout read and changed by channel, for tests that name
- * channels rather than tabs. Each answer is read off the live layout.
+ * channels rather than pages. Each answer is read off the live layout.
  */
 public final class ChatLayoutViews {
     private ChatLayoutViews() {}
@@ -17,8 +17,8 @@ public final class ChatLayoutViews {
     /** The channels of a window's conversations, in row order; whispers as WHISPER. */
     public static List<ChatChannel> channelsOf(Window window) {
         List<ChatChannel> result = new ArrayList<ChatChannel>();
-        for (WindowPage tab : window.getTabs()) {
-            ConversationPage conversation = ConversationPage.from(tab);
+        for (WindowPage page : window.getTabs()) {
+            ConversationPage conversation = ConversationPage.from(page);
             if (conversation != null) {
                 result.add(conversation.getChannel());
             }
@@ -36,17 +36,17 @@ public final class ChatLayoutViews {
     public static List<ChatChannel> orderChannels() {
         List<ChatChannel> result = new ArrayList<ChatChannel>();
         for (WindowPage each : WindowLayout.order()) {
-            ConversationPage tab = ConversationPage.from(each);
-            if (tab != null) {
-                result.add(tab.getChannel());
+            ConversationPage page = ConversationPage.from(each);
+            if (page != null) {
+                result.add(page.getChannel());
             }
         }
         return result;
     }
 
     /**
-     * Reopens a closed channel as the last tab of the window that takes
-     * it, its front tab left alone: false for one already open, or with
+     * Reopens a closed channel as the last page of the window that takes
+     * it, its front page left alone: false for one already open, or with
      * no window to take it.
      */
     public static boolean reopen(ChatChannel channel) {
@@ -54,7 +54,7 @@ public final class ChatLayoutViews {
     }
 
     /**
-     * Reopens a closed channel as the given window's last tab, or where a
+     * Reopens a closed channel as the given window's last page, or where a
      * conversation opens while that window is locked: false for a missing
      * window or a channel already open.
      */
@@ -64,8 +64,8 @@ public final class ChatLayoutViews {
     }
 
     private static boolean reopenIn(ChatChannel channel, String windowId) {
-        ConversationPage tab = ConversationPage.of(channel);
-        return tab != null && !WindowLayout.isOpen(tab)
-                && WindowLayout.openTab(tab, windowId) != null;
+        ConversationPage page = ConversationPage.of(channel);
+        return page != null && !WindowLayout.isOpen(page)
+                && WindowLayout.openTab(page, windowId) != null;
     }
 }

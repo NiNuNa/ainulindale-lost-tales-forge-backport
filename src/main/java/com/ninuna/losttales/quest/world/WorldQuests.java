@@ -23,6 +23,7 @@ import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -177,30 +178,6 @@ public final class WorldQuests {
         return deliver(player, null);
     }
 
-    /**
-     * Whether a running world quest's delivery is handed in at a board and
-     * takes something the player carries: what a board's Hand In asks.
-     */
-    public static boolean hasBoardDelivery(EntityPlayerMP player) {
-        MinecraftServer server = MinecraftServer.getServer();
-        WorldQuestWorldData data = data(server);
-        if (player == null || data == null || data.runningCount() == 0) {
-            return false;
-        }
-        for (String questId : data.runningQuestIds(now(server))) {
-            for (LostTalesQuestObjectiveDefinition objective
-                    : WorldQuestRules.objectives(LostTalesQuestRegistry.getQuest(questId))) {
-                if (LostTalesQuestObjectiveType.DELIVER.is(objective)
-                        && LostTalesQuestDefinitionValidator.isBoardDelivery(
-                                objective.getParams())
-                        && carried(player, objective) > 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private static boolean deliver(EntityPlayerMP player, Entity target) {
         if (player == null || player instanceof FakePlayer) {
             return false;
@@ -244,18 +221,6 @@ public final class WorldQuests {
             }
         }
         return any;
-    }
-
-    /** How many of a delivery's items the player carries. */
-    private static int carried(EntityPlayerMP player,
-                               LostTalesQuestObjectiveDefinition objective) {
-        int carried = 0;
-        for (ItemStack stack : player.inventory.mainInventory) {
-            if (stack != null && LostTalesQuestObjectiveMatcher.matchesItem(stack, objective)) {
-                carried += stack.stackSize;
-            }
-        }
-        return carried;
     }
 
     /**
@@ -400,8 +365,12 @@ public final class WorldQuests {
             return;
         }
         UUID identity = RoleplayCharacterIdentityHook.resolveGameplayId(player);
-        if (mayBePaid(player) && data.hasRewards(identity)) {
-            pay(server, player, data.takeRewards(identity));
+        if (LostTalesQuestRewardHelper.mayBePaid(player)
+                && data.hasRewards(identity)) {
+            Map<EntityPlayerMP, List<String>> owed =
+                    new LinkedHashMap<EntityPlayerMP, List<String>>();
+            owed.put(player, data.takeRewards(identity));
+            pay(server, owed);
         }
         UUID sent;
         synchronized (WorldQuests.class) {
@@ -414,6 +383,8 @@ public final class WorldQuests {
 
     private static void payEveryoneHere(MinecraftServer server,
                                         WorldQuestWorldData data) {
+        Map<EntityPlayerMP, List<String>> owed =
+                new LinkedHashMap<EntityPlayerMP, List<String>>();
         for (Object each : server.getConfigurationManager().playerEntityList) {
             if (!(each instanceof EntityPlayerMP)) {
                 continue;
@@ -421,28 +392,26 @@ public final class WorldQuests {
             EntityPlayerMP player = (EntityPlayerMP)each;
             UUID identity = RoleplayCharacterIdentityHook.resolveGameplayId(
                     player);
-            if (mayBePaid(player) && data.hasRewards(identity)) {
-                pay(server, player, data.takeRewards(identity));
+            if (LostTalesQuestRewardHelper.mayBePaid(player)
+                    && data.hasRewards(identity)) {
+                owed.put(player, data.takeRewards(identity));
             }
         }
+        pay(server, owed);
     }
 
     /**
-     * Whether items and experience given now reach the player: not on the
-     * death screen, where they would stay with the body.
+     * Saves the store once, every reward owed already taken out of it,
+     * then pays each player theirs: a crash in between loses them, but
+     * never pays them twice.
      */
-    private static boolean mayBePaid(EntityPlayerMP player) {
-        return !(player instanceof FakePlayer) && !player.isDead
-                && player.getHealth() > 0.0F;
-    }
-
-    /**
-     * Saves the store, the rewards already taken out of it, then pays
-     * each: a crash in between loses them, but never pays them twice.
-     */
-    private static void pay(MinecraftServer server, EntityPlayerMP player,
-                            List<String> questIds) {
-        if (questIds.isEmpty()) {
+    private static void pay(MinecraftServer server,
+                            Map<EntityPlayerMP, List<String>> owed) {
+        boolean any = false;
+        for (List<String> questIds : owed.values()) {
+            any |= !questIds.isEmpty();
+        }
+        if (!any) {
             return;
         }
         WorldServer overworld = server == null ? null
@@ -450,6 +419,13 @@ public final class WorldQuests {
         if (overworld != null && overworld.mapStorage != null) {
             overworld.mapStorage.saveAllData();
         }
+        for (Map.Entry<EntityPlayerMP, List<String>> each : owed.entrySet()) {
+            pay(each.getKey(), each.getValue());
+        }
+    }
+
+    /** Pays the player each reward of {@code questIds}, already taken out of the store and saved. */
+    private static void pay(EntityPlayerMP player, List<String> questIds) {
         for (String waiting : questIds) {
             boolean podium = waiting.startsWith(WorldQuestRules.PODIUM_REWARD_PREFIX);
             String questId = podium ? waiting.substring(

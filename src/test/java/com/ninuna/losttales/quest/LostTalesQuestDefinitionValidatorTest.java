@@ -122,9 +122,9 @@ public final class LostTalesQuestDefinitionValidatorTest {
         assertOneWarning(HEAD + "\"interaction\":{\"block\":\"minecraft:chest\","
                 + "\"metadata\":\"2\"},\"stages\":[" + stage("10",
                 String.format(GATHER, "a")) + "]}", "interaction names 'metadata'");
-        assertOneWarning(HEAD + "\"dialogue\":{\"HandIn\":\"Thanks.\"},"
+        assertOneWarning(HEAD + "\"conversation\":{\"HandIn\":\"Thanks.\"},"
                 + "\"stages\":[" + stage("10", String.format(GATHER, "a"))
-                + "]}", "dialogue names 'HandIn'");
+                + "]}", "conversation names 'HandIn'");
     }
 
     @Test
@@ -268,7 +268,7 @@ public final class LostTalesQuestDefinitionValidatorTest {
         LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser.parseQuest(
                 new StringReader(HEAD + "\"rewards\":{\"starter\":"
                         + "\"losttales:path/survivalist/night_watch\"}," + stages),
-                "quests/test/q.json");
+                "quests/test/q.json", new java.util.ArrayList<String>());
         assertEquals("losttales:path/survivalist/night_watch",
                 LostTalesQuestRewards.starter(quest.getRewards()));
         assertOneWarning(HEAD + "\"rewards\":{\"starter\":\"night_watch\"}," + stages,
@@ -315,7 +315,8 @@ public final class LostTalesQuestDefinitionValidatorTest {
                 + "\"repeatable\":true,\"repeatAfter\":\"1\"," + stages));
         LostTalesQuestDefinition quest = LostTalesQuestDefinitionJsonParser.parseQuest(
                 new StringReader(HEAD + "\"repeatable\":true,\"repeatAfter\":\"0.5\","
-                        + stages), "quests/test/q.json");
+                        + stages), "quests/test/q.json",
+                new java.util.ArrayList<String>());
         assertEquals(12000L, LostTalesQuestRules.repeatAfterTicks(quest));
         assertOneWarning(HEAD + "\"repeatable\":true,\"repeatAfter\":\"soon\","
                 + stages, "it is a number of in-game days");

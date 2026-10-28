@@ -50,8 +50,8 @@ final class ChatOutbox {
     private final ChatComposer composer;
     private final ChatNoticeSink notices;
     private Minecraft mc;
-    /** The tab the server last heard this player typing into, or null. */
-    private ConversationPage typingTab;
+    /** The page the server last heard this player typing into, or null. */
+    private ConversationPage typingPage;
     private long typingSentNanos;
     /** The field's text as the typing check last saw it, and when. */
     private String typedText = "";
@@ -69,7 +69,7 @@ final class ChatOutbox {
     /* ---- Sending ---- */
 
     /**
-     * Sends a message typed into {@code tab}; the caller has checked it
+     * Sends a message typed into {@code page}; the caller has checked it
      * is valid and may go there. A message being rewritten goes back to
      * the server as a correction to the line it came from and the bar
      * returns to composing from scratch; a line in an NPC conversation
@@ -77,7 +77,7 @@ final class ChatOutbox {
      * anything else is shown at once and sent, answering whatever the
      * composer holds.
      */
-    void sendMessage(ConversationPage tab, String message) {
+    void sendMessage(ConversationPage page, String message) {
         ClientChatIdentitySelection.update();
         // What goes out may have its emoticons converted; the history
         // the caller recorded keeps the raw text.
@@ -89,28 +89,28 @@ final class ChatOutbox {
                     new LostTalesChatEditPacket(edited, outgoing, message));
             return;
         }
-        if (tab.isNpc()) {
-            LostTalesChatPresentation.echoToNpc(tab, outgoing,
+        if (page.isNpc()) {
+            LostTalesChatPresentation.echoToNpc(page, outgoing,
                     resolveLocalShowcases(outgoing),
                     this.composer.replyReference());
             this.composer.cancelReply();
             return;
         }
         recordEmojiUse(outgoing);
-        sendToTab(tab, outgoing, message, this.composer.replyReference(), false);
+        sendToPage(page, outgoing, message, this.composer.replyReference(), false);
         // Answered: the next message is a message of its own.
         this.composer.cancelReply();
     }
 
     /**
-     * Sends an action typed into {@code tab} ({@code /me draws his
+     * Sends an action typed into {@code page} ({@code /me draws his
      * sword}), its words ended as the sentence they read as, the way a
      * message is sent: shown at once and answering whatever the composer
      * holds. A message being rewritten takes the words and stays what it
      * was; in an NPC conversation the action is shown here, as a line
      * there is.
      */
-    void sendAction(ConversationPage tab, String words) {
+    void sendAction(ConversationPage page, String words) {
         ClientChatIdentitySelection.update();
         String outgoing = ChatAction.sentence(
                 ChatInputRules.outgoingMessage(words));
@@ -123,15 +123,15 @@ final class ChatOutbox {
                     new LostTalesChatEditPacket(edited, outgoing, typed));
             return;
         }
-        if (tab.isNpc()) {
-            LostTalesChatPresentation.echoToNpc(tab, outgoing,
+        if (page.isNpc()) {
+            LostTalesChatPresentation.echoToNpc(page, outgoing,
                     resolveLocalShowcases(outgoing),
                     this.composer.replyReference(), true);
             this.composer.cancelReply();
             return;
         }
         recordEmojiUse(outgoing);
-        sendToTab(tab, outgoing, typed, this.composer.replyReference(), true);
+        sendToPage(page, outgoing, typed, this.composer.replyReference(), true);
         this.composer.cancelReply();
     }
 
@@ -150,12 +150,12 @@ final class ChatOutbox {
 
     /**
      * The text after the name of a {@code /msg}, sent into the whisper
-     * tab the name opened: only another way of saying it, so it is
-     * shown before it is sent exactly as a message typed into the tab
+     * page the name opened: only another way of saying it, so it is
+     * shown before it is sent exactly as a message typed into the page
      * is. A body too long to send is refused with the same notice the
-     * bar gives, rather than dropped; an empty one only opens the tab.
+     * bar gives, rather than dropped; an empty one only opens the page.
      */
-    void sendWhisper(ConversationPage tab, String text) {
+    void sendWhisper(ConversationPage page, String text) {
         if (text.length() == 0) {
             return;
         }
@@ -166,32 +166,33 @@ final class ChatOutbox {
                     Integer.valueOf(ChatMessageValidator.MAX_CHARACTERS)));
             return;
         }
-        sendToTab(tab, ChatInputRules.outgoingMessage(text), text,
+        sendToPage(page, ChatInputRules.outgoingMessage(text), text,
                 ChatReplyReference.NONE, false);
     }
 
     /**
-     * Forwards the server's message {@code messageId} into {@code tab},
+     * Forwards the server's message {@code messageId} into {@code page},
      * addressed as a line typed there would be, and says where it went.
      * The server builds the line from its own record, so nothing is shown
      * before it arrives.
      */
-    void forward(ConversationPage tab, long messageId) {
-        if (tab == null || !ChatMessageIds.isServerId(messageId)) {
+    void forward(ConversationPage page, long messageId) {
+        if (page == null || !ChatMessageIds.isServerId(messageId)) {
             return;
         }
         ClientChatIdentitySelection.update();
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                LostTalesChatSendPacket.forward(tab.getChannel(),
-                        tab.target(), ClientChatIdentities.wireKind(tab),
-                        ClientChatIdentities.wireCharacterId(tab),
-                        tab.isWhisper() ? tab.getPartnerIdentity() : "",
-                        tab.isWhisper()
-                                ? ClientChatChannelState.partnerCharacterIdOf(tab)
+                LostTalesChatSendPacket.forward(page.getChannel(),
+                        page.target(), ClientChatIdentities.wireKind(page),
+                        ClientChatIdentities.wireCharacterId(page),
+                        page.isWhisper() ? page.getPartnerIdentity() : "",
+                        page.isWhisper()
+                                ? ClientChatChannelState.partnerCharacterIdOf(page)
                                 : null,
-                        messageId));
+                        messageId)
+                        .range(ChatSpeechRanges.of(page)));
         this.notices.showNotice(StatCollector.translateToLocalFormatted(
-                "gui.losttales.chat.forwarded", tab.title()));
+                "gui.losttales.chat.forwarded", page.title()));
     }
 
     /**
@@ -200,9 +201,9 @@ final class ChatOutbox {
      * references the server re-checks; {@code action} sends the words as
      * an action.
      */
-    private void sendToTab(ConversationPage tab, String outgoing, String typed,
+    private void sendToPage(ConversationPage page, String outgoing, String typed,
                            ChatReplyReference reply, boolean action) {
-        if (tab == null) {
+        if (page == null) {
             return;
         }
         ClientChatIdentitySelection.update();
@@ -212,23 +213,25 @@ final class ChatOutbox {
         // line shown at once reads as the server will send it back.
         boolean named = ChatMessageIds.isServerId(reply.getMessageId());
         boolean unkept = !named && reply.exists();
-        long echoNonce = LostTalesChatPresentation.echoPending(tab, outgoing,
+        long echoNonce = LostTalesChatPresentation.echoPending(page, outgoing,
                 resolveLocalShowcases(outgoing),
                 unkept ? ChatReplyReference.UNKEPT : reply, action);
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesChatSendPacket(tab.getChannel(), outgoing,
-                        resolveShareReferences(outgoing), tab.target(),
-                        ClientChatIdentities.wireKind(tab),
-                        ClientChatIdentities.wireCharacterId(tab),
+                new LostTalesChatSendPacket(page.getChannel(), outgoing,
+                        resolveShareReferences(outgoing), page.target(),
+                        ClientChatIdentities.wireKind(page),
+                        ClientChatIdentities.wireCharacterId(page),
                         named ? reply.getMessageId() : ChatMessageIds.NONE,
-                        tab.isWhisper() ? tab.getPartnerIdentity() : "",
+                        page.isWhisper() ? page.getPartnerIdentity() : "",
                         echoNonce,
-                        tab.isWhisper()
-                                ? ClientChatChannelState.partnerCharacterIdOf(tab)
+                        page.isWhisper()
+                                ? ClientChatChannelState.partnerCharacterIdOf(page)
                                 : null,
                         unkept, action)
-                        .narrating(ClientChatIdentities.wireNarrating(tab))
-                        .typed(typed));
+                        .narrating(ClientChatIdentities.wireNarrating(page))
+                        .typed(typed)
+                        // How far it carries where it is heard nearby (CHAT-37).
+                        .range(ChatSpeechRanges.of(page)));
     }
 
     /**
@@ -403,8 +406,8 @@ final class ChatOutbox {
 
     /**
      * Tells the server, once every heartbeat while the field holds a
-     * message, that this player is typing into the selected tab — and
-     * that they have stopped when the field empties, the tab changes,
+     * message, that this player is typing into the selected page — and
+     * that they have stopped when the field empties, the page changes,
      * the message goes out or the screen closes. Commands are not
      * messages and say nothing; an NPC conversation has nobody to tell.
      */
@@ -418,15 +421,15 @@ final class ChatOutbox {
             stopTyping();
             return;
         }
-        if (selected.equals(this.typingTab)
+        if (selected.equals(this.typingPage)
                 && now - this.typingSentNanos < TYPING_HEARTBEAT_NANOS) {
             return;
         }
-        if (this.typingTab != null && !selected.equals(this.typingTab)) {
-            sendTyping(this.typingTab, false);
+        if (this.typingPage != null && !selected.equals(this.typingPage)) {
+            sendTyping(this.typingPage, false);
         }
         sendTyping(selected, true);
-        this.typingTab = selected;
+        this.typingPage = selected;
         this.typingSentNanos = now;
     }
 
@@ -448,25 +451,26 @@ final class ChatOutbox {
     }
 
     void stopTyping() {
-        if (this.typingTab != null) {
-            sendTyping(this.typingTab, false);
-            this.typingTab = null;
+        if (this.typingPage != null) {
+            sendTyping(this.typingPage, false);
+            this.typingPage = null;
         }
     }
 
-    private static void sendTyping(ConversationPage tab, boolean typing) {
-        if (tab == null) {
+    private static void sendTyping(ConversationPage page, boolean typing) {
+        if (page == null) {
             return;
         }
         // The identity the message will be sent as, stated the same way
         // the send states it, so presence goes where the message will.
         LostTalesNetworkHandler.CHANNEL.sendToServer(
-                new LostTalesChatTypingPacket(tab.getChannel(),
-                        tab.target(), typing,
-                        ClientChatIdentities.wireKind(tab),
-                        ClientChatIdentities.wireCharacterId(tab),
-                        ClientChatIdentities.wireNarrating(tab),
-                        tab.isWhisper() ? tab.getPartnerIdentity() : "",
-                        tab.isWhisper() ? ClientChatChannelState.partnerCharacterIdOf(tab) : null));
+                new LostTalesChatTypingPacket(page.getChannel(),
+                        page.target(), typing,
+                        ClientChatIdentities.wireKind(page),
+                        ClientChatIdentities.wireCharacterId(page),
+                        ClientChatIdentities.wireNarrating(page),
+                        page.isWhisper() ? page.getPartnerIdentity() : "",
+                        page.isWhisper() ? ClientChatChannelState.partnerCharacterIdOf(page) : null)
+                        .range(ChatSpeechRanges.of(page)));
     }
 }

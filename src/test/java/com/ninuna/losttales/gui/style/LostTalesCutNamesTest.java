@@ -40,8 +40,6 @@ public final class LostTalesCutNamesTest {
 
     /** Files that write dots into words that are not names, and why. */
     private static final String[][] ALLOWED = {
-            {"ChatSpeechBubbles.java",
-                    "a spoken line over a head, cut by its length and wrapped"},
             {"Settings.java",
                     "a typed setting's value, read from its end"},
             {"MotionCodec.java", "a log line, never drawn"},

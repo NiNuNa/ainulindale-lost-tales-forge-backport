@@ -16,11 +16,11 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import java.util.UUID;
 
 /**
- * Single bounded client-to-server request envelope for fellowship operations.
- * The colour travels only for a colour change, the position only for a mark
- * placed or moved, the name only for a new fellowship, a rename, a mark
- * placed and an invitation (the invited character's), the value byte only
- * for a guide made or unmade and a switch.
+ * Every fellowship request a client sends, in one packet. The colour
+ * travels only for a colour change, the position only for a go-here mark
+ * set and a mark placed or moved, the name only for a new fellowship, a
+ * rename, a mark placed and an invitation (the invited character's), the
+ * value byte only for a guide made or unmade and a switch.
  */
 public final class FellowshipActionRequestPacket implements IMessage {
 

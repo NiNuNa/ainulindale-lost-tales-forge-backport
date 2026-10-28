@@ -80,7 +80,7 @@ public final class PlayerAppearanceResolverTest {
     }
 
     @Test
-    public void unisexRacesNeverGetAChestAndKeepTheirScale() {
+    public void oneBodyRacesNeverGetAChestAndKeepTheirScale() {
         ResolvedPlayerAppearance resolved = PlayerAppearanceResolver.resolve(
                 PLAYER, new CharacterAppearance(PLAYER, CharacterRaceRegistry.ORC,
                         CharacterBodyTypeRegistry.NEUTRAL, "losttales:orc_0",

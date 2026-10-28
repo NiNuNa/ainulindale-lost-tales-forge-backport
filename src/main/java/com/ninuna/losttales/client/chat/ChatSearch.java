@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,18 +65,19 @@ public final class ChatSearch {
         long pagedFrom;
     }
 
-    /** What each copy's words found, by the copy's tab id, while it keeps words. */
+    /** What each copy's words found, by the copy's page id, while it keeps words. */
     private static final Map<String, Found> FOUND = new HashMap<String, Found>();
     /** The time everything was forgotten that what is kept was found after. */
     private static int seenEpoch = -1;
-    private static final Map<Integer, Cached> TEXTS = new HashMap<Integer, Cached>();
+    /** Each line as read, the one read first going first past the bound. */
+    private static final Map<Integer, Cached> TEXTS = new LinkedHashMap<Integer, Cached>();
     /** What the words of the copy whose lines are being drawn found; null between windows. */
     private static Found drawing;
 
     private ChatSearch() {}
 
     /**
-     * What the words of the copy whose tab has {@code copyId} found, caught
+     * What the words of the copy whose page has {@code copyId} found, caught
      * up with them: words cleared since forget what they found, new words
      * forget the place and are read again. Null while the copy keeps none.
      */

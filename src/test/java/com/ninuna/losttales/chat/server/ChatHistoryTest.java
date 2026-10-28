@@ -5,7 +5,7 @@ import com.ninuna.losttales.chat.ChatNamedPlayer;
 import com.ninuna.losttales.chat.ChatReactionSummary;
 import com.ninuna.losttales.chat.ChatMessageIds;
 import com.ninuna.losttales.chat.ChatReplyReference;
-import com.ninuna.losttales.chat.ChatTabIds;
+import com.ninuna.losttales.chat.ChatPageIds;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.network.packet.ChatPacketFixtures;
 import com.ninuna.losttales.network.packet.LostTalesChatMessagePacket;
@@ -317,7 +317,7 @@ public final class ChatHistoryTest {
                     Arrays.asList(BOB), ChatHistory.Audience.readers());
             long global = record(ChatChannel.GLOBAL, BOB, "well met",
                     Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
-            long bobsNote = record(ChatChannel.CLIENT_CONSOLE, BOB, "remember the gate",
+            long bobsNote = record(ChatChannel.CONSOLE, BOB, "remember the gate",
                     Arrays.asList(BOB), ChatHistory.Audience.accounts(
                             Arrays.asList(BOB), false));
             long alicesFirst = 0L;
@@ -340,7 +340,7 @@ public final class ChatHistoryTest {
             assertTrue("Global keeps its line", ChatHistory.quoteFor(global,
                     requester(CAROL), ChatChannel.GLOBAL, "").exists());
             assertTrue("another player's own line stays", ChatHistory.quoteFor(
-                    bobsNote, requester(BOB), ChatChannel.CLIENT_CONSOLE, "").exists());
+                    bobsNote, requester(BOB), ChatChannel.CONSOLE, "").exists());
             assertFalse("her oldest answer went", ChatHistory.mayRead(alicesFirst,
                     requester(ALICE)));
             assertTrue(ChatHistory.mayRead(alicesLast, requester(ALICE)));
@@ -372,7 +372,7 @@ public final class ChatHistoryTest {
             long firstNote = 0L;
             long lastNote = 0L;
             for (int index = 0; index < 100; index++) {
-                lastNote = record(ChatChannel.CLIENT_CONSOLE, ALICE, "note " + index,
+                lastNote = record(ChatChannel.CONSOLE, ALICE, "note " + index,
                         Arrays.asList(ALICE), ChatHistory.Audience.accounts(
                                 Arrays.asList(ALICE), false));
                 if (index == 0) {
@@ -396,7 +396,7 @@ public final class ChatHistoryTest {
         int kept = LostTalesConfig.chatHistoryPerChannel;
         LostTalesConfig.chatHistoryPerChannel = ChatHistory.MAX_TOTAL;
         try {
-            long note = record(ChatChannel.CLIENT_CONSOLE, ALICE, "an early note",
+            long note = record(ChatChannel.CONSOLE, ALICE, "an early note",
                     Arrays.asList(ALICE), ChatHistory.Audience.accounts(
                             Arrays.asList(ALICE), false));
             for (int index = 0; index < ChatHistory.MAX_TOTAL; index++) {
@@ -441,10 +441,65 @@ public final class ChatHistoryTest {
             assertTrue(ChatHistory.keepsFloor("global"));
             assertTrue(ChatHistory.keepsFloor("faction:gondor"));
             assertFalse(ChatHistory.keepsFloor("fellowship:" + FELLOWSHIP));
-            assertFalse(ChatHistory.keepsFloor("whisper:a|b"));
+            assertTrue(ChatHistory.keepsFloor("whisper:a|b"));
         } finally {
             LostTalesConfig.chatHistoryPerChannel = kept;
         }
+    }
+
+    /**
+     * A whisper pair keeps its floor past the total, so a whisper to
+     * someone away waits for them (CHAT-31); a floor of nought keeps none.
+     */
+    @Test
+    public void aWhisperPairKeepsItsFloorWhateverTheOthersSay() {
+        int kept = LostTalesConfig.chatHistoryPerChannel;
+        int floor = LostTalesConfig.chatWhisperHistoryFloor;
+        LostTalesConfig.chatHistoryPerChannel = ChatHistory.MAX_TOTAL;
+        LostTalesConfig.chatWhisperHistoryFloor = 5;
+        try {
+            List<Long> whispers = new java.util.ArrayList<Long>();
+            for (int index = 0; index < 8; index++) {
+                whispers.add(Long.valueOf(record(ChatChannel.WHISPER, ALICE,
+                        "to bob " + index, Arrays.asList(ALICE, BOB),
+                        ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB),
+                                false))));
+            }
+            for (int index = 0; index < ChatHistory.MAX_TOTAL; index++) {
+                record(ChatChannel.GLOBAL, CAROL, "line " + index,
+                        Arrays.asList(CAROL), ChatHistory.Audience.everyone());
+            }
+            for (int index = 0; index < whispers.size(); index++) {
+                assertEquals("whisper " + index, index >= 3,
+                        ChatHistory.mayRead(whispers.get(index).longValue(),
+                                requester(BOB)));
+            }
+            LostTalesConfig.chatWhisperHistoryFloor = 0;
+            assertFalse(ChatHistory.keepsFloor("whisper:a|b"));
+        } finally {
+            LostTalesConfig.chatHistoryPerChannel = kept;
+            LostTalesConfig.chatWhisperHistoryFloor = floor;
+        }
+    }
+
+    /**
+     * A line heard nearby replays at the size each reader read it at when
+     * it was said (CHAT-37): larger near its speaker, smaller far off.
+     */
+    @Test
+    public void aLineHeardNearbyReplaysAtEachReadersSize() {
+        long id = ChatMessageIdAllocator.next();
+        ChatHistory.record(id, ALICE, "Aldric", null,
+                line(id, ChatChannel.PROXIMITY, ALICE, "Over here."),
+                Arrays.asList(ALICE, BOB, CAROL),
+                ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB, CAROL),
+                        false), null, Arrays.asList(BOB), Arrays.asList(CAROL));
+        assertEquals(1, ChatHistory.replayFor(requester(BOB),
+                ChatMessageIds.NONE).get(0).getDistanceStep());
+        assertEquals(-1, ChatHistory.replayFor(requester(CAROL),
+                ChatMessageIds.NONE).get(0).getDistanceStep());
+        assertEquals(0, ChatHistory.replayFor(requester(ALICE),
+                ChatMessageIds.NONE).get(0).getDistanceStep());
     }
 
     /** Each whisper pair has its own share of the join replay, inside the whole (CHAT-69). */
@@ -483,7 +538,7 @@ public final class ChatHistoryTest {
                 UUID player = UUID.randomUUID();
                 lastPlayer = player;
                 for (int index = 0; index < 100; index++) {
-                    lastOfAll = record(ChatChannel.CLIENT_CONSOLE, player,
+                    lastOfAll = record(ChatChannel.CONSOLE, player,
                             "note " + index, Arrays.asList(player),
                             ChatHistory.Audience.accounts(Arrays.asList(player), false));
                     if (account == 0 && index == 0) {
@@ -505,7 +560,7 @@ public final class ChatHistoryTest {
             UUID flooding = UUID.randomUUID();
             long[] notes = new long[200];
             for (int index = 0; index < notes.length; index++) {
-                notes[index] = record(ChatChannel.CLIENT_CONSOLE, flooding,
+                notes[index] = record(ChatChannel.CONSOLE, flooding,
                         "note " + index, Arrays.asList(flooding),
                         ChatHistory.Audience.accounts(Arrays.asList(flooding), false));
             }
@@ -823,7 +878,7 @@ public final class ChatHistoryTest {
      * conversations, each from when its own character was made: it may
      * play either at will, so what it could read by switching is what it
      * may read. The two are still separate lines, filed under separate
-     * tabs on the client.
+     * pages on the client.
      */
     @Test
     public void anAccountIsReplayedEveryFactionItHasACharacterIn() {
@@ -1269,8 +1324,8 @@ public final class ChatHistoryTest {
     }
 
     /**
-     * A whisper tab reaches back into the kept history like any other: the
-     * page before a line, of the conversation the tab names, for one of
+     * A whisper page reaches back into the kept history like any other: the
+     * page before a line, of the conversation the page names, for one of
      * its two people and nobody else.
      */
     @Test
@@ -1279,14 +1334,14 @@ public final class ChatHistoryTest {
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
         long newer = record(ChatChannel.WHISPER, ALICE, "second", Arrays.asList(ALICE, BOB),
                 ChatHistory.Audience.accounts(Arrays.asList(ALICE, BOB), false));
-        String conversation = ChatTabIds.whisperConversationId("bob", "", "");
+        String conversation = ChatPageIds.whisperConversationId("bob", "", "");
         List<LostTalesChatMessagePacket> page = ChatHistory.replayBefore(
                 requester(ALICE), ChatChannel.WHISPER, conversation, newer);
         assertEquals(1, page.size());
         assertEquals(older, page.get(0).getMessageId());
         assertTrue("another conversation answers with nothing",
                 ChatHistory.replayBefore(requester(ALICE), ChatChannel.WHISPER,
-                        ChatTabIds.whisperConversationId("carol", "", ""), newer).isEmpty());
+                        ChatPageIds.whisperConversationId("carol", "", ""), newer).isEmpty());
         assertTrue("someone who was not sent it is answered with nothing",
                 ChatHistory.replayBefore(requester(CAROL), ChatChannel.WHISPER,
                         conversation, newer).isEmpty());
@@ -1360,6 +1415,31 @@ public final class ChatHistoryTest {
                 LostTalesChatMessagePacket.SERVER_SENDER_ID, "Server restarting",
                 Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
         assertNull(ChatHistory.forwardable(server, reader(BOB)));
+    }
+
+    /**
+     * A forward's words are its original's, shown under its author's name,
+     * so its forwarder cannot edit them into words that author never said.
+     */
+    @Test
+    public void aForwardIsNotEdited() {
+        long id = record(ChatChannel.OOC, ALICE, "meet at the gate",
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+        ChatHistory.Forwardable forward = ChatHistory.forwardable(id, reader(BOB));
+        assertNotNull(forward);
+        long carried = ChatMessageIdAllocator.next();
+        ChatHistory.record(carried, BOB, "Bera", null,
+                line(carried, ChatChannel.OOC, BOB, forward.text)
+                        .withReply(forward.reference),
+                Arrays.asList(ALICE, BOB), ChatHistory.Audience.everyone());
+
+        assertNull(ChatHistory.applyEdit(carried, BOB, "meet at the bridge", "",
+                Collections.<ChatNamedPlayer>emptyList(),
+                Collections.<String>emptyList()));
+        assertNotNull("the original's author still edits it", ChatHistory.applyEdit(id,
+                ALICE, "meet at the bridge", "",
+                Collections.<ChatNamedPlayer>emptyList(),
+                Collections.<String>emptyList()));
     }
 
     /**

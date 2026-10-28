@@ -21,6 +21,18 @@ public final class LostTalesClientMapMarkerVisibility {
 
     private LostTalesClientMapMarkerVisibility() {}
 
+    /**
+     * Forgets the region answers and the world, player and snapshot they
+     * were for; as the client leaves a server or unloads its world.
+     */
+    public static void clear() {
+        REGION_UNLOCK_CACHE.clear();
+        regionCacheWorld = null;
+        regionCachePlayer = null;
+        regionCacheSnapshot = null;
+        regionCacheTick = Long.MIN_VALUE;
+    }
+
     public static boolean isDiscovered(LostTalesMapMarkerData marker) {
         return marker != null
                 && LostTalesClientQuestProgressStore
@@ -126,22 +138,6 @@ public final class LostTalesClientMapMarkerVisibility {
         } catch (Throwable ignored) {
             return false;
         }
-    }
-
-    /**
-     * Compass visibility is deliberately less revealing than map visibility
-     * in one direction and more useful in another: a hidden marker remains
-     * absent from the full map, but its nearby compass hint may still guide
-     * the player to an anonymous discovery. Ordinary waypoint question marks
-     * continue to require their LOTR region to have been unlocked.
-     */
-    public static boolean isUndiscoveredCompassVisible(
-            LostTalesMapMarkerData marker) {
-        if (marker == null || !marker.isDiscoverable()
-                || isDiscovered(marker)) {
-            return false;
-        }
-        return isRegionRequirementMet(marker);
     }
 
 }

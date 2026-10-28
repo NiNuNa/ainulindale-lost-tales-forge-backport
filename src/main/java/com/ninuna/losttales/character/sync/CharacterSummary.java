@@ -8,7 +8,7 @@ import com.ninuna.losttales.character.registry.CharacterChestTypeRegistry;
 import com.ninuna.losttales.util.LostTalesIdentifiers;
 import java.util.UUID;
 
-/** Immutable client-safe projection of one private roleplaying character. */
+/** One character of a player's roster, as their own client sees it. */
 public final class CharacterSummary {
 
     private final UUID characterId;

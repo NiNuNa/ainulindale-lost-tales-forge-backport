@@ -48,7 +48,7 @@ public final class LostTalesQuestCategoryTest {
     public void aQuestIsFiledByTheFirstPartOfItsPath() {
         assertEquals(LostTalesQuestCategory.TUTORIALS, category("losttales:tutorial/meet_nia"));
         assertEquals(LostTalesQuestCategory.PATHS, category("losttales:path/survivalist/night_watch"));
-        assertEquals(LostTalesQuestCategory.MISSIVES, category("losttales:missive/generated/b/1_0"));
+        assertEquals(LostTalesQuestCategory.MISSIVES, category("losttales:missive/b/1_0"));
         assertEquals(LostTalesQuestCategory.FACTIONS, category("losttales:faction/bree/watch"));
         assertEquals(LostTalesQuestCategory.REGIONAL, category("losttales:regional/bree"));
         assertEquals(LostTalesQuestCategory.MAIN_STORY, category("losttales:story/prologue"));

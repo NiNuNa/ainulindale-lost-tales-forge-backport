@@ -9,16 +9,16 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Two windows to move tabs between, for the tests that need more than a
+ * Two windows to move pages between, for the tests that need more than a
  * new player's one: w1 with the two consoles and Operator, Client
  * Console in front, and w2 with every other channel, Global in front.
- * Nothing is hidden, and both are unlocked, so their tabs can be moved
+ * Nothing is hidden, and both are unlocked, so their pages can be moved
  * and closed by hand; a test about the padlock locks them itself.
  */
 public final class TwoWindowLayout {
     private static final List<ConversationPage> CONSOLES = Arrays.asList(
-            ConversationPage.of(ChatChannel.CLIENT_CONSOLE),
-            ConversationPage.of(ChatChannel.SERVER_CONSOLE),
+            ConversationPage.of(ChatChannel.CONSOLE),
+            ConversationPage.of(ChatChannel.SERVER_LOG),
             ConversationPage.of(ChatChannel.OPERATOR));
 
     private static final Runnable TWO_WINDOWS = new Runnable() {

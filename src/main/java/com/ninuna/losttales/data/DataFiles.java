@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import com.ninuna.losttales.util.LostTalesCloseables;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilterReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -33,6 +34,12 @@ import java.util.Map;
 public final class DataFiles {
     public static final int MAX_FILES = 256;
     public static final long MAX_FILE_BYTES = 64L * 1024L;
+    /**
+     * The most characters a bundled file or index is read to. A resource
+     * pack can stand in for any of them, so they are bounded too, past
+     * the largest the mod ships ({@code map_markers/lotr_waypoints.json}).
+     */
+    public static final long MAX_BUNDLED_FILE_BYTES = 1024L * 1024L;
 
     private DataFiles() {}
 
@@ -64,15 +71,25 @@ public final class DataFiles {
         }
     }
 
-    /** The bundled files {@code indexFile}'s {@code listKey} names, in its order. */
+    /**
+     * The bundled files {@code indexFile}'s {@code listKey} names, in its
+     * order: the first {@link #MAX_FILES}, each read to
+     * {@link #MAX_BUNDLED_FILE_BYTES} characters at most, and none whose
+     * path leaves the mod's assets.
+     */
     public static <T> Result<T> readBundled(Source source, String indexFile,
                                             String listKey, Kind<T> kind) {
         List<String> problems = new ArrayList<String>();
         Map<String, T> byId = new LinkedHashMap<String, T>();
         for (String file : index(source, indexFile, listKey, problems)) {
+            if (!staysInAssets(file)) {
+                problems.add(indexFile + " names " + file
+                        + ", which lies outside the mod's assets; left out");
+                continue;
+            }
             Reader reader = null;
             try {
-                reader = source.open(file);
+                reader = bounded(source.open(file), MAX_BUNDLED_FILE_BYTES);
                 if (reader == null) {
                     problems.add(file + " is named by the index but missing");
                     continue;
@@ -135,8 +152,9 @@ public final class DataFiles {
             }
             Reader reader = null;
             try {
-                reader = new InputStreamReader(new FileInputStream(file),
-                        StandardCharsets.UTF_8);
+                // Bounded as it is read too, since the file may grow after its size was asked.
+                reader = bounded(new InputStreamReader(new FileInputStream(file),
+                        StandardCharsets.UTF_8), MAX_FILE_BYTES);
                 accept(kind, reader, name, byId, problems);
             } catch (IOException unreadable) {
                 problems.add(name + " cannot be read: " + unreadable.getMessage());
@@ -164,7 +182,15 @@ public final class DataFiles {
     private static <T> void accept(Kind<T> kind, Reader reader, String file,
                                    Map<String, T> byId, List<String> problems) {
         List<String> said = new ArrayList<String>();
-        T value = kind.parse(reader, file, said);
+        T value;
+        try {
+            value = kind.parse(reader, file, said);
+        } catch (StackOverflowError tooDeep) {
+            // Gson reads nested arrays and objects by recursion, so a file
+            // of a few thousand brackets would otherwise end the start.
+            problems.add(file + " nests too deep to be read");
+            return;
+        }
         if (value == null) {
             problems.add(file + " is not a JSON object");
             return;
@@ -189,7 +215,7 @@ public final class DataFiles {
                                       String listKey, List<String> problems) {
         Reader reader = null;
         try {
-            reader = source.open(indexFile);
+            reader = bounded(source.open(indexFile), MAX_BUNDLED_FILE_BYTES);
             if (reader == null) {
                 problems.add(indexFile + " is missing, so no bundled file loads");
                 return Collections.emptyList();
@@ -214,6 +240,11 @@ public final class DataFiles {
                 }
                 files.add(file);
             }
+            if (files.size() > MAX_FILES) {
+                problems.add(indexFile + " names " + files.size() + " files; only the first "
+                        + MAX_FILES + " are read");
+                files = new ArrayList<String>(files.subList(0, MAX_FILES));
+            }
             return files;
         } catch (IOException unreadable) {
             problems.add(indexFile + " cannot be read, so no bundled file loads: "
@@ -225,6 +256,73 @@ public final class DataFiles {
             LostTalesCloseables.closeQuietly(reader);
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * Whether a path an index names stays under the mod's assets: it
+     * begins with neither {@code /} nor {@code \} and has no {@code ..}
+     * step.
+     */
+    static boolean staysInAssets(String path) {
+        if (path == null || path.startsWith("/") || path.startsWith("\\")) {
+            return false;
+        }
+        String steps = "/" + path.replace('\\', '/') + "/";
+        return !steps.contains("/../");
+    }
+
+    /** {@code reader} read to {@code limit} characters at most; null for none. */
+    static Reader bounded(Reader reader, long limit) {
+        return reader == null ? null : new BoundedReader(reader, limit);
+    }
+
+    /**
+     * A reader that refuses to read past its limit: a file longer than
+     * that cannot be read. A character takes at least one byte, so a
+     * limit in characters lets every file within as many bytes through.
+     */
+    static final class BoundedReader extends FilterReader {
+        private final long limit;
+        private long count;
+
+        BoundedReader(Reader reader, long limit) {
+            super(reader);
+            this.limit = limit;
+        }
+
+        @Override
+        public int read() throws IOException {
+            int character = super.read();
+            if (character >= 0) {
+                counted(1L);
+            }
+            return character;
+        }
+
+        @Override
+        public int read(char[] buffer, int offset, int length) throws IOException {
+            int read = super.read(buffer, offset, length);
+            if (read > 0) {
+                counted(read);
+            }
+            return read;
+        }
+
+        @Override
+        public long skip(long characters) throws IOException {
+            long skipped = super.skip(characters);
+            if (skipped > 0L) {
+                counted(skipped);
+            }
+            return skipped;
+        }
+
+        private void counted(long characters) throws IOException {
+            this.count += characters;
+            if (this.count > this.limit) {
+                throw new IOException("it is longer than " + this.limit + " characters");
+            }
+        }
     }
 
     private static boolean isDirectChild(File folder, File file) {

@@ -147,10 +147,16 @@ public final class AccessoryInventory implements IInventory {
         return AccessoryCompatibilityRegistry.of(this.owner.worldObj);
     }
 
-    /** Refuse server-authoritative insertion if the loss-safe death hook failed. */
+    /**
+     * Whether the death patch of the owner's side landed, so a worn ring
+     * drops at death rather than vanishing: the server's player dies in
+     * {@code EntityPlayerMP.onDeath}, a client's in {@code EntityPlayer}'s
+     * (ACC-05). Without it the slot takes nothing.
+     */
     private boolean isLifecycleOperational() {
         return this.owner.worldObj != null
-                && Boolean.getBoolean(
-                LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY);
+                && Boolean.getBoolean(this.owner.worldObj.isRemote
+                ? LostTalesClassTransformer.ACCESSORY_DEATH_ACTIVE_PROPERTY
+                : LostTalesClassTransformer.ACCESSORY_SERVER_DEATH_ACTIVE_PROPERTY);
     }
 }

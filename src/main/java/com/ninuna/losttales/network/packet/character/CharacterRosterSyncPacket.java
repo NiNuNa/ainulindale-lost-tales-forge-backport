@@ -19,8 +19,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Full private roster snapshot sent only to the owning player: its
- * characters and the deleted characters the server still keeps for it.
+ * A player's whole roster, sent to that player alone: its characters,
+ * and the deleted ones the server still keeps for it.
  */
 public final class CharacterRosterSyncPacket implements IMessage {
 
@@ -123,12 +123,15 @@ public final class CharacterRosterSyncPacket implements IMessage {
                 deleted.add(new DeletedCharacterSummary(characterId, name,
                         raceId, skinId, daysLeft));
             }
-            // Last, whether the server cannot read the characters now.
+            // Then whether the server cannot read the characters now, and
+            // last whether the player's last switch waits for an
+            // administrator (CHAR-45).
             boolean unreadable = buffer.readBoolean();
             if (unreadable && !characters.isEmpty()) {
                 throw new CharacterPacketCodec.DecodeException(
                         "an unreadable store with characters in it");
             }
+            boolean journalHeld = buffer.readBoolean();
             LostTalesPacketCodec.requireFinished(buffer);
             this.snapshot = new CharacterRosterSnapshot(
                     ownerId,
@@ -137,7 +140,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
                     revision,
                     characters,
                     deleted
-            ).withStoreUnreadable(unreadable);
+            ).withStoreUnreadable(unreadable).withJournalHeld(journalHeld);
             if (activeCharacterId != null && this.snapshot.getActiveCharacterId() == null) {
                 throw new CharacterPacketCodec.DecodeException("invalid active character reference");
             }
@@ -192,6 +195,7 @@ public final class CharacterRosterSyncPacket implements IMessage {
             buffer.writeShort(Math.min(0xFFFF, deleted.getDaysLeft()));
         }
         buffer.writeBoolean(this.snapshot.isStoreUnreadable());
+        buffer.writeBoolean(this.snapshot.isJournalHeld());
     }
 
     public int getRequestId() {

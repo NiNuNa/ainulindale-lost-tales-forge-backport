@@ -40,8 +40,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Server-authoritative deletion, restoration, purge, and inactive-generation
- * rollback coordinator.
+ * Deletes, restores and purges characters, and rolls back the saved life of
+ * a character not played.
  *
  * <p>A deleted character is kept for the server's retention
  * ({@code characterDeletionRetentionDays}). Within it the owner restores it
@@ -189,8 +189,8 @@ public final class CharacterDeletionService {
         tombstone.commit(deletedAt, purgeAfter);
         deletionData.saveTombstone(tombstone);
         try {
-            // MapStorage saves the roster, fellowship cleanup, snapshot manifest,
-            // and tombstone in the same authoritative server save pass.
+            // One pass of dimension 0's storage writes every store changed
+            // above, each a file of its own.
             CharacterDeletionStorage.flush(player.worldObj);
         } catch (RuntimeException exception) {
             // The in-memory deletion has committed. Reporting failure here
@@ -715,6 +715,14 @@ public final class CharacterDeletionService {
             if (characterId.equals(roster.getActiveCharacterId())) {
                 return CharacterDeletionMaintenanceResult.CHARACTER_ACTIVE;
             }
+            // A held switch journal puts back the generations it names, so a
+            // rollback under it would be undone or push them out (CHAR-37).
+            CharacterDeletionMaintenanceResult journal = rollbackRefusal(
+                    CharacterSwitchSourceRestore.characterRemovalRefusal(
+                            world, ownerId));
+            if (journal != CharacterDeletionMaintenanceResult.SUCCESS) {
+                return journal;
+            }
             CharacterPlayerStateWorldData playerStateData =
                     CharacterPlayerStateStorage.get(
                             world, ownerId);
@@ -755,6 +763,20 @@ public final class CharacterDeletionService {
             logFailure("rollback", ownerId, characterId, exception);
             return CharacterDeletionMaintenanceResult.INTERNAL_ERROR;
         }
+    }
+
+    /**
+     * What a rollback answers to the switch store's refusal: SUCCESS while
+     * nothing refuses, so the rollback goes on.
+     */
+    static CharacterDeletionMaintenanceResult rollbackRefusal(
+            CharacterErrorId journal) {
+        if (journal == null || journal == CharacterErrorId.NONE) {
+            return CharacterDeletionMaintenanceResult.SUCCESS;
+        }
+        return journal == CharacterErrorId.SWITCH_JOURNAL_HELD
+                ? CharacterDeletionMaintenanceResult.JOURNAL_HELD
+                : CharacterDeletionMaintenanceResult.STORAGE_READ_ONLY;
     }
 
     public synchronized List<CharacterDeletionTombstone> getTombstones(

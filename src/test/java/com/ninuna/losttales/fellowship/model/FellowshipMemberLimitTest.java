@@ -83,7 +83,6 @@ public final class FellowshipMemberLimitTest {
         }
         return new Fellowship(UUID.randomUUID(), list.get(0).getIdentityId(), list,
                 Collections.<UUID>emptyList(), "Grey Company", null,
-                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L,
-                Fellowship.CURRENT_DATA_VERSION);
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L);
     }
 }

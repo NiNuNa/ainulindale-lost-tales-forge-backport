@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Immutable private roster snapshot synchronized to the owning client only. */
+/** A player's roster as their own client sees it; nobody else is sent it. */
 public final class CharacterRosterSnapshot {
 
     /** The most deleted characters a snapshot carries: as many as an account may keep. */
@@ -32,6 +32,11 @@ public final class CharacterRosterSnapshot {
      * until the store reads again.
      */
     private final boolean storeUnreadable;
+    /**
+     * Whether the owner's last switch waits for an administrator (CHAR-45):
+     * the player is held as a ghost, and the page says why.
+     */
+    private final boolean journalHeld;
 
     /**
      * {@code deleted} are the owner's deleted characters the server still
@@ -43,7 +48,7 @@ public final class CharacterRosterSnapshot {
                                    List<CharacterSummary> characters,
                                    List<DeletedCharacterSummary> deleted) {
         this(ownerId, unlockedSlotCount, activeCharacterId, revision, characters,
-                deleted, false);
+                deleted, false, false);
     }
 
     /**
@@ -54,14 +59,15 @@ public final class CharacterRosterSnapshot {
         return new CharacterRosterSnapshot(ownerId,
                 CharacterRoster.INITIAL_UNLOCKED_SLOTS, null, 0L,
                 Collections.<CharacterSummary>emptyList(),
-                Collections.<DeletedCharacterSummary>emptyList(), true);
+                Collections.<DeletedCharacterSummary>emptyList(), true, false);
     }
 
     private CharacterRosterSnapshot(UUID ownerId, int unlockedSlotCount,
                                     UUID activeCharacterId, long revision,
                                     List<CharacterSummary> characters,
                                     List<DeletedCharacterSummary> deleted,
-                                    boolean storeUnreadable) {
+                                    boolean storeUnreadable,
+                                    boolean journalHeld) {
         if (ownerId == null) {
             throw new IllegalArgumentException("ownerId must not be null");
         }
@@ -108,6 +114,7 @@ public final class CharacterRosterSnapshot {
         }
         this.deleted = Collections.unmodifiableList(kept);
         this.storeUnreadable = storeUnreadable && accepted.isEmpty();
+        this.journalHeld = journalHeld;
     }
 
     /** Whether the server cannot read the characters right now: an empty snapshot, the player held. */
@@ -120,7 +127,20 @@ public final class CharacterRosterSnapshot {
         return unreadable == this.storeUnreadable ? this
                 : new CharacterRosterSnapshot(this.ownerId, this.unlockedSlotCount,
                         this.activeCharacterId, this.revision, this.characters,
-                        this.deleted, unreadable);
+                        this.deleted, unreadable, this.journalHeld);
+    }
+
+    /** Whether the owner's last switch waits for an administrator, the player held as a ghost (CHAR-45). */
+    public boolean isJournalHeld() {
+        return this.journalHeld;
+    }
+
+    /** The same snapshot, said to be of a player whose last switch waits for an administrator or not. */
+    public CharacterRosterSnapshot withJournalHeld(boolean held) {
+        return held == this.journalHeld ? this
+                : new CharacterRosterSnapshot(this.ownerId, this.unlockedSlotCount,
+                        this.activeCharacterId, this.revision, this.characters,
+                        this.deleted, this.storeUnreadable, held);
     }
 
     public static CharacterRosterSnapshot fromRoster(CharacterRoster roster,

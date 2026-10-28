@@ -8,7 +8,7 @@ import java.util.Locale;
  * conversation (a channel, a whisper, an NPC or a server's own channel)
  * has two of them, each picked in a sub-window its option opens:
  * Notification Settings, which lines chime, and Chat Feed Settings,
- * which lines reach the closed feed. A
+ * which lines reach the feed. A
  * conversation starts at its defaults ({@link ChatLayout#defaultNotification},
  * Everything for the feed). The player's own lines and replayed history
  * never chime, and Do Not Disturb holds every chime whatever the choice.

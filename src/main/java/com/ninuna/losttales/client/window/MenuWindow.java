@@ -42,7 +42,7 @@ import org.lwjgl.opengl.GL11;
  * section away, as the pickers' sections fold — and
  * <em>separators</em>, a lone hairline between two groups of rows that
  * belong together; a list longer than its window scrolls by the wheel, a
- * accent hairline on an edge saying more lies past it.
+ * short accent fade on an edge saying more lies past it.
  *
  * <p>A menu may hold a field above its rows, which takes what is typed
  * while its window is in front and until a row is taken: a search that
@@ -1887,8 +1887,8 @@ public final class MenuWindow extends SubWindowContent {
      * drawn, so a gliding list answers for what is on screen.
      */
     private int rowIndexAt(Layout at, double x, double y) {
-        if (!(x >= at.left && x < at.left + at.width && y >= at.rowsTop
-                && y < at.rowsBottom)) {
+        if (!LostTalesUiHitBox.contains(x, y, at.left, at.rowsTop, at.width,
+                at.rowsBottom - at.rowsTop)) {
             return -1;
         }
         double offset = y - listTop(at);

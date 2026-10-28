@@ -1,6 +1,7 @@
 package com.ninuna.losttales.quest.missive;
 
 import com.ninuna.losttales.quest.LostTalesQuestIds;
+import com.ninuna.losttales.storage.NbtQuarantine;
 import com.ninuna.losttales.storage.NbtTags;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -23,22 +24,28 @@ import net.minecraftforge.common.util.Constants;
  * up on a board or be accepted: a letter keeps its first posting's days
  * wherever it is pinned, so the record keeps each for the longest days a
  * notice may stand from then ({@link MissivesTaken}), and for good while
- * notices never expire. Past {@link #MAX_ENTRIES} a new one is refused,
- * so no missive is taken until older ones are forgotten. Data of another
- * version, or not shaped as written, is kept as it was and the store goes
- * read-only: then no missive can be taken, rather than one taken twice. An
- * entry that cannot be read is kept aside, untouched.</p>
+ * notices never expire or where its letter has no posting time. Past
+ * {@link #MAX_ENTRIES} a new one is refused, so no missive is taken until
+ * older ones are forgotten.</p>
+ *
+ * <p>An entry that cannot be read, or the later of two for one missive,
+ * is set aside in the quarantine, never dropped (DATA-10). Data of
+ * another version, a quarantine this build cannot read, or one that would
+ * hold more than {@link NbtQuarantine#MAX_ENTRIES} is kept as it was and
+ * the store goes read-only: then no missive can be taken, rather than one
+ * taken twice.</p>
  */
 public final class MissivesTakenWorldData extends WorldSavedData {
     public static final String DATA_NAME = "losttales_missives_taken";
-    static final int DATA_VERSION = 1;
+    static final int DATA_VERSION = 2;
     /** The most missives the world remembers at once. */
     public static final int MAX_ENTRIES = 65536;
     static final String TAG_VERSION = "DataVersion";
     static final String TAG_TAKEN = "Taken";
-    static final String TAG_QUARANTINED = "Quarantined";
     static final String TAG_QUEST_ID = "QuestId";
     static final String TAG_POSTED_AT = "PostedAt";
+    /** Where an entry set aside stood in the list of missives taken. */
+    static final String TAG_TAKEN_INDEX = "TakenIndex";
 
     /** Each missive taken, by quest id, with when its notice was posted; oldest first. */
     private final Map<String, Long> taken = new LinkedHashMap<String, Long>();
@@ -57,31 +64,61 @@ public final class MissivesTakenWorldData extends WorldSavedData {
         this.quarantined.clear();
         this.preserved = null;
         if (compound.getInteger(TAG_VERSION) != DATA_VERSION
-                || compound.hasKey(TAG_TAKEN)
-                && !compound.hasKey(TAG_TAKEN, Constants.NBT.TAG_LIST)
-                || !NbtTags.hasCompoundListWithinLimit(compound, TAG_TAKEN, MAX_ENTRIES)
-                || !NbtTags.hasCompoundListWithinLimit(compound, TAG_QUARANTINED, MAX_ENTRIES)) {
-            this.preserved = (NBTTagCompound) compound.copy();
+                || !compound.hasKey(TAG_TAKEN, Constants.NBT.TAG_LIST)
+                || !NbtTags.hasCompoundListWithinLimit(compound, TAG_TAKEN, MAX_ENTRIES)) {
+            preserve(compound);
             return;
         }
+        NbtQuarantine.Read stored = NbtQuarantine.read(compound);
+        if (!stored.isSupported()) {
+            preserve(compound);
+            return;
+        }
+        List<NBTTagCompound> aside = new ArrayList<NBTTagCompound>(stored.getEntries());
         NBTTagList list = compound.getTagList(TAG_TAKEN, Constants.NBT.TAG_COMPOUND);
         for (int index = 0; index < list.tagCount(); index++) {
             NBTTagCompound entry = list.getCompoundTagAt(index);
-            String questId = entry.getString(TAG_QUEST_ID);
-            if (!entry.hasKey(TAG_QUEST_ID, Constants.NBT.TAG_STRING)
-                    || questId.length() == 0 || !LostTalesQuestIds.fits(questId)
-                    || !entry.hasKey(TAG_POSTED_AT, Constants.NBT.TAG_LONG)
-                    || entry.getLong(TAG_POSTED_AT) < 0L
-                    || this.taken.containsKey(questId)) {
-                this.quarantined.add((NBTTagCompound) entry.copy());
+            String problem = problem(entry);
+            if (problem.length() == 0
+                    && this.taken.containsKey(entry.getString(TAG_QUEST_ID))) {
+                problem = "duplicate_missive";
+            }
+            if (problem.length() > 0) {
+                aside.add(NbtQuarantine.entry(problem, TAG_TAKEN_INDEX, index, entry));
                 continue;
             }
-            this.taken.put(questId, Long.valueOf(entry.getLong(TAG_POSTED_AT)));
+            this.taken.put(entry.getString(TAG_QUEST_ID),
+                    Long.valueOf(entry.getLong(TAG_POSTED_AT)));
         }
-        NBTTagList aside = compound.getTagList(TAG_QUARANTINED, Constants.NBT.TAG_COMPOUND);
-        for (int index = 0; index < aside.tagCount(); index++) {
-            this.quarantined.add((NBTTagCompound) aside.getCompoundTagAt(index).copy());
+        if (aside.size() > NbtQuarantine.MAX_ENTRIES) {
+            this.taken.clear();
+            preserve(compound);
+            return;
         }
+        this.quarantined.addAll(aside);
+        if (aside.size() > stored.getEntries().size()) {
+            markDirty();
+        }
+    }
+
+    /** Why a saved entry cannot be read, as its quarantine reason; empty for one that can. */
+    private static String problem(NBTTagCompound entry) {
+        if (!entry.hasKey(TAG_QUEST_ID, Constants.NBT.TAG_STRING)) {
+            return "missing_quest_id";
+        }
+        String questId = entry.getString(TAG_QUEST_ID);
+        if (questId.length() == 0 || !LostTalesQuestIds.fits(questId)) {
+            return "unreadable_quest_id";
+        }
+        if (!entry.hasKey(TAG_POSTED_AT, Constants.NBT.TAG_LONG)
+                || entry.getLong(TAG_POSTED_AT) < 0L) {
+            return "unreadable_posting_time";
+        }
+        return "";
+    }
+
+    private void preserve(NBTTagCompound compound) {
+        this.preserved = (NBTTagCompound) compound.copy();
     }
 
     @Override
@@ -99,13 +136,7 @@ public final class MissivesTakenWorldData extends WorldSavedData {
             list.appendTag(tag);
         }
         compound.setTag(TAG_TAKEN, list);
-        if (!this.quarantined.isEmpty()) {
-            NBTTagList aside = new NBTTagList();
-            for (NBTTagCompound entry : this.quarantined) {
-                aside.appendTag(entry.copy());
-            }
-            compound.setTag(TAG_QUARANTINED, aside);
-        }
+        NbtQuarantine.write(compound, this.quarantined);
     }
 
     /** Whether missives can be taken here: the store could be read. */
@@ -127,8 +158,8 @@ public final class MissivesTakenWorldData extends WorldSavedData {
 
     /**
      * Records the missive as taken. Entries no copy could bring back at
-     * {@code now} ({@code keepTicks} after their first posting; kept for
-     * good where it is 0) go first. Answers whether it was recorded: never
+     * {@code now} go first: those first posted {@code keepTicks} or longer
+     * before, none while it is 0. Answers whether it was recorded: never
      * while the store is read-only, nor once it holds {@link #MAX_ENTRIES}.
      */
     public synchronized boolean take(String questId, long postedAt, long now,
@@ -153,7 +184,11 @@ public final class MissivesTakenWorldData extends WorldSavedData {
         return this.taken.size();
     }
 
-    /** Forgets the entries posted {@code keepTicks} or longer before {@code now}; answers whether any went. */
+    /**
+     * Forgets the entries posted {@code keepTicks} or longer before
+     * {@code now}, by the one rule for a notice's days
+     * ({@link MissiveNotice#isPast}); answers whether any went.
+     */
     private boolean forgetPast(long now, long keepTicks) {
         if (keepTicks <= 0L) {
             return false;
@@ -161,7 +196,8 @@ public final class MissivesTakenWorldData extends WorldSavedData {
         boolean forgot = false;
         Iterator<Map.Entry<String, Long>> entries = this.taken.entrySet().iterator();
         while (entries.hasNext()) {
-            if (entries.next().getValue().longValue() + keepTicks <= now) {
+            if (MissiveNotice.isPast(entries.next().getValue().longValue(),
+                    keepTicks, now)) {
                 entries.remove();
                 forgot = true;
             }

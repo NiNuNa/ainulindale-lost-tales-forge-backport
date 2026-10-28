@@ -13,7 +13,6 @@ public final class FellowshipFixtures {
                                 List<FellowshipMember> members) {
         return new Fellowship(fellowshipId, leaderIdentityId, members,
                 Collections.<UUID>emptyList(), "Grey Company", null,
-                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L,
-                Fellowship.CURRENT_DATA_VERSION);
+                EnumSet.allOf(FellowshipSwitch.class), 1L, 0L);
     }
 }

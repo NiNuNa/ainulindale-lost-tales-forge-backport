@@ -28,7 +28,7 @@ public final class WindowPlacementTest {
         Window conversation = WindowLayout.windows().get(1);
         WindowPlacement.Box before = WindowPlacement.windowBounds(
                 conversation, null, 1000, 600);
-        assertTrue(ContentView.enter(conversation));
+        assertTrue(Borderless.enter(conversation));
         try {
             WindowPlacement.Box filled = WindowPlacement.windowBounds(
                     conversation, null, 1000, 600);
@@ -40,7 +40,7 @@ public final class WindowPlacementTest {
             assertEquals(before.width, filled.width);
             assertEquals(Window.ScreenFill.NONE, conversation.getFill());
         } finally {
-            ContentView.leave(conversation);
+            Borderless.leave(conversation);
         }
         WindowPlacement.Box after = WindowPlacement.windowBounds(
                 conversation, null, 1000, 600);
@@ -60,7 +60,7 @@ public final class WindowPlacementTest {
         Window conversation = WindowLayout.windows().get(1);
         assertTrue(WindowLayout.setFill(conversation.getId(),
                 Window.ScreenFill.FULL, false));
-        assertTrue(ContentView.enter(conversation));
+        assertTrue(Borderless.enter(conversation));
         try {
             WindowPlacement.Box full = WindowPlacement.fillBounds(
                     Window.ScreenFill.FULL, null, 1000, 600);
@@ -73,7 +73,7 @@ public final class WindowPlacementTest {
                     full.y + full.height, filled.barTop(), 0.0001D);
             assertEquals(full.width, filled.width, 0.0001D);
         } finally {
-            ContentView.leave(conversation);
+            Borderless.leave(conversation);
         }
     }
 

@@ -4,7 +4,7 @@ package com.ninuna.losttales.chat;
  * Everything the chat knows about one channel: the permanent string id,
  * how it presents its senders, how the server routes it, and what a
  * player must hold to use it. The built-in channels each carry one,
- * built by {@link ChatChannel}; the server's gates and the client's tab
+ * built by {@link ChatChannel}; the server's gates and the client's page
  * state read the channel through these facts, so a channel described by
  * data rather than an enum constant needs nothing more to be complete.
  */
@@ -110,7 +110,7 @@ public final class ChatChannelDescriptor {
 
     /**
      * What tells one conversation on the channel from another; see
-     * {@link ChatChannelScope}. A scoped channel's tabs carry the
+     * {@link ChatChannelScope}. A scoped channel's pages carry the
      * identity they are read as.
      */
     public ChatChannelScope getScope() { return this.scope; }

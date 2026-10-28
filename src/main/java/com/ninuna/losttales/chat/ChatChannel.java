@@ -74,7 +74,7 @@ public final class ChatChannel {
      * notices — plus anything they type there, which is echoed back to
      * them alone. Nobody else is ever shown a line of it.
      */
-    public static final ChatChannel CLIENT_CONSOLE = register("client_console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel CONSOLE = register("console", "Console", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.SELF, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE), false);
     /**
@@ -82,19 +82,19 @@ public final class ChatChannel {
      * reader shares of what the server did — started, stopped, a command
      * run, a message taken back, a setting changed, a warning it had to
      * raise — and the talk its readers have over it. Held by the
-     * {@code chat.server_console.read} capability rather than by a channel
+     * {@code chat.server_log.read} capability rather than by a channel
      * gate, and never bridged.
      */
     // The two consoles wear one grey: they are one kind of place.
-    public static final ChatChannel SERVER_CONSOLE = register("server_console", "Server Log", ChatPresentationMode.OUT_OF_CHARACTER,
+    public static final ChatChannel SERVER_LOG = register("server_log", "Server Log", ChatPresentationMode.OUT_OF_CHARACTER,
             ChatRecipientRule.CONSOLE_READERS, ChatChannelAccess.NONE,
             LostTalesColors.rgb(LostTalesColors.CONSOLE_TONE), false);
     /**
-     * A private conversation between two players, in character. Not a tab of its own:
-     * every conversation is one tab on this channel, one per pair of
+     * A private conversation between two players, in character. Not a page of its own:
+     * every conversation is one page on this channel, one per pair of
      * identities — the partner's account and the identity they speak as,
      * and the character of this player's the conversation is held as
-     * ({@link ChatTabIds#whisperConversationId}).
+     * ({@link ChatPageIds#whisperConversationId}).
      */
     // A conversation wears the colour of the person it is with; this
     // plain ivory is only what one with nobody known behind it reads in.
@@ -105,13 +105,13 @@ public final class ChatChannel {
     /** Tab, indicator, and cycle order for the built-in channels: Global
      *  and OOC bracket the role-play ones, then Fellowship,
      *  Operator, and the two consoles, this player's before the server's.
-     *  Whispers are not listed: their tabs exist per conversation.
+     *  Whispers are not listed: their pages exist per conversation.
      *  Anything registered besides these follows them, in the order it
      *  was registered. */
     private static final List<ChatChannel> BUILT_IN_ORDER =
             Collections.unmodifiableList(Arrays.asList(
-                    GLOBAL, PROXIMITY, FACTION, OOC, FELLOWSHIP, OPERATOR, CLIENT_CONSOLE,
-                    SERVER_CONSOLE));
+                    GLOBAL, PROXIMITY, FACTION, OOC, FELLOWSHIP, OPERATOR, CONSOLE,
+                    SERVER_LOG));
 
     /** The ids that are the code's own and are never taken out of force. */
     private static final java.util.Set<String> BUILT_IN_IDS =
@@ -265,7 +265,7 @@ public final class ChatChannel {
     public boolean isBridgeable() { return this.descriptor.isBridgeable(); }
     /** What tells one conversation on the channel from another. */
     public ChatChannelScope getScope() { return this.descriptor.getScope(); }
-    /** Whether a tab here carries the identity it is read as. */
+    /** Whether a page here carries the identity it is read as. */
     public boolean isScoped() { return this.descriptor.getScope().isScoped(); }
     /** The channel as the facts that describe it. */
     public ChatChannelDescriptor getDescriptor() { return this.descriptor; }
@@ -273,7 +273,7 @@ public final class ChatChannel {
     /**
      * Every channel in the order the client presents them: the built-ins
      * in the order chosen for them, then anything a server registered, in
-     * the order it did. Whispers are left out, as their tabs are one per
+     * the order it did. Whispers are left out, as their pages are one per
      * conversation rather than one for the channel.
      */
     public static synchronized List<ChatChannel> presentationOrder() {

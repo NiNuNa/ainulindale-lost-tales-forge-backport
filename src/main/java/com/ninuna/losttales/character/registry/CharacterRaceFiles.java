@@ -208,11 +208,11 @@ public final class CharacterRaceFiles {
             warnings.add("has attack " + race.getAttackDamage() + "; it is 0 to " + MAX_ATTACK);
         }
         if (race.getAllowedBodyTypeIds().isEmpty()) {
-            warnings.add("names no sexes");
+            warnings.add("names no body types");
         }
         for (String bodyType : race.getAllowedBodyTypeIds()) {
             if (!CharacterBodyTypeRegistry.contains(bodyType) || !bodyType.equals(bodyType.toLowerCase(Locale.ROOT))) {
-                warnings.add("names the sex '" + bodyType + "', which is none the game has");
+                warnings.add("names the body type '" + bodyType + "', which is none the game has");
             }
         }
         if (race.getAllowedFactionCategories().isEmpty()
@@ -257,11 +257,11 @@ public final class CharacterRaceFiles {
             }
             if (skins.getBodyTypeId().length() > 0 && !race.isBodyTypeAllowed(skins.getBodyTypeId())) {
                 warnings.add(where + " is painted for '" + skins.getBodyTypeId()
-                        + "', which is no sex the race has");
+                        + "', which is no body type the race has");
             }
             if (!seen.add(skins.getGroup() + "|" + skins.getBodyTypeId())) {
                 warnings.add(where + " lists the group " + skins.getGroup()
-                        + " for the same sex twice");
+                        + " for the same body type twice");
             }
             String texture = skins.getTexture();
             if (texture.length() > MAX_TEXTURE || !TEXTURE.matcher(texture).matches()

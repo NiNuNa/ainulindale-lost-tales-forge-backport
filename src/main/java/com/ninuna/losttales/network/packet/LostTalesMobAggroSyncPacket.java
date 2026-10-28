@@ -201,6 +201,10 @@ public class LostTalesMobAggroSyncPacket implements IMessage {
         while (name.getBytes(StandardCharsets.UTF_8).length > MAX_ENTITY_NAME_BYTES
                 && name.length() > 1) {
             name = name.substring(0, name.length() - 1);
+            // Never half of a letter written as two chars.
+            if (Character.isHighSurrogate(name.charAt(name.length() - 1))) {
+                name = name.substring(0, name.length() - 1);
+            }
         }
         return name;
     }

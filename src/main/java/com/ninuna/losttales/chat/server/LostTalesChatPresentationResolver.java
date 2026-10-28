@@ -3,17 +3,18 @@ package com.ninuna.losttales.chat.server;
 import com.ninuna.losttales.character.model.RoleplayCharacter;
 import com.ninuna.losttales.chat.ChatEpithet;
 import com.ninuna.losttales.chat.ChatFormattingCodes;
+import com.ninuna.losttales.compat.discord.DiscordPostName;
 import com.ninuna.losttales.compat.lotr.LotrCharacterAdapter;
 import com.ninuna.losttales.compat.lotr.LotrFactionColors;
-import com.ninuna.losttales.faction.FactionDemonyms;
 import com.ninuna.losttales.gui.style.LostTalesColors;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
  * Reads optional LOTR presentation fields without making routing depend
  * on them. A title and a faction leave here as LOTR's lang key and the
- * faction's id, so each game names them in its own words; only what the
- * server writes in its own words, a post to Discord, names them here.
+ * faction's id, so each game names them in its own words; a post to
+ * Discord takes them with LOTR's words, and each linked channel words
+ * the rest in its own language ({@link DiscordPostName}).
  */
 final class LostTalesChatPresentationResolver {
 
@@ -56,22 +57,6 @@ final class LostTalesChatPresentationResolver {
         return live == null ? "" : live;
     }
 
-    /**
-     * The people of a faction in this server's words, as a title names
-     * them: a Lothlórien character is a Galadhrim Miner, not a Lothlórien
-     * one ({@link FactionDemonyms}). Empty for no faction.
-     */
-    static String peopleOf(String factionId) {
-        String normalized = LotrCharacterAdapter.normalizeFactionId(factionId);
-        if (normalized.length() == 0) {
-            return "";
-        }
-        String name = LotrCharacterAdapter.getInstance()
-                .getFactionDisplayName(normalized);
-        String plain = ChatFormattingCodes.stripSectionCodes(name).trim();
-        return FactionDemonyms.of(normalized, plain);
-    }
-
     static final class Presentation {
         /** The title's LOTR lang key; empty for none. */
         final String title;
@@ -89,11 +74,16 @@ final class LostTalesChatPresentationResolver {
         }
 
         /**
-         * {@code name} with its title in this server's words —
-         * {@code Aldric, the Gondor Farmer} — for a post to Discord.
+         * {@code name} with its title for a post to Discord —
+         * {@code Aldric, the Gondor Farmer} — the title and the faction
+         * in LOTR's words, the rest in each linked channel's.
          */
-        String titledName(String name) {
-            return ChatEpithet.titledName(name, peopleOf(this.factionId),
+        DiscordPostName discordName(String name) {
+            String factionId = LotrCharacterAdapter.normalizeFactionId(this.factionId);
+            String faction = factionId.length() == 0 ? ""
+                    : ChatFormattingCodes.stripSectionCodes(LotrCharacterAdapter
+                            .getInstance().getFactionDisplayName(factionId)).trim();
+            return DiscordPostName.titled(name, factionId, faction,
                     ChatEpithet.titleName(this.title));
         }
     }

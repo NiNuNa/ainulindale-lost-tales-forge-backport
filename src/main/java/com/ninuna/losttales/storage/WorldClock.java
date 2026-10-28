@@ -19,17 +19,24 @@ import net.minecraftforge.common.util.Constants;
  * Invitations, cooldowns, a deleted character's retention and timed
  * missives count time on that clock, so a clock set forward brings them
  * all due at once. The world remembers the latest time it has seen,
- * looked at as the server starts and once a minute while it runs. A time
- * more than a day past it is a jump: it is logged, and the stretch it
- * spans is held. What would destroy data and falls due inside it waits
- * until an operator accepts the clock ({@code /losttales clock accept}):
- * a deleted character's purge, a chat audit file's removal, a last-seen
- * time forgotten. A deleted character held so can still be restored.
+ * looked at as the server starts, once a minute while it runs, as it
+ * stops, and each time something asks what is held ({@link #hold()}).
  *
- * <p>The world cannot tell a clock set forward from a server stopped for
- * more than a day; both hold until accepted. A second jump before the
- * first is accepted widens the one stretch held to cover both. A clock
- * set back moves nothing: the latest time seen stays.</p>
+ * <p>A clean stop writes a mark with its time ({@link #stopped}), and the
+ * time from that stop to the next start counts as time passed. A time
+ * more than a day past the latest one seen, while the server runs or
+ * after a stop that left no mark (a crash), is a jump: it is logged, and
+ * the stretch it spans is held. What would destroy data and falls due
+ * inside it waits until an operator accepts the clock
+ * ({@code /losttales clock accept}): a deleted character's purge, a chat
+ * audit file's removal, a last-seen time forgotten. A deleted character
+ * held so can still be restored. A clock set forward while the server is
+ * stopped cleanly goes unseen. A second jump before the first is
+ * accepted widens the one stretch held to cover both.</p>
+ *
+ * <p>A clock more than a day behind the latest time seen is logged once
+ * a run and offered for accept, which sets the world's latest time to
+ * the clock's reading (DATA-15); until then the latest time stays.</p>
  *
  * <p>The store of the running server is kept here for the guards that
  * ask from anywhere ({@link #hold()}); {@link #reset()} forgets it as the
@@ -80,31 +87,77 @@ public final class WorldClock {
 
     /**
      * Looks at the clock against the world's last time seen, logging a
-     * jump, and keeps the store for {@link #hold()}. As the server starts,
-     * before anything that would let data expire, and once a minute.
+     * jump or a clock behind it, and keeps the store for {@link #hold()}.
+     * As the server starts, before anything that would let data expire,
+     * and once a minute. The first look of a run takes the clean stop's
+     * mark, and the save is written at once, so a crash before the next
+     * autosave finds no mark.
      */
     public static void observe(MinecraftServer server) {
+        World world = server == null ? null : server.worldServerForDimension(0);
+        Store store = store(world);
+        if (store == null) {
+            return;
+        }
+        current = store;
+        Look look = store.observe(System.currentTimeMillis());
+        report(look);
+        if (look.getCleanStop() != 0L) {
+            world.mapStorage.saveAllData();
+        }
+    }
+
+    /**
+     * A clean stop: the clock is looked at once more and the stop is
+     * marked with its time, for the save the worlds are written with
+     * after the stopping event.
+     */
+    public static void stopped(MinecraftServer server) {
         Store store = store(server);
         if (store == null) {
             return;
         }
         current = store;
-        Jump jump = store.observe(System.currentTimeMillis());
-        if (jump != null) {
-            LostTalesLog.warning("The server's clock reads %s, %s after the last time this"
-                    + " world saw (%s). Whatever this brings past its time that would"
-                    + " destroy data waits: deleted characters are not purged, and chat"
-                    + " audit files and last-seen times are kept, until an operator runs"
-                    + " /losttales clock accept.",
-                    format(jump.getTo()), describe(jump.getTo() - jump.getFrom()),
-                    format(jump.getFrom()));
-        }
+        report(store.stop(System.currentTimeMillis()));
     }
 
-    /** The hold of the running server's world; {@link #NONE} with no server. */
+    /**
+     * The hold of the running server's world, after a look at the clock;
+     * {@link #NONE} with no server.
+     */
     public static Hold hold() {
         Store store = current;
-        return store == null ? NONE : store;
+        return store == null ? NONE : hold(store, System.currentTimeMillis());
+    }
+
+    /**
+     * The store's hold once it has looked at the clock reading {@code now}:
+     * a jump since the last look is held before the caller asks.
+     */
+    static Hold hold(Store store, long now) {
+        report(store.observe(now));
+        return store;
+    }
+
+    private static void report(Look look) {
+        if (look.isJump()) {
+            LostTalesLog.warning("The server's clock reads %s, %s after the last time this"
+                    + " world saw (%s), with the server running or after a stop that left"
+                    + " no mark. Whatever this brings past its time that would destroy"
+                    + " data waits: deleted characters are not purged, and chat audit"
+                    + " files and last-seen times are kept, until an operator runs"
+                    + " /losttales clock accept.",
+                    format(look.getTo()), describe(look.getTo() - look.getFrom()),
+                    format(look.getFrom()));
+        }
+        if (look.isNewlyBehind()) {
+            LostTalesLog.warning("The server's clock reads %s, %s behind the latest time this"
+                    + " world saw (%s). Nothing expires early, and a jump forward is"
+                    + " measured from that latest time. If the clock is right, an operator"
+                    + " runs /losttales clock accept to set the world's time to it.",
+                    format(look.getTo()), describe(look.getFrom() - look.getTo()),
+                    format(look.getFrom()));
+        }
     }
 
     /** The clock's store of the world the server runs; null with no world. */
@@ -139,44 +192,80 @@ public final class WorldClock {
         return (hours / 24L) + " days " + (hours % 24L) + " hours";
     }
 
-    /** A jump the clock made: from the last time seen to the time it read. */
-    public static final class Jump {
+    /**
+     * One look at the clock: the latest time seen before it, the time
+     * the clock read, and what the look found.
+     */
+    public static final class Look {
+        static final Look NOTHING = new Look(0L, 0L, false, 0L, false);
+
         private final long from;
         private final long to;
+        private final boolean jump;
+        private final long cleanStop;
+        private final boolean newlyBehind;
 
-        Jump(long from, long to) {
+        Look(long from, long to, boolean jump, long cleanStop, boolean newlyBehind) {
             this.from = from;
             this.to = to;
+            this.jump = jump;
+            this.cleanStop = cleanStop;
+            this.newlyBehind = newlyBehind;
         }
 
+        /** The latest time the world had seen before the look. */
         public long getFrom() {
             return this.from;
         }
 
+        /** The time the clock read. */
         public long getTo() {
             return this.to;
+        }
+
+        /** Whether the clock read more than a day past the latest time seen, and that stretch is held. */
+        public boolean isJump() {
+            return this.jump;
+        }
+
+        /** The time of the clean stop whose mark this look took, the gap since counted as passed; 0 for none. */
+        public long getCleanStop() {
+            return this.cleanStop;
+        }
+
+        /** Whether this look is the run's first to find the clock more than a day behind. */
+        public boolean isNewlyBehind() {
+            return this.newlyBehind;
         }
     }
 
     /**
-     * The world's last time seen and the stretch a jump holds, in real
-     * milliseconds. Data of another version, or of a shape this build
-     * does not write, is kept as it was, and then everything holds: a
-     * clock that cannot be read lets nothing expire that destroys data.
+     * The world's last time seen, the stretch a jump holds and the clean
+     * stop's mark, in real milliseconds. Data of another version, or of a
+     * shape this build does not write, is kept as it was, and then
+     * everything holds: a clock that cannot be read lets nothing expire
+     * that destroys data.
      */
     public static final class Store extends WorldSavedData implements Hold {
         public static final String DATA_NAME = "losttales_world_clock";
-        static final int DATA_VERSION = 1;
+        static final int DATA_VERSION = 2;
         static final String TAG_VERSION = "DataVersion";
         static final String TAG_LAST_SEEN = "LastSeen";
         static final String TAG_HELD_FROM = "HeldFrom";
         static final String TAG_HELD_TO = "HeldTo";
+        static final String TAG_STOPPED_AT = "StoppedAt";
 
         private long lastSeen;
         private long heldFrom;
         private long heldTo;
+        /** When the server last stopped cleanly; 0 while it runs, or after a stop that left no mark. */
+        private long stoppedAt;
         private NBTTagCompound preserved;
         private boolean warned;
+        /** Whether this run has taken its first look; the first takes the clean stop's mark. */
+        private boolean started;
+        /** Whether this run has said the clock reads behind; again once it has caught up. */
+        private boolean behindSaid;
 
         public Store(String name) {
             super(name);
@@ -187,26 +276,32 @@ public final class WorldClock {
             this.lastSeen = 0L;
             this.heldFrom = 0L;
             this.heldTo = 0L;
+            this.stoppedAt = 0L;
             this.preserved = null;
             this.warned = false;
+            this.started = false;
+            this.behindSaid = false;
             if (compound.getInteger(TAG_VERSION) != DATA_VERSION
                     || !compound.hasKey(TAG_LAST_SEEN, Constants.NBT.TAG_LONG)
                     || !compound.hasKey(TAG_HELD_FROM, Constants.NBT.TAG_LONG)
-                    || !compound.hasKey(TAG_HELD_TO, Constants.NBT.TAG_LONG)) {
+                    || !compound.hasKey(TAG_HELD_TO, Constants.NBT.TAG_LONG)
+                    || !compound.hasKey(TAG_STOPPED_AT, Constants.NBT.TAG_LONG)) {
                 this.preserved = (NBTTagCompound)compound.copy();
                 return;
             }
             long seen = compound.getLong(TAG_LAST_SEEN);
             long from = compound.getLong(TAG_HELD_FROM);
             long to = compound.getLong(TAG_HELD_TO);
+            long stopped = compound.getLong(TAG_STOPPED_AT);
             boolean holding = from != 0L || to != 0L;
-            if (seen < 0L || holding && (from <= 0L || to <= from)) {
+            if (seen < 0L || stopped < 0L || holding && (from <= 0L || to <= from)) {
                 this.preserved = (NBTTagCompound)compound.copy();
                 return;
             }
             this.lastSeen = seen;
             this.heldFrom = from;
             this.heldTo = to;
+            this.stoppedAt = stopped;
         }
 
         @Override
@@ -219,40 +314,69 @@ public final class WorldClock {
             compound.setLong(TAG_LAST_SEEN, this.lastSeen);
             compound.setLong(TAG_HELD_FROM, this.heldFrom);
             compound.setLong(TAG_HELD_TO, this.heldTo);
+            compound.setLong(TAG_STOPPED_AT, this.stoppedAt);
         }
 
         /**
-         * Looks at the clock reading {@code now}: a time more than a day
+         * Looks at the clock reading {@code now}. The run's first look
+         * takes the clean stop's mark, if the stop left one, and the gap
+         * since counts as time passed. Otherwise a time more than a day
          * past the last one seen is a jump, and the stretch it spans is
-         * held. The last time seen moves forward only. Answers the jump,
-         * or null.
+         * held. The last time seen moves forward only; a clock more than
+         * a day behind it is said once a run.
          */
-        public synchronized Jump observe(long now) {
+        public synchronized Look observe(long now) {
             if (this.preserved != null) {
                 if (!this.warned) {
                     this.warned = true;
                     LostTalesLog.warning("The world's clock record cannot be read; nothing"
                             + " that would destroy data expires until it can");
                 }
-                return null;
+                return Look.NOTHING;
+            }
+            long cleanStop = 0L;
+            if (!this.started) {
+                this.started = true;
+                cleanStop = this.stoppedAt;
+                if (this.stoppedAt != 0L) {
+                    this.stoppedAt = 0L;
+                    markDirty();
+                }
             }
             if (this.lastSeen <= 0L) {
                 this.lastSeen = now;
                 markDirty();
-                return null;
+                return Look.NOTHING;
             }
-            Jump jump = null;
-            if (now - this.lastSeen > JUMP_MILLIS) {
+            long from = this.lastSeen;
+            boolean jump = cleanStop == 0L && now - this.lastSeen > JUMP_MILLIS;
+            if (jump) {
                 this.heldFrom = this.heldTo == 0L ? this.lastSeen
                         : Math.min(this.heldFrom, this.lastSeen);
                 this.heldTo = Math.max(this.heldTo, now);
-                jump = new Jump(this.lastSeen, now);
             }
             if (now > this.lastSeen) {
                 this.lastSeen = now;
                 markDirty();
             }
-            return jump;
+            boolean behind = isBehind(now);
+            boolean newlyBehind = behind && !this.behindSaid;
+            this.behindSaid = behind;
+            return new Look(from, now, jump, cleanStop, newlyBehind);
+        }
+
+        /**
+         * A clean stop: one more look at the clock reading {@code now},
+         * then the mark with the stop's time. The looks after it in this
+         * run leave the mark alone; the next run's first takes it.
+         */
+        public synchronized Look stop(long now) {
+            Look look = observe(now);
+            if (this.preserved == null) {
+                this.stoppedAt = Math.max(1L, now);
+                markDirty();
+            }
+            return look;
         }
 
         /** Whether something falling due at {@code dueAt} waits: inside the stretch held. */
@@ -267,14 +391,21 @@ public final class WorldClock {
             return this.preserved != null || this.heldTo != 0L;
         }
 
+        /** Whether the clock reading {@code now} is more than a day behind the latest time seen. */
+        public synchronized boolean isBehind(long now) {
+            return this.preserved == null && this.lastSeen - now > JUMP_MILLIS;
+        }
+
         /** Whether the record is kept as it was, unread. */
         public synchronized boolean isPreserved() {
             return this.preserved != null;
         }
 
         /**
-         * An operator's word that the clock is right: nothing is held any
-         * more. False, and nothing changes, while the record cannot be read.
+         * An operator's word that the clock reading {@code now} is right:
+         * nothing is held any more, and the world's latest time is the
+         * clock's reading, behind it or not. False, and nothing changes,
+         * while the record cannot be read.
          */
         public synchronized boolean accept(long now) {
             if (this.preserved != null) {
@@ -282,7 +413,8 @@ public final class WorldClock {
             }
             this.heldFrom = 0L;
             this.heldTo = 0L;
-            this.lastSeen = Math.max(this.lastSeen, now);
+            this.lastSeen = now;
+            this.behindSaid = false;
             markDirty();
             return true;
         }
@@ -300,6 +432,11 @@ public final class WorldClock {
         /** Where the stretch held ends; 0 for none. */
         public synchronized long getHeldTo() {
             return this.heldTo;
+        }
+
+        /** When the server last stopped cleanly, a mark the next run's first look takes; 0 for none. */
+        public synchronized long getStoppedAt() {
+            return this.stoppedAt;
         }
     }
 }

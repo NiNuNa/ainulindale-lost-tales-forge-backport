@@ -4,11 +4,12 @@ import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.minecraft.entity.player.EntityPlayerMP;
 
 /**
- * Shared safety boundary for client-to-server packet handlers whose
- * refusals go unanswered, among them chat, quests, waystones, missives,
- * quick loot and the character profile read. A refused request is logged
- * and dropped. Character management and fellowship
- * requests have dispatchers of their own, which answer every refusal.
+ * The door for client requests whose refusals go unanswered, among them
+ * chat, quests, waystones, missives, quick loot and the character profile
+ * read: a request is counted against its rate limit, refused if
+ * malformed, then queued. A refused request is logged and dropped.
+ * Character and fellowship requests have doors of their own, which
+ * answer a refusal, a rate-limit refusal at most once a second.
  */
 public final class LostTalesServerPacketDispatcher {
 

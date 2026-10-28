@@ -3,14 +3,8 @@ package com.ninuna.losttales.client.chat;
 import com.ninuna.losttales.client.character.LostTalesClientAccount;
 import com.ninuna.losttales.config.LostTalesConfigFiles;
 import com.ninuna.losttales.chat.emoji.ChatEmoji;
-import com.ninuna.losttales.util.LostTalesCloseables;
 import com.ninuna.losttales.util.LostTalesTextFiles;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -32,7 +26,6 @@ import java.util.UUID;
 public final class ChatEmojiUsageStore {
     /** The folder under the client's, one file per account. */
     static final String FOLDER = LostTalesConfigFiles.CHAT_EMOJIS;
-    private static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final int MAX_COUNT = 1000000;
 
     private static File storeFile;
@@ -125,18 +118,14 @@ public final class ChatEmojiUsageStore {
         if (file == null || !file.isFile()) {
             return;
         }
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(file), UTF_8));
-            String line;
-            while ((line = reader.readLine()) != null) {
+        // A favourite and a count for each emoji at most; unreadable,
+        // the store starts empty.
+        List<String> lines = LostTalesTextFiles.readLines(file,
+                2 * ChatEmoji.values().length);
+        if (lines != null) {
+            for (String line : lines) {
                 parseLine(line.trim());
             }
-        } catch (IOException ignored) {
-            // Preferences are best-effort; starting empty is safe.
-        } finally {
-            LostTalesCloseables.closeQuietly(reader);
         }
     }
 

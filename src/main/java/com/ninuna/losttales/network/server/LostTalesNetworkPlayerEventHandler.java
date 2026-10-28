@@ -8,7 +8,11 @@ import com.ninuna.losttales.quest.missive.MissiveBoardWatches;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 
-/** Clears queued requests and rate windows when a server player disconnects. */
+/**
+ * Drops what a player leaves behind as they log out: their waiting
+ * requests, rate limits and aim, their fellowship syncs and the missive
+ * boards they watch.
+ */
 public final class LostTalesNetworkPlayerEventHandler {
 
     @SubscribeEvent

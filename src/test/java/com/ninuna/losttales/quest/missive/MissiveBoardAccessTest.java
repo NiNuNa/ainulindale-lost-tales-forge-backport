@@ -97,11 +97,12 @@ public final class MissiveBoardAccessTest {
                 MissiveBoardService.refusal(site));
     }
 
+    /** Another mod's refusal is said plainly, never as a banner's. */
     @Test
     public void aBoardAnotherModProtectsIsRefused() {
         Site site = new Site();
         site.others = false;
-        assertEquals("chat.losttales.missive.protected",
+        assertEquals("chat.losttales.missive.not_allowed",
                 MissiveBoardService.refusal(site));
     }
 

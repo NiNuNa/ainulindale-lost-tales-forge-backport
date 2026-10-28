@@ -6,6 +6,7 @@ import net.minecraft.nbt.NBTTagString;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 public final class LostTalesQuestProgressNbtTest {
@@ -14,6 +15,7 @@ public final class LostTalesQuestProgressNbtTest {
     public void excessiveObjectiveListIsRejected() {
         NBTTagCompound quest = new NBTTagCompound();
         quest.setString("QuestId", "losttales:test");
+        quest.setTag("StagePath", new NBTTagList());
         NBTTagList objectives = new NBTTagList();
         for (int i = 0;
              i < LostTalesQuestProgress.MAX_OBJECTIVE_ENTRIES + 1; i++) {
@@ -30,6 +32,7 @@ public final class LostTalesQuestProgressNbtTest {
     public void nonCompoundObjectiveListIsRejected() {
         NBTTagCompound quest = new NBTTagCompound();
         quest.setString("QuestId", "losttales:test");
+        quest.setTag("StagePath", new NBTTagList());
         NBTTagList objectives = new NBTTagList();
         objectives.appendTag(new NBTTagString("not-a-compound"));
         quest.setTag("ObjectiveProgress", objectives);
@@ -45,5 +48,17 @@ public final class LostTalesQuestProgressNbtTest {
 
         assertEquals(Integer.MAX_VALUE,
                 progress.addObjectiveProgress("objective", 1, 0));
+    }
+
+    /** A running quest is written with its path, so one without it is none this build wrote (MOD-10). */
+    @Test
+    public void aRunningQuestWithoutItsPathIsRejected() {
+        LostTalesQuestProgress progress = new LostTalesQuestProgress(
+                "losttales:test", 0, "stage", null, 0L, 0L);
+        NBTTagCompound written = progress.writeToNBT();
+        assertNotNull(LostTalesQuestProgress.readFromNBT(written));
+        written.removeTag("StagePath");
+
+        assertNull(LostTalesQuestProgress.readFromNBT(written));
     }
 }

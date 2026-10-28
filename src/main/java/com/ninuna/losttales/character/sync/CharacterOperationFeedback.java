@@ -2,7 +2,7 @@ package com.ninuna.losttales.character.sync;
 
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 
-/** Immutable client-side record of the latest server operation result. */
+/** The server's answer to one character request, as the client keeps it. */
 public final class CharacterOperationFeedback {
 
     private final int requestId;

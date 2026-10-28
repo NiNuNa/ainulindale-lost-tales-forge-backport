@@ -27,13 +27,16 @@ import java.util.Map;
  * is playing and as whom, {@code /who} describes one player or
  * character, {@code /server} says how the server is doing. {@code /link}
  * pairs the channel it is used in with a game channel by a code an
- * operator asked for in the game, and {@code /unlink} takes the channel's
- * link away; both are offered only to members who may manage webhooks,
+ * operator asked for in the game, in the language its {@code language}
+ * option names, and with that option alone changes the language of the
+ * channel's link (DISC-30); {@code /unlink} takes the channel's link
+ * away. Both are offered only to members who may manage webhooks,
  * and the bridge checks that permission again itself. The answers
  * are built on the server thread from the same identity resolution the
- * chat uses; they and the descriptions Discord shows are the lang file's
- * words in the server's language, put together here so the wording can
- * be checked without a server. A reply is ephemeral, so the channel
+ * chat uses; they are the lang file's words in the language of the
+ * linked channel they are used in, and the descriptions Discord shows are
+ * in the server's default, {@code discord.language} (DISC-30), put
+ * together here so the wording can be checked without a server. A reply is ephemeral, so the channel
  * stays clean. They are answered only in a Discord channel linked to the
  * game: a Discord server that merely has the bot in it learns nothing of
  * who plays.
@@ -47,6 +50,14 @@ public final class DiscordSlashCommands {
     public static final String UNLINK = "unlink";
     /** The option {@code /link} takes the code in. */
     public static final String CODE = "code";
+    /** The option {@code /link} takes the link's language in. */
+    public static final String LANGUAGE = "language";
+    /** The most choices Discord takes for one option. */
+    static final int MAX_CHOICES = 25;
+    /** The longest language a member may type where there are too many to choose from. */
+    private static final int MAX_LANGUAGE_LENGTH = 16;
+    /** The longest typed language an answer repeats. */
+    private static final int MAX_SHOWN_LANGUAGE = 32;
     /** Manage Webhooks as Discord writes a permission: the bitfield in decimal. */
     private static final String MANAGE_WEBHOOKS_PERMISSION =
             String.valueOf(1L << DiscordJson.Interaction.MANAGE_WEBHOOKS);
@@ -73,8 +84,13 @@ public final class DiscordSlashCommands {
         }
     }
 
-    /** The command definitions Discord registers, as the API's JSON array. */
-    public static String definitionsBody(LostTalesWords words) {
+    /**
+     * The command definitions Discord registers, as the API's JSON array,
+     * described in {@code words}, the server's default language;
+     * {@code languages} are the ones the mod ships, offered as the
+     * choices of {@code /link}'s language while Discord takes that many.
+     */
+    public static String definitionsBody(LostTalesWords words, List<String> languages) {
         JsonArray commands = new JsonArray();
         commands.add(command(ONLINE, description(words,
                 "chat.losttales.discord.command.online")));
@@ -99,9 +115,29 @@ public final class DiscordSlashCommands {
         code.addProperty("name", CODE);
         code.addProperty("description", description(words,
                 "chat.losttales.discord.command.link.code"));
-        code.addProperty("required", Boolean.TRUE);
+        code.addProperty("required", Boolean.FALSE);
+        JsonObject language = new JsonObject();
+        language.addProperty("type", Integer.valueOf(3));
+        language.addProperty("name", LANGUAGE);
+        language.addProperty("description", description(words,
+                "chat.losttales.discord.command.link.language"));
+        language.addProperty("required", Boolean.FALSE);
+        if (languages != null && !languages.isEmpty()
+                && languages.size() <= MAX_CHOICES) {
+            JsonArray choices = new JsonArray();
+            for (String shipped : languages) {
+                JsonObject choice = new JsonObject();
+                choice.addProperty("name", shipped);
+                choice.addProperty("value", shipped);
+                choices.add(choice);
+            }
+            language.add("choices", choices);
+        } else {
+            language.addProperty("max_length", Integer.valueOf(MAX_LANGUAGE_LENGTH));
+        }
         JsonArray linkOptions = new JsonArray();
         linkOptions.add(code);
+        linkOptions.add(language);
         link.add("options", linkOptions);
         link.addProperty("default_member_permissions", MANAGE_WEBHOOKS_PERMISSION);
         commands.add(link);
@@ -139,6 +175,39 @@ public final class DiscordSlashCommands {
     public static String linkUnknownCode(LostTalesWords words) {
         return sentences(words.format("chat.losttales.discord.link.unknown_code"),
                 words.format("chat.losttales.discord.link.ask_in_game"));
+    }
+
+    /** {@code /link} with neither a code nor a language. */
+    public static String linkNeedsCode(LostTalesWords words) {
+        return sentences(words.format("chat.losttales.discord.link.needs_code"),
+                words.format("chat.losttales.discord.link.ask_in_game"));
+    }
+
+    /**
+     * {@code /link} naming a language the mod ships no words in, and the
+     * ones it does; {@code typed} is the member's own words, cut short.
+     */
+    public static String linkUnknownLanguage(LostTalesWords words, String typed,
+                                             List<String> languages) {
+        String shown = typed == null ? "" : typed.trim();
+        if (shown.length() > MAX_SHOWN_LANGUAGE) {
+            shown = shown.substring(0, MAX_SHOWN_LANGUAGE) + "...";
+        }
+        StringBuilder list = new StringBuilder();
+        for (String language : languages) {
+            if (list.length() > 0) {
+                list.append(", ");
+            }
+            list.append('`').append(language).append('`');
+        }
+        return bound(words.format("chat.losttales.discord.link.unknown_language",
+                escape(shown), list.toString()));
+    }
+
+    /** The channel's link writes in {@code language} now: said in that language. */
+    public static String languageSet(LostTalesWords words, String language) {
+        return bound(words.format("chat.losttales.discord.link.language",
+                escape(language)));
     }
 
     /** Discord would not let the bot make the channel's webhook. */
@@ -233,7 +302,7 @@ public final class DiscordSlashCommands {
             return who(words, players, wanted);
         }
         if (SERVER.equals(name)) {
-            return serverStatus(ChatServerStatus.parts());
+            return serverStatus(ChatServerStatus.parts(words));
         }
         return "";
     }
@@ -318,7 +387,7 @@ public final class DiscordSlashCommands {
         StringBuilder text = new StringBuilder(LostTalesMetaData.MOD_NAME)
                 .append(" ").append(LostTalesMetaData.MOD_VERSION);
         for (String part : status) {
-            text.append(" • ").append(escape(part));
+            text.append(DiscordServerNotices.SEPARATOR).append(escape(part));
         }
         return bound(text.toString());
     }

@@ -142,9 +142,9 @@ public final class CharacterProfileValidationTest {
      */
     @Test
     public void invisibleMarksAreDroppedAndRefused() {
-        String[] marks = {"‮", "‪", "⁦", "⁩", "​",
-                "‌", "‍", "‎", "‏", "⁠", "﻿",
-                "؜"};
+        String[] marks = {"\u202e", "\u202a", "\u2066", "\u2069", "\u200b",
+                "\u200c", "\u200d", "\u200e", "\u200f", "\u2060", "\ufeff",
+                "\u061c"};
         for (String mark : marks) {
             String typed = "Ar" + mark + "agorn";
             CharacterProfile stored = CharacterValidator.normalizeProfile(

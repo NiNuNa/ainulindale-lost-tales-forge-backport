@@ -168,8 +168,10 @@ public final class PerkCombatEvents {
             }
         }
         if (poison > 0.0D) {
+            PotionEffect before = target.getActivePotionEffect(Potion.poison);
             synchronized (POISONS) {
-                POISONS.add(new PoisonDue(target, poison));
+                POISONS.add(new PoisonDue(target, poison,
+                        before == null ? 0 : before.getDuration()));
             }
         }
         TakenPerk cleave = perks.first(PerkEffect.CLEAVE);
@@ -278,7 +280,8 @@ public final class PerkCombatEvents {
         if (!galloping(player)) {
             moments.chargeSpent = false;
         }
-        if (player.isSprinting()) {
+        // Vanilla charges a sprinter only on the ground, so only that comes back.
+        if (player.isSprinting() && player.onGround) {
             double share = Perks.of(player).total(PerkEffect.SPRINT_HUNGER,
                     Perks.weapon(player.getHeldItem()));
             if (share > 0.0D) {
@@ -307,7 +310,8 @@ public final class PerkCombatEvents {
         for (PoisonDue poison : due) {
             PotionEffect effect = poison.target.isDead ? null
                     : poison.target.getActivePotionEffect(Potion.poison);
-            if (effect != null) {
+            // Only a dose the blow put on grows, so blows never stretch one poison again.
+            if (effect != null && effect.getDuration() > poison.durationBefore) {
                 poison.target.addPotionEffect(new PotionEffect(Potion.poison.id,
                         (int) Math.round(effect.getDuration() * (1.0D + poison.share)),
                         effect.getAmplifier()));
@@ -350,14 +354,19 @@ public final class PerkCombatEvents {
         return (moveX * toX + moveZ * toZ) / length > CHARGE_SPEED;
     }
 
-    /** A poisoned dagger's poison to lengthen once LOTR has put it on. */
+    /**
+     * A poisoned dagger's poison to lengthen once LOTR has put it on, and
+     * how long the poison the target carried before the blow still ran.
+     */
     private static final class PoisonDue {
         final EntityLivingBase target;
         final double share;
+        final int durationBefore;
 
-        PoisonDue(EntityLivingBase target, double share) {
+        PoisonDue(EntityLivingBase target, double share, int durationBefore) {
             this.target = target;
             this.share = share;
+            this.durationBefore = durationBefore;
         }
     }
 }

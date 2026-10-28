@@ -19,7 +19,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Which conversation of a channel a line belongs to. A channel that is
  * more than one conversation stamps the one it was said in on every copy,
- * so the clients file it under that conversation's tab and under no
+ * so the clients file it under that conversation's page and under no
  * other; a channel that is only ever one stamps nothing.
  */
 public final class ChatChannelScopeValueTest {
@@ -40,7 +40,7 @@ public final class ChatChannelScopeValueTest {
         assertFalse(ChatChannel.PROXIMITY.isScoped());
         assertFalse(ChatChannel.OOC.isScoped());
         assertFalse(ChatChannel.OPERATOR.isScoped());
-        assertFalse(ChatChannel.CLIENT_CONSOLE.isScoped());
+        assertFalse(ChatChannel.CONSOLE.isScoped());
         assertFalse(ChatChannel.WHISPER.isScoped());
     }
 
@@ -54,7 +54,7 @@ public final class ChatChannelScopeValueTest {
     /**
      * A fellowship line is stamped with the fellowship it was said in, so two
      * fellowships an account is in through two characters are two
-     * conversations rather than one tab holding both.
+     * conversations rather than one page holding both.
      */
     @Test
     public void aFellowshipLineNamesItsFellowship() {

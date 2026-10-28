@@ -1,5 +1,6 @@
 package com.ninuna.losttales.armour;
 
+import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.progression.perk.PerkIndex;
 import com.ninuna.losttales.progression.perk.Perks;
 import com.ninuna.losttales.progression.perk.TakenPerk;
@@ -21,12 +22,9 @@ import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.network.play.server.S29PacketSoundEffect;
 import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionEffect;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.DamageSource;
-import net.minecraftforge.event.entity.PlaySoundAtEntityEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
@@ -51,6 +49,8 @@ public final class ArmourEvents {
     /** How far a foe notices a player when it has no follow range of its own. */
     private static final double DEFAULT_NOTICE = 16.0D;
     private static final Random RANDOM = new Random();
+    /** Deft Movement's and Elusive's roll, once for each blow. */
+    private static final BlowRoll EVADE = new BlowRoll();
     /** The poison each player last carried, in ticks, so a fresh dose is shortened once. */
     private static final Map<UUID, Integer> POISONS = new HashMap<UUID, Integer>();
 
@@ -107,7 +107,7 @@ public final class ArmourEvents {
         } else if (isMelee(event.source)) {
             chance = perks.total(PerkEffect.MELEE_EVADE);
         }
-        if (chance > 0.0D && RANDOM.nextDouble() < chance) {
+        if (chance > 0.0D && EVADE.misses(event.entityLiving, event.source, chance, RANDOM)) {
             event.setCanceled(true);
         }
     }
@@ -115,7 +115,10 @@ public final class ArmourEvents {
     /**
      * Soft Step: a foe farther than its share of its notice range does not
      * pick a sneaking wearer, through the same target check the One Ring
-     * uses, so it holds for LOTR's and other mods' creatures too.
+     * uses, so it holds for LOTR's and other mods' creatures too. A foe the
+     * wearer struck picks them whatever the range: the foe's own memory of
+     * who struck it last ({@code getAITarget}, kept five seconds) says so,
+     * while {@code softStepEndsOnStrike} is on.
      */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onSetAttackTarget(LivingSetAttackTargetEvent event) {
@@ -133,37 +136,10 @@ public final class ArmourEvents {
         }
         EntityLiving foe = (EntityLiving) event.entityLiving;
         IAttributeInstance range = foe.getEntityAttribute(SharedMonsterAttributes.followRange);
-        double notice = (range == null ? DEFAULT_NOTICE : range.getAttributeValue())
-                * (1.0D - Math.min(1.0D, softStep.amount()));
-        if (foe.getDistanceSqToEntity(player) > notice * notice) {
+        if (ArmourRules.unnoticed(foe.getDistanceSqToEntity(player),
+                range == null ? DEFAULT_NOTICE : range.getAttributeValue(), softStep.amount(),
+                foe.getAITarget() == player, LostTalesConfig.softStepEndsOnStrike)) {
             foe.setAttackTarget(null);
-        }
-    }
-
-    /** Soft Step: a sneaking wearer's steps reach other players at its share of their volume. */
-    @SubscribeEvent
-    public void onPlaySound(PlaySoundAtEntityEvent event) {
-        if (!(event.entity instanceof EntityPlayerMP) || event.entity.worldObj == null
-                || event.entity.worldObj.isRemote || event.name == null
-                || !event.name.contains("step.") || !event.entity.isSneaking()) {
-            return;
-        }
-        EntityPlayerMP player = (EntityPlayerMP) event.entity;
-        TakenPerk softStep = Perks.of(player).first(PerkEffect.SOFT_STEP);
-        MinecraftServer server = MinecraftServer.getServer();
-        if (softStep == null || server == null || server.getConfigurationManager() == null) {
-            return;
-        }
-        float volume = (float) (event.volume
-                * (1.0D - Math.min(1.0D, softStep.param("volume", 0.0D))));
-        event.setCanceled(true);
-        if (volume > 0.0F) {
-            double y = player.posY - player.yOffset;
-            server.getConfigurationManager().sendToAllNearExcept(player, player.posX, y,
-                    player.posZ, volume > 1.0F ? 16.0D * volume : 16.0D,
-                    player.worldObj.provider.dimensionId,
-                    new S29PacketSoundEffect(event.name, player.posX, y, player.posZ, volume,
-                            event.pitch));
         }
     }
 
@@ -188,6 +164,7 @@ public final class ArmourEvents {
         synchronized (POISONS) {
             POISONS.clear();
         }
+        EVADE.clear();
     }
 
     /** What a blow is, as the protections tell blows apart. */

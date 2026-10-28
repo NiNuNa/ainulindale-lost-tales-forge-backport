@@ -35,7 +35,7 @@ public final class ThirdPersonCameraRuntime {
             ThirdPersonCameraController.deactivate();
         }
         if (minecraft != null && minecraft.thePlayer != null) {
-            ThirdPersonChargeFeedbackController.update(minecraft);
+            ChargeFeedbackController.update(minecraft);
             ThirdPersonTargetLockController.update(minecraft);
             ThirdPersonGameplayStateTracker.update(
                     minecraft.thePlayer);
@@ -116,7 +116,7 @@ public final class ThirdPersonCameraRuntime {
         ThirdPersonProjectileAimController.reset();
         ThirdPersonTargetingHooks.resetDiagnostics();
         ThirdPersonTargetLockController.reset();
-        ThirdPersonChargeFeedbackController.reset();
+        ChargeFeedbackController.reset();
         ThirdPersonCameraInspection.reset();
     }
 

@@ -7,6 +7,7 @@ import com.ninuna.losttales.chat.ChatNames;
 import com.ninuna.losttales.chat.ChatRoleCatalog;
 import com.ninuna.losttales.chat.ChatRoleConfig;
 import com.ninuna.losttales.chat.ChatRoleSource;
+import com.ninuna.losttales.chat.server.ChatAccountRoleResolver;
 import com.ninuna.losttales.config.LostTalesConfig;
 import com.ninuna.losttales.config.server.LostTalesServerConfigService;
 import com.ninuna.losttales.config.server.ServerConfigChange;
@@ -14,8 +15,7 @@ import com.ninuna.losttales.config.server.ServerConfigSnapshot;
 import com.ninuna.losttales.permission.LostTalesCapability;
 import com.ninuna.losttales.permission.LostTalesPermissionCatalog;
 import com.ninuna.losttales.permission.LostTalesPermissions;
-import cpw.mods.fml.common.FMLCommonHandler;
-import cpw.mods.fml.relauncher.Side;
+import com.ninuna.losttales.permission.RoleHierarchy;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.command.ICommandSender;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.IChatComponent;
@@ -39,6 +40,14 @@ import net.minecraft.util.IChatComponent;
  * other here; deleting it closes every gate that names it. A role's name
  * is the roles file's and reads as written; the config parser's warnings
  * are the server log's and read in its words.
+ *
+ * <p>Roles are managed as a Discord server's are (DATA-14,
+ * {@link RoleHierarchy}): someone holding {@code roles.manage} through a
+ * role creates, edits, deletes, assigns and takes away only the roles
+ * ranked below their own highest role, and an operator holding it by
+ * level, like the console, stands above every role. Either way a role
+ * is written or handed on only by someone who holds everything it
+ * grants ({@link #withheldGrant}).</p>
  */
 public final class LostTalesCommandRole extends LostTalesCommandBase {
 
@@ -67,10 +76,6 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
     public void processCommand(ICommandSender sender, String[] args) {
         if (args == null || args.length == 0) {
             sendUsage(sender);
-            return;
-        }
-        if (FMLCommonHandler.instance().getEffectiveSide() != Side.SERVER) {
-            say(sender, EnumChatFormatting.RED, SAY + "side_only");
             return;
         }
         String action = args[0];
@@ -155,6 +160,9 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "team.assign");
             return;
         }
+        if (notBelow(sender, standingOf(sender), role)) {
+            return;
+        }
         String withheld = grant ? withheldGrant(sender, role) : null;
         if (withheld != null) {
             say(sender, EnumChatFormatting.RED, SAY + "withheld.assign", role.getId(), withheld);
@@ -221,6 +229,10 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "no_role", id);
             return;
         }
+        Standing standing = standingOf(sender);
+        if (existing != null && notBelow(sender, standing, existing)) {
+            return;
+        }
         String entry = existing == null ? id + "=" : ChatRoleConfig.formatRole(existing);
         StringBuilder merged = new StringBuilder(entry);
         for (int index = 2; index < args.length; index++) {
@@ -245,6 +257,17 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         ChatAccountRole role = parsed.byId(id);
         if (role == null) {
             say(sender, EnumChatFormatting.RED, SAY + "unreadable");
+            return;
+        }
+        if (!standing.manages(role.getRank())) {
+            if (standing.highest == null) {
+                say(sender, EnumChatFormatting.RED, SAY + "rank.no_role", id);
+            } else {
+                say(sender, EnumChatFormatting.RED, SAY + "rank.define", id,
+                        Integer.valueOf(role.getRank()), standing.highest.getId(),
+                        Integer.valueOf(standing.highest.getRank()),
+                        Integer.valueOf(standing.highest.getRank()));
+            }
             return;
         }
         String withheld = withheldGrant(sender, role);
@@ -275,6 +298,9 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
             say(sender, EnumChatFormatting.RED, SAY + "team.delete");
             return;
         }
+        if (notBelow(sender, standingOf(sender), role)) {
+            return;
+        }
         for (ChatChannel channel : ChatChannel.values()) {
             ChatChannelGates.Gate gate = ChatChannelGates.current().gateOf(channel);
             if (gate.getReadRoles().contains(id) || gate.getSendRoles().contains(id)) {
@@ -292,14 +318,76 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
                 java.util.Collections.<String>emptySet()));
     }
 
+    /** Where a sender stands among the roles (DATA-14, {@link RoleHierarchy}). */
+    static final class Standing {
+        /** Above every role: an operator holding {@code roles.manage} by level, or the console. */
+        static final Standing ABOVE_EVERY_ROLE = new Standing(
+                RoleHierarchy.ABOVE_EVERY_ROLE, null);
+
+        final int place;
+        /** The sender's highest role; null above every role, or with none. */
+        final ChatAccountRole highest;
+
+        Standing(int place, ChatAccountRole highest) {
+            this.place = place;
+            this.highest = highest;
+        }
+
+        /** Whether a role of {@code rank} ranks below the sender. */
+        boolean manages(int rank) {
+            return RoleHierarchy.manages(this.place, rank);
+        }
+    }
+
+    /**
+     * Where {@code sender} stands: above every role while it holds
+     * {@code roles.manage} by operator level, as the console always
+     * does; a player holding it through a role at their highest role
+     * among those their account holds; anything else below every role.
+     */
+    static Standing standingOf(ICommandSender sender) {
+        if (sender != null && sender.canCommandSenderUseCommand(
+                LostTalesCapability.ROLES_MANAGE.getRequiredOpLevel(),
+                LostTalesPermissions.NODE)) {
+            return Standing.ABOVE_EVERY_ROLE;
+        }
+        if (!(sender instanceof EntityPlayerMP)) {
+            return new Standing(RoleHierarchy.BELOW_EVERY_ROLE, null);
+        }
+        ChatAccountRole highest = RoleHierarchy.highestOf(
+                ChatAccountRoleResolver.grantingMask((EntityPlayerMP)sender),
+                ChatRoleCatalog.server());
+        return highest == null ? new Standing(RoleHierarchy.BELOW_EVERY_ROLE, null)
+                : new Standing(highest.getRank(), highest);
+    }
+
+    /**
+     * Refuses a role that does not rank below the sender, naming it and
+     * the sender's highest role; true when it refused.
+     */
+    private static boolean notBelow(ICommandSender sender, Standing standing,
+                                    ChatAccountRole role) {
+        if (standing.manages(role.getRank())) {
+            return false;
+        }
+        if (standing.highest == null) {
+            say(sender, EnumChatFormatting.RED, SAY + "rank.no_role", role.getId());
+        } else {
+            say(sender, EnumChatFormatting.RED, SAY + "rank.not_below", role.getId(),
+                    Integer.valueOf(role.getRank()), standing.highest.getId(),
+                    Integer.valueOf(standing.highest.getRank()));
+        }
+        return true;
+    }
+
     /**
      * The first capability the role grants that {@code sender} does not
      * hold, or null when it grants nothing beyond them. Managing roles
      * is not a way around the capabilities: a role may only be written
      * or handed on by someone who could already do everything it
      * allows, so nobody grants themselves — or a friend — what they
-     * were not given. An operator holds every capability by level, so
-     * this refuses an operator nothing.
+     * were not given. An operator of level 3 holds every built-in
+     * capability by level, so this refuses them nothing.
      */
     static String withheldGrant(ICommandSender sender, ChatAccountRole role) {
         LostTalesPermissionCatalog permissions = LostTalesPermissionCatalog.current();
@@ -408,9 +496,11 @@ public final class LostTalesCommandRole extends LostTalesCommandBase {
         }
         if (args.length == 2 && !"create".equalsIgnoreCase(args[0])
                 && !"list".equalsIgnoreCase(args[0])) {
+            // Only the roles ranked below the sender, the ones it may act on.
+            Standing standing = standingOf(sender);
             List<String> ids = new ArrayList<String>();
             for (ChatAccountRole role : ChatRoleCatalog.server().roles()) {
-                if (!role.isLocked()) {
+                if (!role.isLocked() && standing.manages(role.getRank())) {
                     ids.add(role.getId());
                 }
             }

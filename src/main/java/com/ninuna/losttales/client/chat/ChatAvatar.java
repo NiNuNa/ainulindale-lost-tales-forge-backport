@@ -12,7 +12,7 @@ import net.minecraft.util.IChatComponent;
  * ({@link ChatTimestampColumn}), beside the row that names them and the
  * first row of what they said. The rest of a group's messages leave the
  * area to their times, so a run reads as one block under one picture.
- * The closed feed keeps the small head in the name's row.
+ * The feed keeps the small head in the name's row.
  *
  * <p>A head is pixel art, so the avatar draws each of the face's eight
  * texels as a two-pixel square, and a player's avatar wears the

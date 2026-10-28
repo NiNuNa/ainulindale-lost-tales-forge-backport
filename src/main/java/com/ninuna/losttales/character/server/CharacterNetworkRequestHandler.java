@@ -3,6 +3,7 @@ package com.ninuna.losttales.character.server;
 import com.ninuna.losttales.LostTalesMetaData;
 import com.ninuna.losttales.character.deletion.CharacterDeletionService;
 import com.ninuna.losttales.character.model.CharacterProfile;
+import com.ninuna.losttales.character.sync.CharacterAppearance;
 import com.ninuna.losttales.character.sync.CharacterOperationType;
 import com.ninuna.losttales.character.validation.CharacterErrorId;
 import com.ninuna.losttales.chat.server.LostTalesChatService;
@@ -17,7 +18,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 
 import java.util.UUID;
 
-/** Executes queued character requests on the logical server thread. */
+/** Carries out queued character requests on the server thread. */
 public final class CharacterNetworkRequestHandler {
 
     private CharacterNetworkRequestHandler() {}
@@ -246,6 +247,10 @@ public final class CharacterNetworkRequestHandler {
                 return;
             }
         }
+        // The look everyone was told, so that only a request that changes
+        // the played character's look tells them again.
+        CharacterAppearance lookBefore = operationType == CharacterOperationType.REQUEST_ROSTER
+                ? null : CharacterAppearanceSyncManager.appearanceOf(player);
         CharacterOperationResult result;
         try {
             result = operation.run();
@@ -265,14 +270,14 @@ public final class CharacterNetworkRequestHandler {
                 && result.getRoster() != null
                 && operationType != CharacterOperationType.REQUEST_ROSTER) {
             try {
-                // Once the coordinator commits, synchronization is best-effort.
-                // Never report a contradictory failure for an already committed
-                // switch; a later roster request can safely repair stale clients.
+                // The change is saved; telling the clients is best effort. A
+                // saved change is never answered as a failure, and the next
+                // roster request sets a stale client right.
                 if (touchesGameplay(operationType)) {
                     CharacterRaceGameplayHandler.apply(player);
                 }
-                CharacterAppearanceSyncManager.broadcastPlayer(
-                        player, result.getRoster());
+                CharacterAppearanceSyncManager.broadcastIfChanged(
+                        player, lookBefore, result.getRoster());
                 if (operationType == CharacterOperationType.LORE_CLAIM
                         || operationType == CharacterOperationType.LORE_RELEASE) {
                     LoreCharacterSyncManager.broadcast(player);

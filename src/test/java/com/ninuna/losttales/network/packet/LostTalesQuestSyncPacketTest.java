@@ -59,7 +59,7 @@ public final class LostTalesQuestSyncPacketTest {
                         "Camp", "", false, 0,
                         12.0D, 64.0D, -7.0D,
                         128.0D, 8.0D, true, true, false,
-                        LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                        LostTalesMapMarkerSource.QUEST_GIVER,
                         false, "", 23);
         LostTalesQuestObjectiveDefinition objective =
                 new LostTalesQuestObjectiveDefinition(
@@ -113,12 +113,12 @@ public final class LostTalesQuestSyncPacketTest {
         assertTrue(decoded.getQuestHistory().get(0)
                 .isOptionalObjectiveCompleted("rescue_scouts"));
         assertEquals(Collections.singleton("losttales:test_quest"),
-                decoded.getPinnedQuestIds());
-        assertEquals("runtime:camp", decoded.getPinnedMapMarkerId());
-        assertEquals(1, decoded.getDynamicMapMarkers().size());
-        assertEquals(23, decoded.getDynamicMapMarkers().get(0)
+                decoded.getTrackedQuestIds());
+        assertEquals("runtime:camp", decoded.getTrackedMapMarkerId());
+        assertEquals(1, decoded.getGiverMarkers().size());
+        assertEquals(23, decoded.getGiverMarkers().get(0)
                 .getPriority());
-        assertEquals(1, decoded.getDynamicQuestDefinitions().size());
+        assertEquals(1, decoded.getMissiveDefinitions().size());
     }
 
     @Test
@@ -158,10 +158,10 @@ public final class LostTalesQuestSyncPacketTest {
                         "quest", "white", "Quest", "",
                         false, 100, 1.0D, 64.0D, 2.0D,
                         128.0D, 8.0D, false, true, false,
-                        LostTalesMapMarkerSource.QUEST_DYNAMIC,
+                        LostTalesMapMarkerSource.QUEST_GIVER,
                         false, "", 7);
-        assertTrue(data.discoverDynamicMarker(marker));
-        assertTrue(data.setPinnedMapMarkerId(
+        assertTrue(data.discoverGiverMarker(marker));
+        assertTrue(data.setTrackedMapMarkerId(
                 "LOTR:WAYPOINT:hobbiton"));
         LostTalesQuestSyncPacket original =
                 LostTalesQuestSyncPacket.fromPlayerData(data);
@@ -177,9 +177,9 @@ public final class LostTalesQuestSyncPacketTest {
                         "lotr:waypoint:HOBBITON"),
                 decoded.getDiscoveredMarkerIds());
         assertEquals("lotr:waypoint:HOBBITON",
-                decoded.getPinnedMapMarkerId());
-        assertEquals(1, decoded.getDynamicMapMarkers().size());
+                decoded.getTrackedMapMarkerId());
+        assertEquals(1, decoded.getGiverMarkers().size());
         assertEquals("lotr:waypoint:HOBBITON",
-                decoded.getDynamicMapMarkers().get(0).getId());
+                decoded.getGiverMarkers().get(0).getId());
     }
 }

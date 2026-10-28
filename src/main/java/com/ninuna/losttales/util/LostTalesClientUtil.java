@@ -32,6 +32,7 @@ import lotr.client.gui.LOTRMapLabels;
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.EnumRarity;
@@ -59,6 +60,11 @@ import java.util.Locale;
 public final class LostTalesClientUtil {
     /** What the lang keys of the item tooltips' words begin with. */
     private static final String TOOLTIP = "item.losttales.tooltip.";
+    /** LOTR's map with the mod's overlay drawn in, and its sepia copy. */
+    private static final ResourceLocation MERGED_MAP =
+            new ResourceLocation("losttales", "dynamic/lotr_map");
+    private static final ResourceLocation MERGED_SEPIA_MAP =
+            new ResourceLocation("losttales:map_sepia");
     /** The keyboard as it is now. */
     private static final LostTalesTooltipKeys.Held KEYBOARD = new LostTalesTooltipKeys.Held() {
         @Override
@@ -337,12 +343,17 @@ public final class LostTalesClientUtil {
             setClientMapImage(baseMap);
             return;
         }
-        ResourceLocation mergedMapTexture = Minecraft.getMinecraft().getTextureManager()
-                .getDynamicTextureLocation("losttales_lotr_map", new DynamicTexture(mergedMapImage));
+        // Each reload replaces both pictures in place, the old ones' GL
+        // textures deleted first; a new name each time would keep them all.
+        TextureManager textures = Minecraft.getMinecraft().getTextureManager();
+        textures.deleteTexture(MERGED_MAP);
+        textures.deleteTexture(MERGED_SEPIA_MAP);
+        ResourceLocation mergedMapTexture = MERGED_MAP;
+        textures.loadTexture(mergedMapTexture, new DynamicTexture(mergedMapImage));
         ReflectionHelper.setPrivateValue(LOTRTextures.class, null,
                 mergedMapTexture, "mapTexture");
         ResourceLocation sepiaMapTexture = invokeStatic(new Object[]{mergedMapImage,
-                        new ResourceLocation("losttales:map_sepia")},
+                        MERGED_SEPIA_MAP},
                 LOTRTextures.class, "convertToSepia",
                 BufferedImage.class, ResourceLocation.class);
         if (sepiaMapTexture == null) {

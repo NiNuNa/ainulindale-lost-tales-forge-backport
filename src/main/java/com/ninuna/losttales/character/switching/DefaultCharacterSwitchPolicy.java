@@ -8,6 +8,8 @@ import com.ninuna.losttales.entity.combat.LostTalesMobAggroEventHandler;
 import com.ninuna.losttales.util.LostTalesMath;
 import java.util.List;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.inventory.ContainerPlayer;
+import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.util.AxisAlignedBB;
 
 /** Every check a switch must pass, each refusal with its reason. */
@@ -57,7 +59,8 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
                     CharacterErrorId.SWITCH_FAST_TRAVEL);
         }
         if (player.openContainer != null
-                && player.openContainer != player.inventoryContainer) {
+                && player.openContainer != player.inventoryContainer
+                || holdsCraftingItems(player)) {
             return CharacterSwitchPolicyResult.denied(
                     CharacterErrorId.SWITCH_CONTAINER_OPEN);
         }
@@ -112,6 +115,27 @@ public final class DefaultCharacterSwitchPolicy implements CharacterSwitchPolicy
             return cooldownRefusal;
         }
         return CharacterSwitchPolicyResult.allowed();
+    }
+
+    /**
+     * Whether the inventory's own crafting grid holds anything. No saved
+     * life keeps the grid, so its items would fall out at the next
+     * character's feet when the inventory closes.
+     */
+    private static boolean holdsCraftingItems(EntityPlayerMP player) {
+        if (!(player.inventoryContainer instanceof ContainerPlayer)) {
+            return false;
+        }
+        InventoryCrafting grid = ((ContainerPlayer)player.inventoryContainer).craftMatrix;
+        if (grid == null) {
+            return false;
+        }
+        for (int slot = 0; slot < grid.getSizeInventory(); slot++) {
+            if (grid.getStackInSlot(slot) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

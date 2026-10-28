@@ -38,7 +38,7 @@ public final class MotionIds {
     public static final String CHAT_JUMP_SHOW = "chat.jump.show";
     /** A message's toolbar coming up once the history rests under the pointer. */
     public static final String CHAT_TOOLBAR_SHOW = "chat.toolbar.show";
-    /** The closed feed's lines rising for its typing row. */
+    /** The feed's lines rising for its typing row. */
     public static final String CHAT_FEED_TYPING = "chat.feed.typing";
     /** The scrollbar coming and going. */
     public static final String CHAT_SCROLLBAR_FADE = "chat.scrollbar.fade";
@@ -106,7 +106,7 @@ public final class MotionIds {
     /** The journal's lists gliding to where they were scrolled. */
     public static final String SCREEN_JOURNAL_SCROLL = "screen.journal.scroll";
     /** A quest conversation's replies gliding to the chosen one. */
-    public static final String SCREEN_DIALOGUE_GLIDE = "screen.dialogue.glide";
+    public static final String SCREEN_CONVERSATION_GLIDE = "screen.conversation.glide";
     /** The Characters page's roster and profile gliding to where they were scrolled, a History opening or folding, and its figure to its zoom. */
     public static final String SCREEN_CHARACTERS_GLIDE = "screen.characters.glide";
 

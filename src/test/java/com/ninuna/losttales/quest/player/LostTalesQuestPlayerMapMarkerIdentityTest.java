@@ -15,7 +15,7 @@ import static org.junit.Assert.assertTrue;
 
 public final class LostTalesQuestPlayerMapMarkerIdentityTest {
     @Test
-    public void discoveryPinAndForgetUseLogicalLotrIdentity() {
+    public void discoveryTrackAndForgetUseLogicalLotrIdentity() {
         LostTalesQuestPlayerData data =
                 new LostTalesQuestPlayerData();
 
@@ -26,20 +26,20 @@ public final class LostTalesQuestPlayerMapMarkerIdentityTest {
         assertTrue(data.isMarkerDiscovered(
                 "lotr:waypoint:hobbiton"));
         assertEquals(1, data.getDiscoveredMarkerIds().size());
-        assertTrue(data.setPinnedMapMarkerId(
+        assertTrue(data.setTrackedMapMarkerId(
                 "LOTR:WAYPOINT:hobbiton"));
         assertEquals("lotr:waypoint:HOBBITON",
-                data.getPinnedMapMarkerId());
+                data.getTrackedMapMarkerId());
 
         assertTrue(data.forgetMarker(
                 "LOTR:WAYPOINT:hobbiton"));
         assertFalse(data.isMarkerDiscovered(
                 "lotr:waypoint:HOBBITON"));
-        assertEquals("", data.getPinnedMapMarkerId());
+        assertEquals("", data.getTrackedMapMarkerId());
     }
 
     @Test
-    public void dynamicUpdateRetainsIdAndSupportedFieldsOnly() {
+    public void giverUpdateRetainsIdAndSupportedFieldsOnly() {
         LostTalesQuestPlayerData data =
                 new LostTalesQuestPlayerData();
         LostTalesMapMarkerDefinition first = marker(
@@ -47,25 +47,25 @@ public final class LostTalesQuestPlayerMapMarkerIdentityTest {
         LostTalesMapMarkerDefinition updated = marker(
                 "LOTR:WAYPOINT:hobbiton", "Updated");
 
-        assertTrue(data.discoverDynamicMarker(first));
-        assertTrue(data.discoverDynamicMarker(updated));
+        assertTrue(data.discoverGiverMarker(first));
+        assertTrue(data.discoverGiverMarker(updated));
 
         LostTalesMapMarkerDefinition stored =
-                data.getDynamicMapMarker(
+                data.getGiverMarker(
                         "lotr:waypoint:hobbiton");
         assertNotNull(stored);
         assertEquals("lotr:waypoint:HOBBITON", stored.getId());
         assertEquals("Updated", stored.getName());
         assertEquals("", stored.getDescription());
-        assertEquals(LostTalesMapMarkerSource.QUEST_DYNAMIC,
+        assertEquals(LostTalesMapMarkerSource.QUEST_GIVER,
                 stored.getSource());
         assertFalse(stored.hasWaystone());
-        assertEquals(1, data.getDynamicMapMarkers().size());
+        assertEquals(1, data.getGiverMarkers().size());
         assertEquals(1, data.getDiscoveredMarkerIds().size());
 
         assertTrue(data.forgetMarker(
                 "LOTR:WAYPOINT:hobbiton"));
-        assertTrue(data.getDynamicMapMarkers().isEmpty());
+        assertTrue(data.getGiverMarkers().isEmpty());
     }
 
     @Test
@@ -84,8 +84,8 @@ public final class LostTalesQuestPlayerMapMarkerIdentityTest {
                 "lotr:waypoint:HOBBITON", "First"));
         dynamic.appendTag(dynamic(
                 "LOTR:WAYPOINT:hobbiton", "Duplicate"));
-        playerData.setTag("DynamicMapMarkers", dynamic);
-        playerData.setString("PinnedMapMarkerId",
+        playerData.setTag("GiverMarkers", dynamic);
+        playerData.setString("TrackedMapMarkerId",
                 "LOTR:WAYPOINT:hobbiton");
         NBTTagCompound wrapper = new NBTTagCompound();
         wrapper.setTag(LostTalesQuestPlayerData.PROPERTY_ID,
@@ -96,11 +96,11 @@ public final class LostTalesQuestPlayerMapMarkerIdentityTest {
         data.loadNBTData(wrapper);
 
         assertEquals(1, data.getDiscoveredMarkerIds().size());
-        assertEquals(1, data.getDynamicMapMarkers().size());
-        assertEquals("First", data.getDynamicMapMarker(
+        assertEquals(1, data.getGiverMarkers().size());
+        assertEquals("First", data.getGiverMarker(
                 "lotr:waypoint:hobbiton").getName());
         assertEquals("lotr:waypoint:HOBBITON",
-                data.getPinnedMapMarkerId());
+                data.getTrackedMapMarkerId());
 
         NBTTagCompound repairedWrapper = new NBTTagCompound();
         data.saveNBTData(repairedWrapper);
@@ -110,7 +110,7 @@ public final class LostTalesQuestPlayerMapMarkerIdentityTest {
                 "DiscoveredMarkers",
                 Constants.NBT.TAG_COMPOUND).tagCount());
         assertEquals(1, repaired.getTagList(
-                "DynamicMapMarkers",
+                "GiverMarkers",
                 Constants.NBT.TAG_COMPOUND).tagCount());
     }
 

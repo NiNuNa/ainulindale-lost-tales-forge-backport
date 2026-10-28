@@ -136,6 +136,38 @@ public final class ChatCommandTextTest {
         assertEquals(2, warnings.size());
     }
 
+    /**
+     * A mistyped or other config or Discord action keeps no value either:
+     * config keeps at most the action, category and key, Discord at most
+     * the action and the game channel.
+     */
+    @Test
+    public void anyConfigOrDiscordActionKeepsNoValue() {
+        String mistyped = ChatCommandText.describeTyped(
+                "/losttales config sett discord botToken abc.def.ghi", null);
+        assertEquals("/losttales config sett discord botToken ...", mistyped);
+        assertFalse(mistyped.contains("abc"));
+        assertEquals("/losttales cfg SET discord botToken ...",
+                ChatCommandText.describe("losttales", null, new String[] {
+                        "cfg", "SET", "discord", "botToken", "a.b.c"}, null));
+        assertEquals("/losttales config reload", ChatCommandText.describe("losttales", null,
+                new String[] {"config", "reload"}, null));
+        assertEquals("/losttales config", ChatCommandText.describe("losttales", null,
+                new String[] {"config"}, null));
+        String link = ChatCommandText.describe("losttales", null, new String[] {
+                "discord", "link", "ooc", "BIDIRECTIONAL"}, null);
+        assertEquals("/losttales discord link ooc ...", link);
+        String other = ChatCommandText.describeTyped(
+                "/losttales discord unlnk ooc 123456789012345678", null);
+        assertEquals("/losttales discord unlnk ooc ...", other);
+        assertFalse(other.contains("1234"));
+        assertEquals("/losttales discord list", ChatCommandText.describe("losttales", null,
+                new String[] {"discord", "list"}, null));
+        // Another sub-command is repeated whole.
+        assertEquals("/losttales role assign Bob mod", ChatCommandText.describe("losttales",
+                null, new String[] {"role", "assign", "Bob", "mod"}, null));
+    }
+
     /** Every name the config sub-command answers to is masked: none is left out. */
     @Test
     public void everyNameOfTheConfigCommandIsMasked() {

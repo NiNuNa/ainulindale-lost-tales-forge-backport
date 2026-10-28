@@ -34,9 +34,8 @@ public final class LoreCharacterSyncManager {
     private LoreCharacterSyncManager() {}
 
     /**
-     * Refreshes the viewer-specific ownership projection for every connected
-     * player after a claim or release commits. Lore ownership is server-wide,
-     * so limiting this update to the actor would leave other open menus stale.
+     * Sends every online player their lore list after a claim or a release:
+     * every list shows who holds each figure.
      */
     public static void broadcast(EntityPlayerMP actor) {
         if (actor == null) return;

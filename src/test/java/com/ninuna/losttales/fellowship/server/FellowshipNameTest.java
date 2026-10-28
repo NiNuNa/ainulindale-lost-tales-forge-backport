@@ -49,7 +49,7 @@ public final class FellowshipNameTest {
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
                 FellowshipNames.nameError("Grey\nCompany", BUNDLED));
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
-                FellowshipNames.nameError("Grey‮Company", BUNDLED));
+                FellowshipNames.nameError("Grey\u202eCompany", BUNDLED));
     }
 
     @Test
@@ -93,7 +93,7 @@ public final class FellowshipNameTest {
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
                 FellowshipNames.markNameError("Weather​top", BUNDLED));
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
-                FellowshipNames.markNameError("Weather‮top", BUNDLED));
+                FellowshipNames.markNameError("Weather\u202etop", BUNDLED));
         assertEquals(FellowshipErrorId.NAME_NOT_ALLOWED,
                 FellowshipNames.markNameError("§cWeathertop", BUNDLED));
         assertEquals(FellowshipErrorId.NONE,

@@ -278,8 +278,8 @@ public final class ChatHistoryNbtCodecTest {
                 ChatConsoleStream.reactionsSnapshot(), Collections.<NBTTagCompound>emptyList());
         NBTTagCompound shortened = (NBTTagCompound)written.getTagList("Entries",
                 Constants.NBT.TAG_COMPOUND).getCompoundTagAt(0).copy();
-        // Without the tab a command's answer is filed under.
-        shortened.getCompoundTag("ForOthers").removeTag("Tab");
+        // Without the page a command's answer is filed under.
+        shortened.getCompoundTag("ForOthers").removeTag("Page");
         NBTTagList rewritten = new NBTTagList();
         rewritten.appendTag(shortened);
         written.setTag("Entries", rewritten);
